@@ -410,6 +410,7 @@
                 <div class="game-controls">
                     <div class="control-row">
                         <button id="saveGame" class="secondary-btn" data-i18n="save">保存</button>
+                        <button id="editTeamInfoBtn" class="secondary-btn" data-i18n="editTeamInfo">チーム情報を編集</button>
                         <button id="playerSubstitution" class="secondary-btn" style="display: none;" data-i18n="playerSubstitution">選手交代</button>
                         <button id="editPlayersBtn" class="secondary-btn" data-i18n="editPlayers">選手情報編集</button>
                         <button id="endGame" class="secondary-btn" data-i18n="endGame">試合終了</button>
@@ -418,6 +419,39 @@
                         <button id="noNextInning" class="warning-btn" data-i18n="noNextInning">次のイニングに進まない</button>
                         <button id="forceGameEnd" class="danger-btn" data-i18n="forceGameEnd">強制終了</button>
                         <button id="showGameTime" class="info-btn" data-i18n="showGameTime">時刻確認</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- チーム情報編集モーダル -->
+            <div id="editTeamInfoModal" class="modal edit-team-info-modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 data-i18n="editTeamInfoTitle">チーム情報の編集</h3>
+                        <button class="close-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="help-text" data-i18n="editTeamInfoHelp">試合開始前であれば、チーム名と先攻後攻を変更できます</p>
+
+                        <div class="team-edit-form">
+                            <div class="form-group">
+                                <label data-i18n="awayTeamNameLabel">アウェイチーム名</label>
+                                <input type="text" id="editAwayTeamName" class="team-name-input" placeholder="アウェイチーム">
+                            </div>
+
+                            <div class="form-group">
+                                <label data-i18n="homeTeamNameLabel">ホームチーム名</label>
+                                <input type="text" id="editHomeTeamName" class="team-name-input" placeholder="ホームチーム">
+                            </div>
+
+                            <button id="swapTeamsBtn" class="secondary-btn" data-i18n="swapTeams">
+                                ホーム/アウェイを入れ替え
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="saveTeamInfoBtn" class="primary-btn" data-i18n="save">保存</button>
+                        <button class="secondary-btn close-modal" data-i18n="cancel">キャンセル</button>
                     </div>
                 </div>
             </div>
