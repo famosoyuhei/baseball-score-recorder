@@ -245,7 +245,16 @@ class I18n {
                 playerDetailIncomplete: '詳細未入力',
                 fillPlayerDetails: '選手詳細を入力',
                 incompletePlayers: '未入力の選手',
-                noIncompletePlayers: '未入力の選手はいません'
+                noIncompletePlayers: '未入力の選手はいません',
+
+                // チーム情報編集
+                editTeamInfo: 'チーム情報を編集',
+                editTeamInfoTitle: 'チーム情報の編集',
+                editTeamInfoHelp: '試合開始前であれば、チーム名と先攻後攻を変更できます',
+                homeTeamNameLabel: 'ホームチーム名',
+                awayTeamNameLabel: 'アウェイチーム名',
+                swapTeams: 'ホーム/アウェイを入れ替え',
+                cannotEditAfterStart: '試合が進行中のため、チーム情報は変更できません'
             },
 
             // 英語 (English)
@@ -474,7 +483,16 @@ class I18n {
                 playerDetailIncomplete: 'Details Missing',
                 fillPlayerDetails: 'Fill Player Details',
                 incompletePlayers: 'Incomplete Players',
-                noIncompletePlayers: 'No incomplete players'
+                noIncompletePlayers: 'No incomplete players',
+
+                // Team Info Edit
+                editTeamInfo: 'Edit Team Info',
+                editTeamInfoTitle: 'Edit Team Information',
+                editTeamInfoHelp: 'You can change team names and home/away before the game starts',
+                homeTeamNameLabel: 'Home Team Name',
+                awayTeamNameLabel: 'Away Team Name',
+                swapTeams: 'Swap Home/Away',
+                cannotEditAfterStart: 'Cannot edit team information after game has started'
             },
 
             // スペイン語 (Spanish)
@@ -672,7 +690,16 @@ class I18n {
                 playerDetailIncomplete: 'Detalles Faltantes',
                 fillPlayerDetails: 'Completar Detalles del Jugador',
                 incompletePlayers: 'Jugadores Incompletos',
-                noIncompletePlayers: 'No hay jugadores incompletos'
+                noIncompletePlayers: 'No hay jugadores incompletos',
+
+                // Edición de Información del Equipo
+                editTeamInfo: 'Editar Info del Equipo',
+                editTeamInfoTitle: 'Editar Información del Equipo',
+                editTeamInfoHelp: 'Puede cambiar nombres y local/visitante antes del inicio',
+                homeTeamNameLabel: 'Nombre del Equipo Local',
+                awayTeamNameLabel: 'Nombre del Equipo Visitante',
+                swapTeams: 'Intercambiar Local/Visitante',
+                cannotEditAfterStart: 'No se puede editar después del inicio del juego'
             },
 
             // ポルトガル語 (Portuguese)
@@ -870,7 +897,16 @@ class I18n {
                 playerDetailIncomplete: 'Detalhes Faltando',
                 fillPlayerDetails: 'Preencher Detalhes do Jogador',
                 incompletePlayers: 'Jogadores Incompletos',
-                noIncompletePlayers: 'Não há jogadores incompletos'
+                noIncompletePlayers: 'Não há jogadores incompletos',
+
+                // Edição de Informações da Equipe
+                editTeamInfo: 'Editar Info da Equipe',
+                editTeamInfoTitle: 'Editar Informações da Equipe',
+                editTeamInfoHelp: 'Você pode alterar nomes e casa/visitante antes do início',
+                homeTeamNameLabel: 'Nome da Equipe da Casa',
+                awayTeamNameLabel: 'Nome da Equipe Visitante',
+                swapTeams: 'Trocar Casa/Visitante',
+                cannotEditAfterStart: 'Não pode editar após o início do jogo'
             }
         };
     }
