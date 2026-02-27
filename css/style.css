@@ -2132,7 +2132,9 @@ main {
 
 .setup-controls {
     margin-top: 2rem;
+    margin-bottom: 8rem; /* 固定ボタンとの重なりを防ぐための余白 */
     text-align: center;
+    padding-bottom: 2rem;
 }
 
 .setup-controls .primary-btn {

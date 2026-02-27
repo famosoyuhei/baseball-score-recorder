@@ -512,17 +512,8 @@ class BaseballApp {
         const game = gameManager.currentGame;
         const playerInputs = document.querySelectorAll('.player-name-input');
 
-        // 基本レベルの場合は空の選手名でも続行可能
-        if (game.playerDetailLevel !== 'basic') {
-            // 標準・詳細レベルでは全選手名が必要
-            for (let input of playerInputs) {
-                if (!input.value.trim()) {
-                    this.showError('すべての選手名を入力してください');
-                    input.focus();
-                    return;
-                }
-            }
-        }
+        // すべてのレベルで空白を許可（後から追記可能）
+        // バリデーションは削除して、常に続行可能に
 
         try {
             console.log('savePlayerSetup - starting player data creation');
@@ -534,6 +525,9 @@ class BaseballApp {
                 const team = input.dataset.team;
                 const order = parseInt(input.dataset.order);
                 const name = input.value.trim() || `${order}${i18n.t('playerNumber')}`; // 空の場合は打順番号を使用
+
+                // 簡易登録フラグを設定（名前が未入力の場合）
+                const isQuickRegistered = !input.value.trim();
 
                 console.log(`Creating player - team: ${team}, order: ${order}, name: ${name}`);
 
@@ -554,6 +548,13 @@ class BaseballApp {
                 const player = new Player(name, team, position, order);
                 player.isStarter = true;
                 player.isBench = false;
+
+                // 簡易登録フラグを設定
+                if (isQuickRegistered) {
+                    player.isQuickRegistered = true;
+                    player.needsDetailFill = true;
+                }
+
                 player.id = await storage.savePlayer(player.toJSON());
 
                 console.log(`Player created and saved:`, player);
