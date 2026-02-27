@@ -63,6 +63,10 @@ class BaseballApp {
             this.showPlayerListModal();
         });
 
+        document.getElementById('editTeamInfoBtn').addEventListener('click', () => {
+            this.showEditTeamInfoModal();
+        });
+
         // 手動ゲーム制御ボタン
         document.getElementById('noNextInning').addEventListener('click', () => {
             this.setNoNextInning();
@@ -5610,6 +5614,111 @@ class BaseballApp {
         // デモ用のサンプル結果生成
         const results = ['6-3', 'F8', 'K', '━', '■', '4-3', 'L6', '①'];
         return results[(inning + batterIndex) % results.length];
+    }
+
+    // チーム情報編集モーダル
+    showEditTeamInfoModal() {
+        const game = gameManager.currentGame;
+        if (!game) return;
+
+        // 試合が進行中かチェック（1回表の最初の打席前まで編集可能）
+        const canEdit = !game.innings || game.innings.length === 0 ||
+                       (game.innings.length === 1 && game.innings[0].atBats.length === 0);
+
+        if (!canEdit) {
+            this.showError(i18n.t('cannotEditAfterStart'));
+            return;
+        }
+
+        const modal = document.getElementById('editTeamInfoModal');
+        document.getElementById('editHomeTeamName').value = game.homeTeam;
+        document.getElementById('editAwayTeamName').value = game.awayTeam;
+
+        modal.style.display = 'flex';
+        setTimeout(() => i18n.updatePageContent(), 100);
+
+        // モーダル内のイベントリスナー
+        this.setupEditTeamInfoModalListeners();
+    }
+
+    setupEditTeamInfoModalListeners() {
+        const modal = document.getElementById('editTeamInfoModal');
+
+        // 閉じるボタン
+        const closeButtons = modal.querySelectorAll('.close-modal');
+        closeButtons.forEach(btn => {
+            btn.onclick = () => {
+                modal.style.display = 'none';
+            };
+        });
+
+        // 入れ替えボタン
+        const swapBtn = document.getElementById('swapTeamsBtn');
+        swapBtn.onclick = () => {
+            const homeInput = document.getElementById('editHomeTeamName');
+            const awayInput = document.getElementById('editAwayTeamName');
+            const temp = homeInput.value;
+            homeInput.value = awayInput.value;
+            awayInput.value = temp;
+        };
+
+        // 保存ボタン
+        const saveBtn = document.getElementById('saveTeamInfoBtn');
+        saveBtn.onclick = async () => {
+            await this.saveTeamInfo();
+        };
+
+        // モーダル外クリックで閉じる
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+    }
+
+    async saveTeamInfo() {
+        const game = gameManager.currentGame;
+        if (!game) return;
+
+        const newHomeTeam = document.getElementById('editHomeTeamName').value.trim();
+        const newAwayTeam = document.getElementById('editAwayTeamName').value.trim();
+
+        if (!newHomeTeam || !newAwayTeam) {
+            this.showError('チーム名を入力してください');
+            return;
+        }
+
+        // チーム名が入れ替わった場合、選手データも入れ替える
+        const isSwapped = (newHomeTeam === game.awayTeam && newAwayTeam === game.homeTeam);
+
+        if (isSwapped) {
+            // 選手データを入れ替え
+            const tempPlayers = game.players.home;
+            game.players.home = game.players.away;
+            game.players.away = tempPlayers;
+
+            // 各選手のteamプロパティを更新
+            game.players.home.forEach(p => p.team = 'home');
+            game.players.away.forEach(p => p.team = 'away');
+        }
+
+        // チーム名を更新
+        game.homeTeam = newHomeTeam;
+        game.awayTeam = newAwayTeam;
+
+        // ゲームを保存
+        await gameManager.saveGame();
+
+        // 画面を更新
+        document.getElementById('homeTeamName').textContent = newHomeTeam;
+        document.getElementById('awayTeamName').textContent = newAwayTeam;
+        document.getElementById('homeTeamName').removeAttribute('data-i18n');
+        document.getElementById('awayTeamName').removeAttribute('data-i18n');
+
+        // モーダルを閉じる
+        document.getElementById('editTeamInfoModal').style.display = 'none';
+
+        this.showSuccess('チーム情報を更新しました');
     }
 }
 
