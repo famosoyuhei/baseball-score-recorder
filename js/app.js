@@ -579,14 +579,8 @@ class BaseballApp {
                 }
             }
 
-            // 標準・詳細レベルで守備位置の重複チェック
-            if (game.playerDetailLevel === 'standard' || game.playerDetailLevel === 'detailed') {
-                const validationResult = this.validatePlayerPositions(game);
-                if (!validationResult.valid) {
-                    this.showError(validationResult.message);
-                    return;
-                }
-            }
+            // 守備位置のバリデーションを削除（空白登録を許可）
+            // 後から選手リストモーダルで守備位置を追記可能
 
             // ゲーム保存
             await gameManager.saveGame();
