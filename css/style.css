@@ -1,0 +1,4697 @@
+/* リセットとベーススタイル */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f5f5f5;
+}
+
+/* レイアウト */
+#app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    background-color: #1976d2;
+    color: white;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+header h1 {
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+}
+
+nav {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.nav-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.nav-btn:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+.language-select {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    outline: none;
+}
+
+.language-select:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+.language-select option {
+    background: #1976d2;
+    color: white;
+}
+
+main {
+    flex: 1;
+    padding: 1rem;
+}
+
+/* 画面管理 */
+.screen {
+    display: none;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.screen.active {
+    display: block;
+}
+
+/* ウェルカム画面 */
+#welcomeScreen {
+    text-align: center;
+    padding: 2rem;
+}
+
+#welcomeScreen h2 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+}
+
+.feature-list {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin: 2rem 0;
+    text-align: left;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.feature-list h3 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+}
+
+.feature-list ul {
+    list-style-position: inside;
+}
+
+.feature-list li {
+    margin-bottom: 0.5rem;
+}
+
+/* フォーム */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #1976d2;
+}
+
+/* ボタン */
+.primary-btn {
+    background-color: #1976d2;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.primary-btn:hover {
+    background-color: #1565c0;
+}
+
+.secondary-btn {
+    background-color: #757575;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.secondary-btn:hover {
+    background-color: #616161;
+}
+
+.button-group {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ゲーム画面 - コンパクトレイアウト */
+.game-header-compact {
+    background: white;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* スコアボード（コンパクト） */
+.score-board-compact {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: space-between;
+}
+
+.team-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 80px;
+}
+
+.team-score .team-name {
+    font-size: 0.75rem;
+    color: #666;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.team-score .score {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #1976d2;
+    line-height: 1;
+}
+
+.team-score.away.attacking .score,
+.team-score.home.attacking .score {
+    color: #ff9800;
+}
+
+.inning-compact {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    padding: 0.25rem 0.5rem;
+    background: #f5f5f5;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* カウント表示（コンパクト） */
+.count-status-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* 走者状況（コンパクト） */
+.runners-status-compact {
+    display: flex;
+    justify-content: center;
+}
+
+.diamond-compact {
+    display: grid;
+    grid-template-columns: repeat(3, 40px);
+    grid-template-rows: repeat(3, 40px);
+    gap: 2px;
+    position: relative;
+}
+
+.base-compact {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    position: relative;
+}
+
+.base-compact .base-indicator {
+    width: 16px;
+    height: 16px;
+    background: #e0e0e0;
+    border: 2px solid #bdbdbd;
+    transform: rotate(45deg);
+    transition: all 0.3s ease;
+}
+
+.base-compact.occupied .base-indicator {
+    background: #4caf50;
+    border-color: #388e3c;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+}
+
+.base-compact .runner-name {
+    position: absolute;
+    bottom: -18px;
+    font-size: 0.65rem;
+    color: #666;
+    white-space: nowrap;
+    max-width: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.base-compact.occupied .runner-name {
+    color: #2e7d32;
+    font-weight: bold;
+}
+
+.base-compact.second {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.base-compact.third {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.base-compact.first {
+    grid-column: 3;
+    grid-row: 2;
+}
+
+.batter-box-compact {
+    grid-column: 2;
+    grid-row: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e3f2fd;
+    border: 2px solid #1976d2;
+    border-radius: 4px;
+    padding: 0.25rem;
+}
+
+.batter-box-compact .current-batter {
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: #1976d2;
+    text-align: center;
+    max-width: 35px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 旧スコアボード（後方互換性のため残す） */
+.score-board {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.score-board .team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 100px;
+}
+
+.score-board .team span:first-child {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.25rem;
+}
+
+.score-board .team span:last-child {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #1976d2;
+}
+
+.score-board .inning {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.game-status {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.game-status span {
+    font-weight: 500;
+}
+
+/* カウント表示のドット形式 */
+.count-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.count-label {
+    font-size: 0.85rem;
+    color: #666;
+    font-weight: 600;
+}
+
+.count-dots {
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+.count-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #ddd;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.count-dot.active {
+    background: #1976d2;
+    border-color: #1976d2;
+    box-shadow: 0 0 8px rgba(25, 118, 210, 0.5);
+    transform: scale(1.1);
+}
+
+.count-dot.ball.active {
+    background: #4caf50;
+    border-color: #4caf50;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}
+
+.count-dot.strike.active {
+    background: #f44336;
+    border-color: #f44336;
+    box-shadow: 0 0 8px rgba(244, 67, 54, 0.5);
+}
+
+.count-separator {
+    font-size: 1.2rem;
+    color: #999;
+    margin: 0 0.3rem;
+    font-weight: bold;
+}
+
+/* アウトカウント表示 */
+.outs-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.outs-dots {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.out-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #ddd;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.out-dot.active {
+    background: #ff9800;
+    border-color: #ff9800;
+    box-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
+    transform: scale(1.1);
+}
+
+.runners-status {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.runners-status h4 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.diamond {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    max-width: 300px;
+    margin: 0 auto;
+    position: relative;
+}
+
+.base {
+    background-color: #f5f5f5;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 0.5rem;
+    text-align: center;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.base.occupied {
+    background-color: #4caf50;
+    border-color: #4caf50;
+    color: white;
+}
+
+#base-second {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+#base-third {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+#base-first {
+    grid-column: 3;
+    grid-row: 2;
+}
+
+.home-plate {
+    grid-column: 2;
+    grid-row: 3;
+    background-color: #e3f2fd;
+    border: 2px solid #1976d2;
+    border-radius: 8px;
+    padding: 0.5rem;
+    text-align: center;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.base-label {
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+.runner-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.current-batter {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #1976d2;
+}
+
+.current-batter-highlight {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-color: #1976d2 !important;
+    box-shadow: 0 0 15px rgba(25, 118, 210, 0.4);
+    animation: batterpulse 2s infinite;
+}
+
+@keyframes batterpulse {
+    0%, 100% {
+        box-shadow: 0 0 15px rgba(25, 118, 210, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 25px rgba(25, 118, 210, 0.6);
+    }
+}
+
+.base.occupied .base-label,
+.base.occupied .runner-name {
+    color: white;
+}
+
+.game-controls {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    z-index: 100;
+}
+
+/* 半イニングごと記録インターフェース */
+.inning-interface {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.current-inning-stats {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.stat-group {
+    margin-bottom: 1.5rem;
+}
+
+.stat-group:last-child {
+    margin-bottom: 0;
+}
+
+.stat-group h4 {
+    color: #1976d2;
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.score-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.score-btn {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    flex: 1;
+    min-width: 60px;
+}
+
+.score-btn:hover {
+    background-color: #45a049;
+}
+
+.stat-btn {
+    background-color: #2196f3;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-right: 0.5rem;
+}
+
+.stat-btn:hover {
+    background-color: #1976d2;
+}
+
+.undo-btn {
+    background-color: #ff9800;
+    color: white;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.undo-btn:hover {
+    background-color: #f57c00;
+}
+
+.save-btn {
+    background-color: #009688;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.save-btn:hover {
+    background-color: #00796b;
+}
+
+.inning-history {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.inning-history h4 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.inning-history-item {
+    border-bottom: 1px solid #eee;
+    padding: 0.75rem 0;
+}
+
+.inning-history-item:last-child {
+    border-bottom: none;
+}
+
+.inning-number {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.half-inning {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+    padding: 0.25rem 0;
+}
+
+.half-inning .team {
+    font-weight: 500;
+    min-width: 80px;
+}
+
+.half-inning .stats {
+    flex: 1;
+    margin: 0 1rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.edit-btn {
+    background-color: #ffc107;
+    color: #333;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.edit-btn:hover {
+    background-color: #ffb300;
+}
+
+/* モーダル */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-content h3 {
+    color: #1976d2;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.correction-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+
+/* 打者ごと記録インターフェース */
+.batter-interface {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.current-batter-info {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.batter-display h4 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.batter-info {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    font-size: 1.1rem;
+}
+
+.batter-info .team {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.batter-info .order {
+    background-color: #1976d2;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+.batter-info .name {
+    font-size: 1.2rem;
+    font-weight: 500;
+}
+
+.game-situation {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.runners-display h5 {
+    color: #333;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.bases {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.base {
+    background-color: #f5f5f5;
+    border: 2px solid #ddd;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.base.occupied {
+    background-color: #4caf50;
+    color: white;
+    border-color: #4caf50;
+    font-weight: bold;
+}
+
+.count-display {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.result-selection {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.result-selection h4 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.result-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+}
+
+.result-btn {
+    background-color: #f8f9fa;
+    border: 2px solid #e9ecef;
+    color: #495057;
+    padding: 0.75rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    font-weight: 500;
+}
+
+.result-btn:hover {
+    background-color: #e3f2fd;
+    border-color: #1976d2;
+    color: #1976d2;
+}
+
+.result-btn.selected {
+    background-color: #1976d2;
+    border-color: #1976d2;
+    color: white;
+    font-weight: bold;
+}
+
+.detail-inputs {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.input-group {
+    margin-bottom: 1rem;
+}
+
+.input-group:last-child {
+    margin-bottom: 0;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #555;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: #1976d2;
+}
+
+.batter-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.at-bat-history {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.at-bat-history h4 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.history-placeholder {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 1rem;
+}
+
+/* 走者進塁調整モーダル */
+.runner-modal-content {
+    max-width: 600px;
+    width: 95%;
+}
+
+.situation-summary {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #1976d2;
+}
+
+.play-summary {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: #1976d2;
+}
+
+.before-situation {
+    font-size: 0.95rem;
+    color: #666;
+}
+
+.runner-adjustment {
+    margin-bottom: 1.5rem;
+}
+
+.runner-adjustment h4 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.runner-setting {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.runner-setting label {
+    min-width: 80px;
+    font-weight: 500;
+    color: #333;
+    margin-right: 1rem;
+}
+
+.runner-setting select {
+    flex: 1;
+    padding: 0.5rem;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+}
+
+.runner-setting select:focus {
+    outline: none;
+    border-color: #1976d2;
+}
+
+.calculated-result {
+    background-color: #e8f5e8;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #4caf50;
+}
+
+.calculated-result h4 {
+    color: #2e7d32;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.calculated-result div {
+    font-size: 0.95rem;
+    color: #2e7d32;
+    margin-bottom: 0.25rem;
+}
+
+.tertiary-btn {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.tertiary-btn:hover {
+    background-color: #5a6268;
+}
+
+.out-detail-setting {
+    background-color: #fff3cd;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #ffc107;
+}
+
+.out-detail-setting h5 {
+    color: #856404;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.play-description {
+    margin-bottom: 1.5rem;
+}
+
+.play-description h4 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.play-description .input-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    resize: vertical;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}
+
+.play-description .input-group textarea:focus {
+    outline: none;
+    border-color: #1976d2;
+}
+
+/* 球ごと記録インターフェース */
+.pitch-interface {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.pitch-count-display {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.count-large {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+}
+
+.count-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.count-item label {
+    font-size: 1rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.count-item span {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #1976d2;
+    line-height: 1;
+}
+
+.count-separator {
+    font-size: 2rem;
+    color: #999;
+    font-weight: bold;
+}
+
+.pitch-input-section,
+.pitch-result-section,
+.pitch-history,
+.at-bat-completion {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.pitch-input-section h4,
+.pitch-result-section h4,
+.pitch-history h4,
+.at-bat-completion h4 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.pitch-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.pitch-result-buttons,
+.at-bat-result-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.5rem;
+}
+
+.pitch-result-btn,
+.at-bat-result-btn {
+    background-color: #f8f9fa;
+    border: 2px solid #e9ecef;
+    color: #495057;
+    padding: 0.75rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    font-weight: 500;
+}
+
+.pitch-result-btn:hover,
+.at-bat-result-btn:hover {
+    background-color: #e3f2fd;
+    border-color: #1976d2;
+    color: #1976d2;
+}
+
+.pitch-result-btn.selected,
+.at-bat-result-btn.selected {
+    background-color: #1976d2;
+    border-color: #1976d2;
+    color: white;
+    font-weight: bold;
+}
+
+.pitch-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.pitch-history-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.pitch-item {
+    display: grid;
+    grid-template-columns: 60px 80px 70px 1fr 60px;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-bottom: 1px solid #eee;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.pitch-item:last-child {
+    border-bottom: none;
+}
+
+.pitch-number {
+    font-weight: bold;
+    color: #1976d2;
+}
+
+.pitch-type {
+    color: #333;
+}
+
+.pitch-velocity {
+    color: #666;
+    text-align: right;
+}
+
+.pitch-result {
+    color: #333;
+}
+
+.pitch-count {
+    text-align: center;
+    font-weight: 500;
+    color: #1976d2;
+}
+
+.no-pitches {
+    text-align: center;
+    color: #999;
+    font-style: italic;
+    padding: 1rem;
+}
+
+.result-details {
+    display: grid;
+    grid-template-columns: 1fr 100px;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+/* 打者・投手情報コンテナ */
+.player-stats-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* 現在打者の成績表示 */
+.current-batter-stats {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 2px solid #e3f2fd;
+    transition: all 0.3s ease;
+}
+
+.current-batter-stats.updated {
+    animation: batterChange 0.5s ease-in-out;
+}
+
+/* 現在投手の投球情報 */
+.current-pitcher-stats {
+    background: linear-gradient(135deg, #fff8e1 0%, #fffbf0 100%);
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 2px solid #fff3e0;
+    transition: all 0.3s ease;
+}
+
+.current-pitcher-stats.updated {
+    animation: pitcherChange 0.5s ease-in-out;
+}
+
+@keyframes pitcherChange {
+    0% {
+        transform: scale(1);
+        border-color: #fff3e0;
+    }
+    50% {
+        transform: scale(1.02);
+        border-color: #ff9800;
+        box-shadow: 0 4px 16px rgba(255, 152, 0, 0.3);
+    }
+    100% {
+        transform: scale(1);
+        border-color: #fff3e0;
+    }
+}
+
+@keyframes batterChange {
+    0% {
+        transform: scale(1);
+        border-color: #e3f2fd;
+    }
+    50% {
+        transform: scale(1.02);
+        border-color: #1976d2;
+        box-shadow: 0 4px 16px rgba(25, 118, 210, 0.3);
+    }
+    100% {
+        transform: scale(1);
+        border-color: #e3f2fd;
+    }
+}
+
+.batter-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.batter-name-large {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.batter-number {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #1976d2;
+    background: #e3f2fd;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    min-width: 40px;
+    text-align: center;
+}
+
+.batter-name {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #333;
+    flex: 1;
+}
+
+.batter-position {
+    font-size: 0.9rem;
+    color: #666;
+    background: #f5f5f5;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.batter-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 0.75rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    background: white;
+    padding: 0.5rem;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: #999;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.stat-value {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #1976d2;
+}
+
+.stat-value.highlight {
+    color: #ff9800;
+    animation: statHighlight 0.5s ease-in-out;
+}
+
+@keyframes statHighlight {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+/* 投手情報レイアウト */
+.pitcher-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.pitcher-name-large {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #ffe0b2;
+}
+
+.pitcher-number {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #ff9800;
+    background: #fff3e0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    min-width: 40px;
+    text-align: center;
+}
+
+.pitcher-name {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #333;
+    flex: 1;
+}
+
+.pitcher-label {
+    font-size: 0.9rem;
+    color: #f57c00;
+    background: #fff3e0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.pitcher-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+/* 投球数表示（大きく目立つ） */
+.pitch-count-display {
+    background: white;
+    padding: 0.75rem;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.pitch-count-label {
+    font-size: 0.7rem;
+    color: #999;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.pitch-count-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #ff9800;
+    line-height: 1;
+    transition: all 0.3s ease;
+}
+
+.pitch-count-value.warning {
+    color: #ff5722;
+    animation: pitchWarning 1s ease-in-out infinite;
+}
+
+.pitch-count-value.danger {
+    color: #d32f2f;
+    animation: pitchDanger 0.8s ease-in-out infinite;
+}
+
+@keyframes pitchWarning {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+@keyframes pitchDanger {
+    0%, 100% {
+        transform: scale(1);
+        text-shadow: 0 0 0 rgba(211, 47, 47, 0);
+    }
+    50% {
+        transform: scale(1.1);
+        text-shadow: 0 0 10px rgba(211, 47, 47, 0.5);
+    }
+}
+
+.pitch-count-unit {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 600;
+}
+
+/* 投手ミニ統計 */
+.pitcher-stats-mini {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.mini-stat {
+    background: white;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mini-stat-label {
+    font-size: 0.7rem;
+    color: #666;
+    font-weight: 600;
+}
+
+.mini-stat-value {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #ff9800;
+}
+
+/* タブレット以上で2カラム表示 */
+@media (min-width: 769px) {
+    .player-stats-container {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* プレー履歴タイムライン */
+.play-timeline {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.play-timeline h4 {
+    color: #1976d2;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.play-timeline h4::before {
+    content: "📋";
+    font-size: 1.2rem;
+}
+
+.timeline-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.timeline-item {
+    padding: 0.75rem;
+    border-left: 3px solid #e0e0e0;
+    background: #fafafa;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    animation: slideIn 0.3s ease;
+}
+
+.timeline-item:hover {
+    background: #f0f0f0;
+    border-left-color: #1976d2;
+    transform: translateX(2px);
+}
+
+.timeline-item.latest {
+    border-left-color: #4caf50;
+    background: #e8f5e9;
+    font-weight: 500;
+}
+
+.timeline-item.score {
+    border-left-color: #ff9800;
+    background: #fff3e0;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.timeline-inning {
+    font-size: 0.75rem;
+    color: #666;
+    font-weight: 600;
+}
+
+.timeline-situation {
+    font-size: 0.75rem;
+    color: #999;
+}
+
+.timeline-content {
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.timeline-content .player-name {
+    font-weight: bold;
+    color: #1976d2;
+}
+
+.timeline-content .result {
+    color: #333;
+}
+
+.timeline-content .runs {
+    color: #ff9800;
+    font-weight: bold;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* 得点アニメーション */
+@keyframes scoreFlash {
+    0%, 100% {
+        background-color: inherit;
+        transform: scale(1);
+    }
+    50% {
+        background-color: #ffeb3b;
+        transform: scale(1.2);
+    }
+}
+
+.score-animation {
+    animation: scoreFlash 0.6s ease-in-out 3;
+}
+
+/* 走者進塁アニメーション */
+@keyframes runnerAdvance {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.3);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.runner-advance-animation {
+    animation: runnerAdvance 0.5s ease-in-out;
+}
+
+/* レスポンシブデザイン */
+
+/* スマホ縦持ち（〜480px）*/
+@media (max-width: 480px) {
+    .game-header-compact {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        padding: 0.5rem;
+    }
+
+    .score-board-compact {
+        order: 1;
+        justify-content: center;
+    }
+
+    .count-status-compact {
+        order: 2;
+        flex-direction: row;
+        gap: 1rem;
+    }
+
+    .runners-status-compact {
+        order: 3;
+    }
+
+    .team-score .team-name {
+        font-size: 0.7rem;
+    }
+
+    .team-score .score {
+        font-size: 1.5rem;
+    }
+
+    .inning-compact {
+        font-size: 0.9rem;
+        padding: 0.25rem 0.4rem;
+    }
+
+    .diamond-compact {
+        grid-template-columns: repeat(3, 35px);
+        grid-template-rows: repeat(3, 35px);
+    }
+
+    .base-compact .base-indicator {
+        width: 14px;
+        height: 14px;
+    }
+
+    .play-timeline {
+        max-height: 150px;
+        padding: 0.75rem;
+    }
+
+    .play-timeline h4 {
+        font-size: 0.9rem;
+    }
+
+    .timeline-item {
+        padding: 0.5rem;
+    }
+
+    .timeline-content {
+        font-size: 0.85rem;
+    }
+}
+
+/* スマホ横持ち・タブレット縦（481px〜768px）*/
+@media (min-width: 481px) and (max-width: 768px) {
+    .game-header-compact {
+        grid-template-columns: 1fr auto 1fr;
+        gap: 0.5rem;
+        padding: 0.75rem;
+    }
+
+    .score-board-compact {
+        gap: 0.25rem;
+    }
+
+    .team-score .score {
+        font-size: 1.6rem;
+    }
+
+    .diamond-compact {
+        grid-template-columns: repeat(3, 38px);
+        grid-template-rows: repeat(3, 38px);
+    }
+}
+
+/* タブレット横（769px〜1024px）- 2カラムレイアウト */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #gameScreen {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 1rem;
+    }
+
+    .game-header-compact {
+        grid-column: 1 / -1;
+    }
+
+    #gameContent {
+        grid-column: 1;
+    }
+
+    .play-timeline,
+    .detailed-scoreboard {
+        grid-column: 1 / -1;
+    }
+
+    /* サイドバーエリア */
+    .sidebar-stats {
+        grid-column: 2;
+        grid-row: 2 / -1;
+    }
+}
+
+/* PC（1025px〜）- 3カラムレイアウト */
+@media (min-width: 1025px) {
+    #gameScreen {
+        display: grid;
+        grid-template-columns: 250px 1fr 300px;
+        gap: 1rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .game-header-compact {
+        grid-column: 1 / -1;
+    }
+
+    /* 左カラム: スコアボード詳細 */
+    .detailed-scoreboard {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    /* 中央カラム: ゲームコンテンツ */
+    #gameContent {
+        grid-column: 2;
+        grid-row: 2;
+    }
+
+    /* 右カラム: プレー履歴・統計 */
+    .play-timeline {
+        grid-column: 3;
+        grid-row: 2;
+        max-height: 400px;
+    }
+
+    .game-controls {
+        position: relative;
+        bottom: auto;
+        left: auto;
+        right: auto;
+        grid-column: 2;
+    }
+}
+
+/* 従来のレスポンシブ */
+@media (max-width: 768px) {
+    header {
+        padding: 0.75rem;
+    }
+
+    header h1 {
+        font-size: 1.3rem;
+    }
+
+    .nav-btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
+    }
+
+    main {
+        padding: 0.75rem;
+    }
+
+    .feature-list {
+        padding: 1rem;
+    }
+
+    .score-board {
+        padding: 0.75rem;
+    }
+
+    .score-board .team span:last-child {
+        font-size: 1.5rem;
+    }
+
+    .score-board .inning {
+        font-size: 1rem;
+    }
+
+    .button-group {
+        flex-direction: column;
+    }
+
+    .primary-btn,
+    .secondary-btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .game-controls {
+        flex-direction: column;
+    }
+
+    .nav-btn {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+/* 選手登録画面 */
+.player-setup-section {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.player-setup-section h3 {
+    color: #1976d2;
+    margin-bottom: 0.5rem;
+}
+
+.player-setup-section p {
+    color: #666;
+    margin-bottom: 1.5rem;
+}
+
+.dh-setup-section {
+    background: #f0f8ff;
+    border: 1px solid #1976d2;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.dh-setup-section h4 {
+    color: #1976d2;
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.dh-options {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.dh-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.dh-option:hover {
+    background: rgba(25, 118, 210, 0.1);
+}
+
+.dh-option input[type="radio"] {
+    margin: 0;
+}
+
+.team-setup-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.team-tab {
+    padding: 0.75rem 1.5rem;
+    border: 2px solid #ddd;
+    background: white;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.team-tab.active {
+    border-color: #1976d2;
+    background: #1976d2;
+    color: white;
+}
+
+.team-tab:hover:not(.active) {
+    border-color: #1976d2;
+    background: #f0f8ff;
+}
+
+.team-setup-content {
+    border: 2px solid #1976d2;
+    border-radius: 0 8px 8px 8px;
+    background: white;
+    padding: 1.5rem;
+}
+
+.batting-order-list {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 500px;
+}
+
+.batting-order-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: #f9f9f9;
+    border-radius: 6px;
+    border: 1px solid #eee;
+}
+
+.player-inputs {
+    display: flex;
+    gap: 0.5rem;
+    flex: 1;
+    align-items: center;
+}
+
+.order-number {
+    font-weight: bold;
+    color: #1976d2;
+    min-width: 60px;
+    font-size: 1.1rem;
+}
+
+.player-name-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    min-width: 140px;
+}
+
+.player-name-input:focus {
+    outline: none;
+    border-color: #1976d2;
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+}
+
+.position-select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    min-width: 160px;
+    background: white;
+    cursor: pointer;
+}
+
+.position-select:focus {
+    outline: none;
+    border-color: #1976d2;
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+}
+
+.position-select option {
+    padding: 0.25rem;
+}
+
+.setup-controls {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.setup-controls .primary-btn {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+/* 選手登録画面のレスポンシブ */
+@media (max-width: 768px) {
+    .player-setup-section {
+        padding: 0.5rem;
+    }
+
+    .team-setup-content {
+        padding: 1rem;
+    }
+
+    .batting-order-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .player-inputs {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .order-number {
+        text-align: center;
+        min-width: auto;
+    }
+
+    .player-name-input,
+    .position-select {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .team-tab {
+        flex: 1;
+        text-align: center;
+    }
+
+    .dh-options {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .dh-option {
+        padding: 0.75rem;
+    }
+}
+
+/* 選手交代画面 */
+.substitution-modal-content {
+    max-width: 900px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.substitution-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #eee;
+}
+
+.sub-tab {
+    padding: 0.75rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: bold;
+    color: #666;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+}
+
+.sub-tab.active {
+    color: #1976d2;
+    border-bottom-color: #1976d2;
+}
+
+.sub-tab:hover:not(.active) {
+    color: #1976d2;
+    background: #f0f8ff;
+}
+
+.team-selection {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f9f9f9;
+    border-radius: 6px;
+}
+
+.team-selection label {
+    font-weight: bold;
+    margin-right: 0.5rem;
+}
+
+.team-selection select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+}
+
+.substitution-content {
+    margin-bottom: 1.5rem;
+}
+
+.sub-content {
+    display: none;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+}
+
+.sub-content.active {
+    display: block;
+}
+
+.sub-content h4 {
+    color: #1976d2;
+    margin-bottom: 0.5rem;
+}
+
+.sub-content p {
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+/* 守備位置交換 */
+.lineup-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.lineup-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: #f9f9f9;
+    border-radius: 6px;
+    border: 1px solid #eee;
+}
+
+.player-info {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.batting-order {
+    font-weight: bold;
+    color: #1976d2;
+    min-width: 50px;
+}
+
+.player-name {
+    font-weight: bold;
+    min-width: 120px;
+}
+
+.position {
+    color: #666;
+    min-width: 80px;
+}
+
+.new-position {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    min-width: 160px;
+}
+
+/* 選手変更 */
+.change-item,
+.combo-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: #f9f9f9;
+    border-radius: 6px;
+    border: 1px solid #eee;
+}
+
+.current-player,
+.current-info {
+    font-weight: bold;
+    flex: 1;
+}
+
+.change-controls,
+.combo-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.change-controls label,
+.combo-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.new-player-name,
+.combo-new-name {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 140px;
+}
+
+.combo-new-position {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    min-width: 140px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .substitution-modal-content {
+        margin: 1rem;
+        max-height: 90vh;
+    }
+
+    .substitution-tabs {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .sub-tab {
+        text-align: center;
+        border-bottom: none;
+        border-left: 3px solid transparent;
+    }
+
+    .sub-tab.active {
+        border-left-color: #1976d2;
+        border-bottom-color: transparent;
+    }
+
+    .lineup-item,
+    .change-item,
+    .combo-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .change-controls,
+    .combo-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .new-player-name,
+    .combo-new-name,
+    .new-position,
+    .combo-new-position {
+        min-width: auto;
+        width: 100%;
+    }
+}
+
+/* 攻撃側・守備側選手交代 */
+.team-situation {
+    background: #f0f8ff;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 6px;
+    border: 1px solid #1976d2;
+}
+
+.situation-info {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+}
+
+.batting-team,
+.fielding-team {
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+}
+
+.batting-team {
+    background: #ffeb3b;
+    color: #333;
+}
+
+.fielding-team {
+    background: #4caf50;
+    color: white;
+}
+
+.batting-substitutions {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.pinch-hitter-section,
+.pinch-runner-section {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 1rem;
+    background: #fafafa;
+}
+
+.pinch-hitter-section h5,
+.pinch-runner-section h5 {
+    color: #1976d2;
+    margin-bottom: 0.5rem;
+}
+
+.pinch-hitter-controls,
+.pinch-runner-controls {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.current-batter-info {
+    font-weight: bold;
+    padding: 0.5rem;
+    background: #e3f2fd;
+    border-radius: 4px;
+}
+
+.pinch-hitter-input {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.pinch-hitter-input label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.pinch-hitter-input input[type="text"] {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.current-runners h6 {
+    color: #1976d2;
+    margin-bottom: 0.5rem;
+}
+
+.runner-substitution {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem;
+    background: #e8f5e8;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.runner-info {
+    font-weight: bold;
+}
+
+.runner-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.runner-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.pinch-runner-name {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 120px;
+}
+
+/* 守備側サブタブ */
+.fielding-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background: #f5f5f5;
+    border-radius: 6px;
+}
+
+.fielding-tab {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.fielding-tab.active {
+    background: #1976d2;
+    color: white;
+    border-color: #1976d2;
+}
+
+.fielding-tab:hover:not(.active) {
+    background: #e3f2fd;
+    border-color: #1976d2;
+}
+
+.fielding-content {
+    position: relative;
+}
+
+.fielding-sub-content {
+    display: none;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+}
+
+.fielding-sub-content.active {
+    display: block;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .situation-info {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+
+    .pinch-hitter-input,
+    .runner-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .runner-substitution {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .pinch-hitter-input input[type="text"],
+    .pinch-runner-name {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .fielding-tabs {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .fielding-tab {
+        text-align: center;
+    }
+}
+
+/* 守備位置決定画面 */
+.substitute-defense-content {
+    max-width: 800px;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.situation-notice {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.situation-notice p {
+    margin: 0;
+    color: #856404;
+}
+
+.situation-notice p:first-child {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.substitute-players-section {
+    margin-bottom: 1.5rem;
+}
+
+.substitute-players-section h4 {
+    color: #1976d2;
+    margin-bottom: 1rem;
+}
+
+.substitute-players-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.substitute-player-item {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem;
+    background: #fafafa;
+}
+
+.player-info {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #eee;
+}
+
+.player-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.current-status {
+    background: #ff9800;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.batting-order {
+    background: #1976d2;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.choice-options {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.choice-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    transition: background-color 0.2s;
+}
+
+.choice-option:hover {
+    background: #f0f8ff;
+}
+
+.choice-option input[type="radio"] {
+    margin: 0;
+}
+
+.field-position-section,
+.replacement-section {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    padding: 0.75rem;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+}
+
+.field-position-section label,
+.replacement-section label {
+    font-weight: bold;
+    color: #333;
+}
+
+.defensive-position,
+.replacement-position {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+}
+
+.replacement-name {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.current-defense-info {
+    background: #e8f5e8;
+    border: 1px solid #4caf50;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.current-defense-info h4 {
+    color: #2e7d32;
+    margin-bottom: 0.75rem;
+}
+
+.current-defense-list {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.defense-player {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.defense-player span:first-child {
+    font-weight: bold;
+}
+
+.defense-player span:last-child {
+    color: #666;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .substitute-defense-content {
+        margin: 0.5rem;
+        max-height: 95vh;
+    }
+
+    .player-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .choice-options {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .field-position-section,
+    .replacement-section {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .current-defense-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 詳細レベル専用スタイル */
+.batting-order-item.detailed {
+    border: 2px solid #e3f2fd;
+    background: #f8f9fa;
+}
+
+.detail-btn {
+    background: #2196f3;
+    color: white;
+    border: none;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.detail-btn:hover {
+    background: #1976d2;
+}
+
+/* 控え選手セクション */
+.bench-players-section {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: #fff3e0;
+    border-radius: 8px;
+    border: 1px solid #ffcc02;
+}
+
+.bench-players-section h4 {
+    color: #e65100;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.bench-players-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.bench-player-item {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem;
+    background: white;
+    border: 1px solid #ffcc02;
+    border-radius: 4px;
+}
+
+.bench-player-name {
+    flex: 1;
+    padding: 0.3rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.bench-detail {
+    background: #ff9800;
+    color: white;
+}
+
+.bench-detail:hover {
+    background: #f57c00;
+}
+
+.remove-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.remove-btn:hover {
+    background: #d32f2f;
+}
+
+.add-bench-player {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.add-bench-player:hover {
+    background: #388e3c;
+}
+
+/* 選手詳細モーダル */
+.player-detail-modal .modal-content {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.player-detail-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.player-detail-form h4 {
+    color: #1976d2;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    border-bottom: 2px solid #e3f2fd;
+    padding-bottom: 0.3rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.player-detail-form .form-group {
+    margin-bottom: 0.5rem;
+}
+
+.player-detail-form label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 500;
+    color: #555;
+}
+
+.player-detail-form input,
+.player-detail-form select,
+.player-detail-form textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.player-detail-form textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.bench-player-modal .modal-content {
+    border-left: 4px solid #ff9800;
+}
+
+.bench-player-modal h3 {
+    color: #e65100;
+}
+
+.bench-player-modal h4 {
+    color: #e65100;
+    border-bottom-color: #fff3e0;
+}
+
+/* レスポンシブ対応 - 詳細レベル */
+@media (max-width: 768px) {
+    .player-detail-modal .modal-content {
+        margin: 0.5rem;
+        max-height: 95vh;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .bench-player-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.3rem;
+    }
+
+    .bench-players-section {
+        margin-top: 1rem;
+        padding: 0.5rem;
+    }
+}
+
+/* 手動ゲーム制御ボタン */
+.manual-controls {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 2px solid #ddd;
+}
+
+.control-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.warning-btn {
+    background: #ff9800;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.warning-btn:hover {
+    background: #f57c00;
+    transform: translateY(-1px);
+}
+
+.warning-btn:disabled,
+.warning-btn.disabled {
+    background: #cccccc;
+    color: #666666;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.danger-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.danger-btn:hover {
+    background: #d32f2f;
+    transform: translateY(-1px);
+}
+
+.info-btn {
+    background: #2196f3;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.info-btn:hover {
+    background: #1976d2;
+    transform: translateY(-1px);
+}
+
+/* 時刻情報モーダル */
+.time-info-modal .modal-content {
+    max-width: 500px;
+}
+
+.time-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.info-section {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #2196f3;
+}
+
+.info-section h4 {
+    margin: 0 0 0.5rem 0;
+    color: #1976d2;
+    font-size: 1rem;
+}
+
+.info-section p {
+    margin: 0.3rem 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.info-section strong {
+    color: #333;
+    font-weight: 600;
+}
+
+/* ゲーム状態表示の拡張 */
+.game-status.manual-control-active {
+    border-left: 4px solid #ff9800;
+    background: #fff3e0;
+}
+
+.game-status.final-inning-set {
+    border-left: 4px solid #f44336;
+    background: #ffebee;
+}
+
+.manual-control-indicator {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background: #ff9800;
+    color: white;
+    font-size: 0.8rem;
+    border-radius: 12px;
+    margin-left: 0.5rem;
+}
+
+.final-inning-indicator {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background: #f44336;
+    color: white;
+    font-size: 0.8rem;
+    border-radius: 12px;
+    margin-left: 0.5rem;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* レスポンシブ対応 - 手動制御 */
+@media (max-width: 768px) {
+    .control-row {
+        flex-direction: column;
+        gap: 0.3rem;
+    }
+
+    .warning-btn,
+    .danger-btn,
+    .info-btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .time-info-modal .modal-content {
+        margin: 0.5rem;
+        max-height: 95vh;
+        overflow-y: auto;
+    }
+
+    .info-section {
+        padding: 0.5rem;
+    }
+}
+
+/* 詳細スコアボード */
+.detailed-scoreboard {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin: 1rem 0;
+    overflow-x: auto;
+    border: 2px solid #1976d2;
+}
+
+.scoreboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+.scoreboard-table th,
+.scoreboard-table td {
+    padding: 0.5rem;
+    text-align: center;
+    border: 1px solid #ddd;
+    min-width: 35px;
+}
+
+.scoreboard-table th {
+    background-color: #1976d2;
+    color: white;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.scoreboard-table .team-name {
+    text-align: left;
+    font-weight: bold;
+    background-color: #f5f5f5;
+    min-width: 120px;
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.scoreboard-table .current-inning {
+    background-color: #ffeb3b !important;
+    color: #000;
+    font-weight: bold;
+}
+
+.scoreboard-table .away-row {
+    background-color: #fafafa;
+}
+
+.scoreboard-table .home-row {
+    background-color: #ffffff;
+}
+
+.scoreboard-table .total-column {
+    background-color: #e3f2fd;
+    font-weight: bold;
+    border-left: 2px solid #1976d2;
+}
+
+.scoreboard-table .stats-column {
+    background-color: #f5f5f5;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .detailed-scoreboard {
+        margin: 0.5rem;
+    }
+
+    .scoreboard-table {
+        font-size: 0.8rem;
+    }
+
+    .scoreboard-table th,
+    .scoreboard-table td {
+        padding: 0.25rem;
+        min-width: 30px;
+    }
+
+    .scoreboard-table .team-name {
+        min-width: 100px;
+        max-width: 120px;
+    }
+}
+
+/* 最上部スコアボード - 攻撃中チームハイライト */
+.score-board .team.attacking {
+    background-color: #ffeb3b;
+    color: #000;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.score-board .team.attacking span {
+    color: #000 !important;
+}
+
+/* 半イニング記録レベル用スタイル */
+.inning-level .game-status,
+.inning-level .runners-status {
+    display: none;
+}
+
+/* ベンチモード用スタイル */
+.bench-mode {
+    --bench-btn-size: 60px;
+    --bench-font-size: 1.1rem;
+}
+
+.bench-mode .game-controls {
+    margin-top: 1rem;
+}
+
+/* ベンチモード専用の簡素化されたピッチ記録インターフェース */
+.bench-pitch-controls {
+    display: none;
+    background: #fff;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.bench-mode.pitch-level .bench-pitch-controls {
+    display: block;
+}
+
+.bench-mode.pitch-level .detailed-pitch-controls {
+    display: none;
+}
+
+.bench-count-display {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #f5f5f5;
+    border-radius: 4px;
+}
+
+.bench-current-batter {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.bench-count {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #1976d2;
+}
+
+.bench-outs {
+    font-size: 1.1rem;
+    margin-top: 0.5rem;
+    color: #666;
+}
+
+/* ベンチモード用大きなボタン */
+.bench-button-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.bench-button-grid.three-col {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.bench-btn {
+    background: #2196f3;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 1rem;
+    font-size: var(--bench-font-size);
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    min-height: var(--bench-btn-size);
+}
+
+.bench-btn:hover {
+    background: #1976d2;
+    transform: translateY(-1px);
+}
+
+.bench-btn:active {
+    transform: translateY(0);
+}
+
+.bench-btn.ball {
+    background: #4caf50;
+}
+
+.bench-btn.ball:hover {
+    background: #388e3c;
+}
+
+.bench-btn.strike {
+    background: #f44336;
+}
+
+.bench-btn.strike:hover {
+    background: #d32f2f;
+}
+
+.bench-btn.hit {
+    background: #ff9800;
+}
+
+.bench-btn.hit:hover {
+    background: #f57c00;
+}
+
+.bench-btn.out {
+    background: #9e9e9e;
+}
+
+.bench-btn.out:hover {
+    background: #757575;
+}
+
+.bench-btn.walk {
+    background: #8bc34a;
+}
+
+.bench-btn.walk:hover {
+    background: #689f38;
+}
+
+.bench-btn.hbp {
+    background: #ff5722;
+}
+
+.bench-btn.hbp:hover {
+    background: #e64a19;
+}
+
+/* ベンチモード用走者表示 */
+.bench-runners {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.bench-base {
+    background: #f5f5f5;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.bench-base.occupied {
+    background: #4caf50;
+    color: white;
+    border-color: #388e3c;
+}
+
+.bench-base-label {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+}
+
+/* モバイル最適化 */
+@media (max-width: 768px) {
+    .bench-mode {
+        --bench-btn-size: 50px;
+        --bench-font-size: 1rem;
+    }
+
+    .bench-pitch-controls {
+        margin: 0.5rem;
+        padding: 0.5rem;
+    }
+
+    .bench-count-display {
+        padding: 0.5rem;
+    }
+
+    .bench-current-batter {
+        font-size: 1.1rem;
+    }
+
+    .bench-count {
+        font-size: 1.5rem;
+    }
+}
+
+/* スタジアム使用向け（高輝度・大フォント） */
+@media (max-width: 480px) {
+    .bench-mode {
+        --bench-btn-size: 45px;
+        --bench-font-size: 0.9rem;
+    }
+}
+
+/* TV観戦モード用（詳細分析UI表示） */
+.tv-mode .bench-pitch-controls {
+    display: none;
+}
+
+.tv-mode .detailed-pitch-controls {
+    display: block;
+}
+
+/* ベンチモード高度な機能用スタイル */
+.bench-advanced-controls {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 2px solid #e0e0e0;
+}
+
+.bench-btn.substitution {
+    background: #9c27b0;
+}
+
+.bench-btn.substitution:hover {
+    background: #7b1fa2;
+}
+
+.bench-btn.steal {
+    background: #ff9800;
+}
+
+.bench-btn.steal:hover {
+    background: #f57c00;
+}
+
+.bench-btn.bunt {
+    background: #795548;
+}
+
+.bench-btn.bunt:hover {
+    background: #5d4037;
+}
+
+.bench-btn.wildpitch {
+    background: #607d8b;
+}
+
+.bench-btn.wildpitch:hover {
+    background: #455a64;
+}
+
+/* モーダルスタイル */
+.bench-substitution-modal,
+.bench-steal-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    color: #333;
+    background: #f0f0f0;
+    border-radius: 50%;
+}
+
+.substitution-type-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.sub-type-btn {
+    background: #e3f2fd;
+    border: 2px solid #bbdefb;
+    color: #1976d2;
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.sub-type-btn:hover {
+    background: #bbdefb;
+}
+
+.sub-type-btn.active {
+    background: #1976d2;
+    color: white;
+    border-color: #1565c0;
+}
+
+.player-selection {
+    margin-bottom: 1rem;
+}
+
+.selection-group {
+    margin-bottom: 1rem;
+}
+
+.selection-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.selection-group select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.substitution-actions,
+.steal-result-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.steal-result-selector {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+}
+
+.bench-btn.confirm {
+    background: #4caf50;
+}
+
+.bench-btn.confirm:hover {
+    background: #388e3c;
+}
+
+.bench-btn.cancel {
+    background: #9e9e9e;
+}
+
+.bench-btn.cancel:hover {
+    background: #757575;
+}
+
+.bench-btn.steal-success {
+    background: #4caf50;
+}
+
+.bench-btn.steal-success:hover {
+    background: #388e3c;
+}
+
+.bench-btn.steal-out {
+    background: #f44336;
+}
+
+.bench-btn.steal-out:hover {
+    background: #d32f2f;
+}
+
+.bench-btn.steal-wild {
+    background: #ff9800;
+}
+
+.bench-btn.steal-wild:hover {
+    background: #f57c00;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 480px) {
+    .modal-content {
+        width: 95%;
+        padding: 1rem;
+    }
+
+    .substitution-type-selector {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* NPB公式スコアブックスタイル */
+.npb-scorebook-container {
+    margin: 2rem 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.team-scorebook {
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.team-scorebook:last-child {
+    border-bottom: none;
+}
+
+.team-scorebook .team-name {
+    background: #1976d2;
+    color: white;
+    margin: 0;
+    padding: 1rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.team-scorebook.away .team-name {
+    background: #d32f2f;
+}
+
+.npb-scorebook-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.npb-scorebook-table th,
+.npb-scorebook-table td {
+    border: 1px solid #ddd;
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+    vertical-align: middle;
+    min-width: 35px;
+    height: 50px;
+}
+
+.npb-scorebook-table thead th {
+    background: #f5f5f5;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.npb-scorebook-table .player-name {
+    text-align: left;
+    font-weight: bold;
+    min-width: 120px;
+    background: #fafafa;
+    font-size: 0.8rem;
+}
+
+.npb-scorebook-table .inning-cell {
+    position: relative;
+    background: white;
+    padding: 2px;
+    line-height: 1.1;
+}
+
+.at-bat-result {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #333;
+    margin-bottom: 2px;
+}
+
+.base-advancement {
+    font-size: 0.7rem;
+    color: #666;
+    font-style: italic;
+}
+
+/* NPB記号スタイル */
+.at-bat-result .homerun {
+    color: #f44336;
+    font-size: 1.3rem;
+}
+
+.at-bat-result .triple {
+    color: #ff9800;
+}
+
+.at-bat-result .double {
+    color: #2196f3;
+}
+
+.at-bat-result .single {
+    color: #4caf50;
+}
+
+.at-bat-result .strikeout {
+    color: #9e9e9e;
+    font-weight: bold;
+}
+
+.at-bat-result .walk {
+    background: #e3f2fd;
+    padding: 2px;
+    border-radius: 2px;
+}
+
+.at-bat-result .hbp {
+    background: #ffebee;
+    padding: 2px;
+    border-radius: 2px;
+    color: #d32f2f;
+}
+
+/* 統計列 */
+.stat-runs,
+.stat-hits,
+.stat-errors {
+    background: #f0f0f0;
+    font-weight: bold;
+}
+
+.inning-total {
+    background: #e8f5e8;
+    font-weight: bold;
+    color: #2e7d32;
+}
+
+/* スコアブック表示切り替えボタン */
+.scorebook-toggle {
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.scorebook-toggle button {
+    background: #1976d2;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    margin: 0 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.scorebook-toggle button:hover {
+    background: #1565c0;
+}
+
+.scorebook-toggle button.active {
+    background: #0d47a1;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* NPBスコアブック専用レスポンシブ */
+@media (max-width: 768px) {
+    .npb-scorebook-table {
+        font-size: 0.7rem;
+    }
+
+    .npb-scorebook-table th,
+    .npb-scorebook-table td {
+        padding: 0.25rem 0.1rem;
+        min-width: 25px;
+        height: 40px;
+    }
+
+    .npb-scorebook-table .player-name {
+        min-width: 80px;
+        font-size: 0.7rem;
+    }
+
+    .at-bat-result {
+        font-size: 0.9rem;
+    }
+
+    .base-advancement {
+        font-size: 0.6rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .npb-scorebook-container {
+        margin: 1rem 0;
+    }
+
+    .npb-scorebook-table {
+        font-size: 0.6rem;
+    }
+
+    .npb-scorebook-table th,
+    .npb-scorebook-table td {
+        padding: 0.1rem;
+        min-width: 20px;
+        height: 35px;
+    }
+
+    .at-bat-result {
+        font-size: 0.8rem;
+    }
+
+    .team-scorebook .team-name {
+        padding: 0.5rem;
+        font-size: 1rem;
+    }
+}
+
+/* ===== 打席履歴・訂正モーダル ===== */
+
+.at-bat-history-modal,
+.correction-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.at-bat-history-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.correction-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #333;
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.close-modal:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    padding: 1.5rem;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.at-bat-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.at-bat-history-item {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    align-items: center;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.at-bat-history-item:hover {
+    background: #e8f4f8;
+    border-color: #2196F3;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+}
+
+.at-bat-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.inning-info {
+    background: #2196F3;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.player-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.batting-order {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.at-bat-result {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.result-text {
+    font-weight: bold;
+    color: #1976D2;
+    font-size: 1rem;
+}
+
+.result-detail {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.runs,
+.rbis {
+    background: #4caf50;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.at-bat-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.edit-at-bat-btn,
+.delete-at-bat-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.edit-at-bat-btn {
+    background: #2196F3;
+    color: white;
+}
+
+.edit-at-bat-btn:hover {
+    background: #1976D2;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+}
+
+.delete-at-bat-btn {
+    background: #f44336;
+    color: white;
+}
+
+.delete-at-bat-btn:hover {
+    background: #d32f2f;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3);
+}
+
+.corrected-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #ff9800;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.correction-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.correction-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.correction-form label {
+    font-weight: bold;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.correction-form .form-control {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.correction-form .form-control:focus {
+    outline: none;
+    border-color: #2196F3;
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.current-result-display {
+    background: #f0f0f0;
+    padding: 1rem;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #666;
+}
+
+.correction-warning {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    padding: 1rem;
+    color: #856404;
+    font-size: 0.9rem;
+}
+
+.correction-warning strong {
+    color: #ff9800;
+}
+
+.history-placeholder {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #999;
+}
+
+.history-placeholder p {
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: #999;
+    font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+    .at-bat-history-item {
+        grid-template-columns: 1fr;
+    }
+
+    .at-bat-actions {
+        justify-content: flex-start;
+    }
+
+    .modal-header h3 {
+        font-size: 1.25rem;
+    }
+
+    .at-bat-history-content,
+    .correction-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+}
+
+@media (max-width: 480px) {
+    .at-bat-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .modal-header {
+        padding: 1rem;
+    }
+
+    .modal-body {
+        padding: 1rem;
+    }
+
+    .modal-footer {
+        padding: 1rem;
+        flex-direction: column;
+    }
+
+    .modal-footer button {
+        width: 100%;
+    }
+
+    .edit-at-bat-btn,
+    .delete-at-bat-btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
+    }
+}
+
+
+/* ===== クイック記録・詳細追記機能 ===== */
+
+.at-bat-history-item.needs-detail {
+    border-left: 4px solid #ff9800;
+    background: #fff8e1;
+}
+
+.incomplete-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 6rem;
+    background: #ff9800;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.quick-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 11rem;
+    background: #9c27b0;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.fill-detail-btn {
+    background: #ff9800;
+    color: white;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.fill-detail-btn:hover {
+    background: #f57c00;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(255, 152, 0, 0.3);
+}
+
+.fill-details-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.fill-details-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.detail-fill-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.current-info-display {
+    background: #fff8e1;
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 4px solid #ff9800;
+}
+
+.current-info-display strong {
+    font-size: 1.2rem;
+    color: #e65100;
+}
+
+.current-info-display .note {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #666;
+    font-style: italic;
+}
+
+.form-help {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.detail-reminder {
+    background: #e3f2fd;
+    border: 1px solid #2196F3;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    color: #1565c0;
+}
+
+.detail-reminder strong {
+    color: #0d47a1;
+}
+
+/* トースト通知 */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: #323232;
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transform: translateY(100px);
+    transition: all 0.3s ease-out;
+    z-index: 10001;
+    max-width: 400px;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast.toast-info {
+    background: #2196F3;
+}
+
+.toast.toast-success {
+    background: #4caf50;
+}
+
+.toast.toast-error {
+    background: #f44336;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .incomplete-badge {
+        right: 0.5rem;
+        top: 2.5rem;
+    }
+
+    .quick-badge {
+        right: 0.5rem;
+        top: 4rem;
+    }
+
+    .toast {
+        bottom: 1rem;
+        right: 1rem;
+        left: 1rem;
+        max-width: none;
+    }
+}
+
+/* ===== 選手情報編集モーダル ===== */
+
+.player-list-modal,
+.edit-player-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.player-list-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 900px;
+    width: 90%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.edit-player-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.player-teams {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    padding: 1rem;
+}
+
+.team-players h4 {
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #2196F3;
+    color: #1976d2;
+    font-size: 1.1rem;
+}
+
+.players-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.player-card {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.player-card.needs-detail {
+    border-left: 4px solid #ff9800;
+    background: #fff8e1;
+}
+
+.player-card:hover {
+    background: #e3f2fd;
+    border-color: #2196F3;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+}
+
+.player-card.needs-detail:hover {
+    background: #ffe0b2;
+    border-color: #ff9800;
+}
+
+.player-main-info {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex: 1;
+}
+
+.player-order {
+    background: #1976d2;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    min-width: 45px;
+    text-align: center;
+}
+
+.player-name-display {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #333;
+    min-width: 80px;
+}
+
+.player-position-display {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #666;
+    min-width: 40px;
+    text-align: center;
+}
+
+.edit-player-btn {
+    background: #2196F3;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s ease;
+}
+
+.edit-player-btn:hover {
+    background: #1976d2;
+}
+
+.edit-player-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+}
+
+.edit-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.edit-form-field label {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.edit-form-field input,
+.edit-form-field select {
+    padding: 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+}
+
+.edit-form-field input:focus,
+.edit-form-field select:focus {
+    outline: none;
+    border-color: #2196F3;
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.player-current-info {
+    background: #f5f5f5;
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 4px solid #2196F3;
+    margin-bottom: 1rem;
+}
+
+.player-current-info .label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 0.25rem;
+}
+
+.player-current-info .value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1976d2;
+}
+
+.save-player-btn {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    margin-top: 0.5rem;
+}
+
+.save-player-btn:hover {
+    background: #43a047;
+}
+
+.save-player-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+/* 選手カード内の未入力バッジ */
+.player-card .incomplete-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 5rem;
+    background: #ff9800;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .player-teams {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .player-main-info {
+        gap: 0.5rem;
+    }
+
+    .player-name-display {
+        min-width: 60px;
+        font-size: 0.9rem;
+    }
+
+    .player-list-content,
+    .edit-player-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .edit-player-form {
+        padding: 1rem;
+    }
+}

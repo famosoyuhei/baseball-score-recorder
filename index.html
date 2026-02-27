@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="オフラインで使用できる野球試合記録アプリ">
+    <title>野球スコア記録アプリ</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="./favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="./icons/favicon-48x48.png">
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="./icons/apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="./icons/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="./icons/apple-touch-icon-167x167.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-180x180.png">
+
+    <!-- Android Chrome Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="./static/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./static/icon-512.png">
+
+    <link rel="stylesheet" href="./css/style.css">
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2196F3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="野球スコア">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="野球スコア">
+
+    <!-- Microsoft Tiles -->
+    <meta name="msapplication-TileColor" content="#2196F3">
+    <meta name="msapplication-TileImage" content="./icons/icon-144x144.png">
+    <meta name="msapplication-config" content="./browserconfig.xml">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1 data-i18n="appTitle">野球スコア記録</h1>
+            <nav>
+                <button id="newGameBtn" class="nav-btn" data-i18n="newGame">新規試合</button>
+                <button id="loadGameBtn" class="nav-btn" data-i18n="loadGame">試合を読込</button>
+                <button id="settingsBtn" class="nav-btn" data-i18n="settings">設定</button>
+                <select id="languageSelect" class="language-select">
+                    <option value="ja">日本語</option>
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="pt">Português</option>
+                </select>
+            </nav>
+        </header>
+
+        <main id="mainContent">
+            <div id="welcomeScreen" class="screen active">
+                <h2 data-i18n="welcome">野球スコア記録アプリへようこそ</h2>
+                <p data-i18n="description">オフラインで使用できる野球試合記録システムです</p>
+                <div class="feature-list">
+                    <h3 data-i18n="features">機能</h3>
+                    <ul>
+                        <li data-i18n="featureInning">半イニングごとの記録</li>
+                        <li data-i18n="featureBatter">打者ごとの詳細記録</li>
+                        <li data-i18n="featurePitch">球ごとの詳細記録</li>
+                        <li data-i18n="featurePlayer">選手情報管理</li>
+                        <li data-i18n="featureOffline">オフライン動作</li>
+                    </ul>
+                </div>
+                <button id="startBtn" class="primary-btn" data-i18n="startNewGame">新しい試合を始める</button>
+            </div>
+
+            <div id="gameSetupScreen" class="screen">
+                <h2 data-i18n="gameSetup">試合設定</h2>
+                <form id="gameSetupForm">
+                    <div class="form-group">
+                        <label for="homeTeam" data-i18n="homeTeam">ホームチーム名:</label>
+                        <input type="text" id="homeTeam" required data-i18n-placeholder="homeTeamPlaceholder">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="awayTeam" data-i18n="awayTeam">アウェイチーム名:</label>
+                        <input type="text" id="awayTeam" required data-i18n-placeholder="awayTeamPlaceholder">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="recordingLevel" data-i18n="recordingLevel">記録レベル:</label>
+                        <select id="recordingLevel" required>
+                            <option value="inning" data-i18n="recordingInning">半イニングごと</option>
+                            <option value="batter" data-i18n="recordingBatter">打者ごと</option>
+                            <option value="pitch" data-i18n="recordingPitch">球ごと</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="playerDetailLevel" data-i18n="playerDetailLevel">選手詳細レベル:</label>
+                        <select id="playerDetailLevel" required>
+                            <option value="basic" data-i18n="playerBasic">基本（打順のみ）</option>
+                            <option value="standard" data-i18n="playerStandard">標準（打順・守備位置）</option>
+                            <option value="detailed" data-i18n="playerDetailed">詳細（全情報・控え選手含む）</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="recordingMode" data-i18n="recordingMode">記録環境:</label>
+                        <select id="recordingMode" required>
+                            <option value="bench" data-i18n="benchMode">ベンチ記録（推奨）</option>
+                            <option value="tv" data-i18n="tvMode">TV観戦記録</option>
+                        </select>
+                        <small data-i18n="recordingModeHelp">ベンチ記録は簡素化された高速入力、TV観戦記録は詳細分析機能を含みます</small>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="button" id="backToWelcome" class="secondary-btn" data-i18n="back">戻る</button>
+                        <button type="submit" class="primary-btn" data-i18n="startGame">試合開始</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="gameScreen" class="screen">
+                <!-- 最上部：固定ヘッダー（スコア・イニング・カウント） -->
+                <div id="gameHeader" class="game-header-compact">
+                    <!-- スコアボード（左） -->
+                    <div class="score-board-compact">
+                        <div class="team-score away" id="awayTeamScoreBox">
+                            <span class="team-name" id="awayTeamName" data-i18n="awayTeam">アウェイ</span>
+                            <span class="score" id="awayScore">0</span>
+                        </div>
+                        <div class="inning-compact">
+                            <span id="currentInning">1<span data-i18n="currentInning">回</span><span data-i18n="top">表</span></span>
+                        </div>
+                        <div class="team-score home" id="homeTeamScoreBox">
+                            <span class="team-name" id="homeTeamName" data-i18n="homeTeam">ホーム</span>
+                            <span class="score" id="homeScore">0</span>
+                        </div>
+                    </div>
+
+                    <!-- カウント表示（中央） -->
+                    <div class="count-status-compact">
+                        <div class="count-display">
+                            <span class="count-label">B-S</span>
+                            <div class="count-dots">
+                                <div class="count-dot ball" id="ball1"></div>
+                                <div class="count-dot ball" id="ball2"></div>
+                                <div class="count-dot ball" id="ball3"></div>
+                                <div class="count-dot ball" id="ball4"></div>
+                                <span class="count-separator">-</span>
+                                <div class="count-dot strike" id="strike1"></div>
+                                <div class="count-dot strike" id="strike2"></div>
+                                <div class="count-dot strike" id="strike3"></div>
+                            </div>
+                        </div>
+                        <div class="outs-display">
+                            <span class="count-label" data-i18n="outs">アウト</span>
+                            <div class="outs-dots">
+                                <div class="out-dot" id="out1"></div>
+                                <div class="out-dot" id="out2"></div>
+                                <div class="out-dot" id="out3"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 走者状況（右/下） -->
+                    <div class="runners-status-compact">
+                        <div class="diamond-compact">
+                            <div class="base-compact third" id="base-third">
+                                <span class="base-indicator"></span>
+                                <span class="runner-name" id="third-runner-name">-</span>
+                            </div>
+                            <div class="base-compact second" id="base-second">
+                                <span class="base-indicator"></span>
+                                <span class="runner-name" id="second-runner-name">-</span>
+                            </div>
+                            <div class="base-compact first" id="base-first">
+                                <span class="base-indicator"></span>
+                                <span class="runner-name" id="first-runner-name">-</span>
+                            </div>
+                            <div class="batter-box-compact">
+                                <span class="current-batter" id="current-batter-name">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 従来の表示（バックアップ用・非表示） -->
+                    <div style="display: none;">
+                        <span><span data-i18n="outs">アウト</span>: <span id="outs">0</span></span>
+                        <span><span data-i18n="balls">ボール</span>: <span id="balls">0</span></span>
+                        <span><span data-i18n="strikes">ストライク</span>: <span id="strikes">0</span></span>
+                    </div>
+                </div>
+
+                <!-- 打者・投手情報グリッド -->
+                <div class="player-stats-container">
+                    <!-- 現在打者の成績表示 -->
+                    <div class="current-batter-stats" id="currentBatterStats">
+                        <div class="batter-info">
+                            <div class="batter-name-large">
+                                <span id="currentBatterNumber" class="batter-number">1</span>
+                                <span id="currentBatterName" class="batter-name">打者名</span>
+                                <span id="currentBatterPosition" class="batter-position">P</span>
+                            </div>
+                            <div class="batter-stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-label" data-i18n="todayStats">本日</span>
+                                    <span class="stat-value" id="todayAtBats">0-0</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label" data-i18n="battingAvg">打率</span>
+                                    <span class="stat-value" id="battingAvg">.---</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label" data-i18n="onBaseAvg">出塁率</span>
+                                    <span class="stat-value" id="onBaseAvg">.---</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label" data-i18n="rbi">打点</span>
+                                    <span class="stat-value" id="batterRBI">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 現在投手の投球情報（球ごと記録時のみ表示） -->
+                    <div class="current-pitcher-stats pitch-level-only" id="currentPitcherStats" style="display: none;">
+                        <div class="pitcher-info">
+                            <div class="pitcher-name-large">
+                                <span id="currentPitcherNumber" class="pitcher-number">11</span>
+                                <span id="currentPitcherName" class="pitcher-name">投手名</span>
+                                <span class="pitcher-label">P</span>
+                            </div>
+                            <div class="pitcher-stats-grid">
+                                <div class="pitch-count-display">
+                                    <span class="pitch-count-label" data-i18n="pitchCount">投球数</span>
+                                    <span class="pitch-count-value" id="pitchCount">0</span>
+                                    <span class="pitch-count-unit" data-i18n="pitches">球</span>
+                                </div>
+                                <div class="pitcher-stats-mini">
+                                    <div class="mini-stat">
+                                        <span class="mini-stat-label" data-i18n="strikeouts">奪三振</span>
+                                        <span class="mini-stat-value" id="pitcherStrikeouts">0</span>
+                                    </div>
+                                    <div class="mini-stat">
+                                        <span class="mini-stat-label" data-i18n="walks">与四球</span>
+                                        <span class="mini-stat-value" id="pitcherWalks">0</span>
+                                    </div>
+                                    <div class="mini-stat">
+                                        <span class="mini-stat-label" data-i18n="hitsAllowed">被安打</span>
+                                        <span class="mini-stat-value" id="pitcherHits">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- プレー履歴タイムライン -->
+                <div class="play-timeline" id="playTimeline">
+                    <h4 data-i18n="recentPlays">最近のプレー</h4>
+                    <div class="timeline-items" id="timelineItems">
+                        <div class="timeline-item" style="text-align: center; color: #999; font-style: italic;">
+                            <span data-i18n="noPlaysYet">まだプレーがありません</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- スコアボード表示切り替え -->
+                <div class="scorebook-toggle">
+                    <button id="standardScoreboardBtn" class="active" data-i18n="standardScoreboard">標準スコアボード</button>
+                    <button id="npbScoreboardBtn" data-i18n="npbScorebook">NPB公式スコアブック</button>
+                </div>
+
+                <!-- 詳細スコアボード -->
+                <div class="detailed-scoreboard" id="detailedScoreboard">
+                    <table class="scoreboard-table" id="scoreboardTable">
+                        <!-- 動的に生成される -->
+                    </table>
+                </div>
+
+                <!-- NPB公式スコアブック -->
+                <div id="npbScoreboardContainer" style="display: none;">
+                    <!-- NPBスコアブックが動的に生成される -->
+                </div>
+
+                <div id="gameContent">
+                    <!-- 記録レベルに応じて動的に生成 -->
+                </div>
+
+                <!-- ベンチモード専用の簡素化された球ごと記録UI -->
+                <div class="bench-pitch-controls" id="benchPitchControls">
+                    <div class="bench-count-display">
+                        <div class="bench-current-batter" id="benchCurrentBatter">-</div>
+                        <div class="bench-count" id="benchCount">●●●-●●</div>
+                        <div class="bench-outs" id="benchOuts">0アウト</div>
+                    </div>
+
+                    <div class="bench-button-grid">
+                        <button class="bench-btn ball" id="benchBallBtn" data-i18n="ballButton">ボール</button>
+                        <button class="bench-btn strike" id="benchStrikeBtn" data-i18n="strikeButton">ストライク</button>
+                    </div>
+
+                    <div class="bench-button-grid three-col">
+                        <button class="bench-btn hit" id="benchHitBtn" data-i18n="hitButton">ヒット</button>
+                        <button class="bench-btn out" id="benchOutBtn" data-i18n="outButton">アウト</button>
+                        <button class="bench-btn walk" id="benchWalkBtn" data-i18n="walkButton">四球</button>
+                    </div>
+
+                    <div class="bench-button-grid">
+                        <button class="bench-btn hbp" id="benchHbpBtn" data-i18n="hbpButton">死球</button>
+                        <button class="bench-btn" id="benchErrorBtn" data-i18n="errorButton">エラー</button>
+                    </div>
+
+                    <!-- 選手交代・高度なプレー記録 -->
+                    <div class="bench-advanced-controls">
+                        <div class="bench-button-grid">
+                            <button class="bench-btn substitution" id="benchSubstitutionBtn" data-i18n="substitutionButton">選手交代</button>
+                            <button class="bench-btn steal" id="benchStealBtn" data-i18n="stealButton">盗塁</button>
+                        </div>
+                        <div class="bench-button-grid">
+                            <button class="bench-btn bunt" id="benchBuntBtn" data-i18n="buntButton">バント</button>
+                            <button class="bench-btn wildpitch" id="benchWildPitchBtn" data-i18n="wildPitchButton">暴投</button>
+                        </div>
+                    </div>
+
+                    <div class="bench-runners" id="benchRunners">
+                        <div class="bench-base" id="benchFirst">
+                            <div class="bench-base-label">1塁</div>
+                            <div class="bench-runner-name">-</div>
+                        </div>
+                        <div class="bench-base" id="benchSecond">
+                            <div class="bench-base-label">2塁</div>
+                            <div class="bench-runner-name">-</div>
+                        </div>
+                        <div class="bench-base" id="benchThird">
+                            <div class="bench-base-label">3塁</div>
+                            <div class="bench-runner-name">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ベンチモード選手交代モーダル -->
+                <div class="bench-substitution-modal" id="benchSubstitutionModal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 data-i18n="playerSubstitution">選手交代</h3>
+                            <button class="close-btn" id="benchSubModalClose">&times;</button>
+                        </div>
+
+                        <div class="substitution-type-selector">
+                            <button class="sub-type-btn" data-type="pinch-hit" data-i18n="pinchHit">代打</button>
+                            <button class="sub-type-btn" data-type="pinch-run" data-i18n="pinchRun">代走</button>
+                            <button class="sub-type-btn" data-type="defensive" data-i18n="defensive">守備交代</button>
+                            <button class="sub-type-btn" data-type="pitcher" data-i18n="pitcherChange">投手交代</button>
+                            <button class="sub-type-btn" data-type="dh-to-pitcher" data-i18n="dhToPitcher" style="display:none;">DH→投手</button>
+                        </div>
+
+                        <div class="player-selection">
+                            <div class="selection-group">
+                                <label data-i18n="outPlayer">退場選手:</label>
+                                <select id="benchOutPlayer"></select>
+                            </div>
+                            <div class="selection-group">
+                                <label data-i18n="inPlayer">入場選手:</label>
+                                <select id="benchInPlayer"></select>
+                            </div>
+                        </div>
+
+                        <div class="substitution-actions">
+                            <button class="bench-btn confirm" id="benchSubConfirm" data-i18n="confirm">交代実行</button>
+                            <button class="bench-btn cancel" id="benchSubCancel" data-i18n="cancel">キャンセル</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 盗塁記録モーダル -->
+                <div class="bench-steal-modal" id="benchStealModal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 data-i18n="stealAttempt">盗塁試行</h3>
+                            <button class="close-btn" id="benchStealModalClose">&times;</button>
+                        </div>
+
+                        <div class="steal-selection">
+                            <div class="selection-group">
+                                <label data-i18n="stealRunner">盗塁走者:</label>
+                                <select id="benchStealRunner"></select>
+                            </div>
+                            <div class="selection-group">
+                                <label data-i18n="stealTarget">目標塁:</label>
+                                <select id="benchStealTarget">
+                                    <option value="second" data-i18n="secondBase">2塁</option>
+                                    <option value="third" data-i18n="thirdBase">3塁</option>
+                                    <option value="home" data-i18n="homePlate">本塁</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="steal-result-selector">
+                            <button class="bench-btn steal-success" id="benchStealSuccess" data-i18n="stealSuccess">盗塁成功</button>
+                            <button class="bench-btn steal-out" id="benchStealOut" data-i18n="stealOut">盗塁失敗</button>
+                            <button class="bench-btn steal-wild" id="benchStealWild" data-i18n="wildAdvance">暴投進塁</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="game-controls">
+                    <div class="control-row">
+                        <button id="saveGame" class="secondary-btn" data-i18n="save">保存</button>
+                        <button id="playerSubstitution" class="secondary-btn" style="display: none;" data-i18n="playerSubstitution">選手交代</button>
+                        <button id="editPlayersBtn" class="secondary-btn" data-i18n="editPlayers">選手情報編集</button>
+                        <button id="endGame" class="secondary-btn" data-i18n="endGame">試合終了</button>
+                    </div>
+                    <div class="control-row manual-controls">
+                        <button id="noNextInning" class="warning-btn" data-i18n="noNextInning">次のイニングに進まない</button>
+                        <button id="forceGameEnd" class="danger-btn" data-i18n="forceGameEnd">強制終了</button>
+                        <button id="showGameTime" class="info-btn" data-i18n="showGameTime">時刻確認</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="./js/storage.js"></script>
+    <script src="./js/data.js"></script>
+    <script src="./js/game.js"></script>
+    <script src="./js/i18n.js"></script>
+    <script src="./js/realtime-ui.js"></script>
+    <script src="./js/npb-scorebook.js"></script>
+    <script src="./js/app.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.error('SW registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>
