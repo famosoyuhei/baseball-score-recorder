@@ -1089,7 +1089,7 @@ class BaseballApp {
                 modal.querySelectorAll('.sub-content').forEach(content => {
                     content.classList.remove('active');
                 });
-                modal.getElementById(`${tab.dataset.type}Content`).classList.add('active');
+                modal.querySelector(`#${tab.dataset.type}Content`).classList.add('active');
 
                 this.updateSubstitutionContent(tab.dataset.type, battingTeam, fieldingTeam);
             });
@@ -1105,7 +1105,7 @@ class BaseballApp {
                 modal.querySelectorAll('.fielding-sub-content').forEach(content => {
                     content.classList.remove('active');
                 });
-                modal.getElementById(`fielding${tab.dataset.fieldType.split('-').map(word =>
+                modal.querySelector(`#fielding${tab.dataset.fieldType.split('-').map(word =>
                     word.charAt(0).toUpperCase() + word.slice(1)).join('')}`).classList.add('active');
 
                 this.updateFieldingSubstitutionContent(tab.dataset.fieldType, fieldingTeam);
@@ -1113,11 +1113,11 @@ class BaseballApp {
         });
 
         // ボタンイベント
-        modal.getElementById('executeSubstitution').addEventListener('click', () => {
+        modal.querySelector('#executeSubstitution').addEventListener('click', () => {
             this.executeSubstitution(modal);
         });
 
-        modal.getElementById('cancelSubstitution').addEventListener('click', () => {
+        modal.querySelector('#cancelSubstitution').addEventListener('click', () => {
             document.body.removeChild(modal);
         });
 
@@ -1320,7 +1320,7 @@ class BaseballApp {
     }
 
     showPositionSwapContent(modal, players) {
-        const area = modal.getElementById('positionSwapArea');
+        const area = modal.querySelector('#positionSwapArea');
         area.innerHTML = `
             <div class="current-lineup">
                 <h5>現在のラインナップ</h5>
@@ -1343,7 +1343,7 @@ class BaseballApp {
     }
 
     showPlayerChangeContent(modal, players) {
-        const area = modal.getElementById('playerChangeArea');
+        const area = modal.querySelector('#playerChangeArea');
         area.innerHTML = `
             <div class="player-changes">
                 <h5>選手変更</h5>
@@ -1375,7 +1375,7 @@ class BaseballApp {
     }
 
     showCombinationContent(modal, players) {
-        const area = modal.getElementById('combinationArea');
+        const area = modal.querySelector('#combinationArea');
         area.innerHTML = `
             <div class="combination-changes">
                 <h5>選手変更+守備位置調整</h5>
@@ -1782,7 +1782,7 @@ class BaseballApp {
             });
 
             // 確定ボタン処理
-            modal.getElementById('confirmDefensivePositions').addEventListener('click', async () => {
+            modal.querySelector('#confirmDefensivePositions').addEventListener('click', async () => {
                 try {
                     await this.processSubstituteDefensivePositions(modal, battingTeam, substitutePlayers);
                     document.body.removeChild(modal);
