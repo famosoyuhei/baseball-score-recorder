@@ -101,33 +101,33 @@ class RealtimeUI {
     // 走者状況のフォーマット
     formatRunners(runners) {
         const bases = [];
-        if (runners.first) bases.push('一');
-        if (runners.second) bases.push('二');
-        if (runners.third) bases.push('三');
+        if (runners.first) bases.push(i18n.t('firstBaseKanji'));
+        if (runners.second) bases.push(i18n.t('secondBaseKanji'));
+        if (runners.third) bases.push(i18n.t('thirdBaseKanji'));
 
-        if (bases.length === 0) return '走者なし';
-        if (bases.length === 3) return '満塁';
-        return bases.join('・') + '塁';
+        if (bases.length === 0) return i18n.t('noRunners');
+        if (bases.length === 3) return i18n.t('basesLoaded');
+        return bases.join('・') + i18n.t('basesSuffix');
     }
 
     // 打席結果のフォーマット
     formatResult(result) {
         const resultMap = {
-            'single': '単打',
-            'double': '二塁打',
-            'triple': '三塁打',
-            'homerun': '本塁打',
-            'walk': '四球',
-            'hit_by_pitch': '死球',
-            'strikeout': '三振',
-            'groundout': 'ゴロ',
-            'flyout': 'フライ',
-            'lineout': 'ライナー',
-            'sacrifice_bunt': '犠打',
-            'sacrifice_fly': '犠飛',
-            'ground_double_play': '併殺',
-            'fly_double_play': '飛併殺',
-            'error': 'エラー'
+            'single': i18n.t('singleHit'),
+            'double': i18n.t('doubleHit'),
+            'triple': i18n.t('tripleHit'),
+            'homerun': i18n.t('homeRun'),
+            'walk': i18n.t('walkFourBalls'),
+            'hit_by_pitch': i18n.t('hitByPitchDead'),
+            'strikeout': i18n.t('strikeoutSwing'),
+            'groundout': i18n.t('groundBall'),
+            'flyout': i18n.t('flyBall'),
+            'lineout': i18n.t('lineDrive'),
+            'sacrifice_bunt': i18n.t('sacrificeBunt'),
+            'sacrifice_fly': i18n.t('sacrificeFly'),
+            'ground_double_play': i18n.t('doublePlayGround'),
+            'fly_double_play': i18n.t('doublePlayFly'),
+            'error': i18n.t('errorPlay')
         };
 
         return resultMap[result] || result;
@@ -359,7 +359,7 @@ class RealtimeUI {
 
     // 選手名を取得（ID から名前を取得）
     getPlayerName(playerId) {
-        if (!playerId || playerId === 'batter') return '走者';
+        if (!playerId || playerId === 'batter') return i18n.t('runner');
 
         // gameManager から選手情報を取得
         if (window.gameManager && gameManager.currentGame) {
@@ -367,11 +367,11 @@ class RealtimeUI {
             const allPlayers = [...game.players.home, ...game.players.away];
             const player = allPlayers.find(p => p.id === playerId);
             if (player) {
-                return player.name || `${player.battingOrder}番`;
+                return player.name || `${player.battingOrder}${i18n.t('battingOrderSuffix')}`;
             }
         }
 
-        return '走者';
+        return i18n.t('runner');
     }
 
     // 投手情報の更新
@@ -399,7 +399,7 @@ class RealtimeUI {
 
         // 投手情報がない場合
         if (!pitcher) {
-            document.getElementById('currentPitcherName').textContent = '投手名';
+            document.getElementById('currentPitcherName').textContent = i18n.t('pitcherName');
             document.getElementById('currentPitcherNumber').textContent = '-';
             document.getElementById('pitchCount').textContent = '0';
             return;
@@ -416,7 +416,7 @@ class RealtimeUI {
         // 投手名
         const nameEl = document.getElementById('currentPitcherName');
         if (nameEl) {
-            nameEl.textContent = pitcher.name || '投手名';
+            nameEl.textContent = pitcher.name || i18n.t('pitcherName');
         }
 
         // 投球数

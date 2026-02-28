@@ -54,6 +54,7 @@ class I18n {
                 strikeouts: '奪三振',
                 walks: '与四球',
                 hitsAllowed: '被安打',
+                pitcherName: '投手名',
 
                 // 機能一覧
                 features: '機能',
@@ -227,6 +228,10 @@ class I18n {
                 confirmForceEndGame: '試合を強制終了しますか？\n理由: {reason}',
                 noReason: '理由なし',
 
+                // アラートメッセージ (Alert messages)
+                errorPrefix: 'エラー: ',
+                selectStolenBaseRunner: '盗塁走者を選択してください',
+
                 // 言語設定
                 language: '言語',
                 japanese: '日本語',
@@ -342,7 +347,33 @@ class I18n {
                 addBenchPlayer: '控え選手を追加',
                 benchPlayerNamePlaceholder: '控え選手名',
                 remove: '削除',
-                detail: '詳細'
+                detail: '詳細',
+
+                // 走者状況表示 (Runner situation display)
+                noRunners: '走者なし',
+                basesLoaded: '満塁',
+                basesSuffix: '塁',
+                firstBaseKanji: '一',
+                secondBaseKanji: '二',
+                thirdBaseKanji: '三',
+
+                // 打席結果名 (At-bat result names - used in realtime-ui.js)
+                singleHit: '単打',
+                doubleHit: '二塁打',
+                tripleHit: '三塁打',
+                homeRun: '本塁打',
+                walkFourBalls: '四球',
+                hitByPitchDead: '死球',
+                strikeoutSwing: '三振',
+                groundBall: 'ゴロ',
+                flyBall: 'フライ',
+                lineDrive: 'ライナー',
+                sacrificeBunt: '犠打',
+                sacrificeFly: '犠飛',
+                doublePlayGround: '併殺',
+                doublePlayFly: '飛併殺',
+                errorPlay: 'エラー',
+                runner: '走者'
             },
 
             // 英語 (English)
@@ -522,6 +553,7 @@ class I18n {
                 rbi: 'RBI',
                 recentPlays: 'Recent Plays',
                 noPlaysYet: 'No plays yet',
+                pitcherName: 'Pitcher Name',
 
                 // メッセージ
                 gameStarted: 'Game started',
@@ -535,6 +567,10 @@ class I18n {
                 confirmNoNextInning: 'Do you want to prevent advancing to the next inning after the current {half} of inning {inning}?\n(Time limit, field usage time, etc.)',
                 confirmForceEndGame: 'Do you want to force end the game?\nReason: {reason}',
                 noReason: 'No reason',
+
+                // Alert messages
+                errorPrefix: 'Error: ',
+                selectStolenBaseRunner: 'Please select a runner for stolen base',
 
                 // 言語設定
                 language: 'Language',
@@ -623,7 +659,7 @@ class I18n {
                 swapTeams: 'Swap Home/Away',
                 cannotEditAfterStart: 'Cannot edit team information after game has started',
 
-                // 選手交代関連
+                // Substitution
                 substitutionModalTitle: 'Player Substitution',
                 offensiveSubstitution: 'Offensive Substitution',
                 defensiveSubstitution: 'Defensive Substitution',
@@ -640,6 +676,32 @@ class I18n {
                 targetTeam: 'Target Team',
                 offense: 'Offense',
                 defense: 'Defense',
+
+                // Runner situation display
+                noRunners: 'No runners',
+                basesLoaded: 'Bases loaded',
+                basesSuffix: ' base',
+                firstBaseKanji: '1st',
+                secondBaseKanji: '2nd',
+                thirdBaseKanji: '3rd',
+
+                // At-bat result names
+                singleHit: 'Single',
+                doubleHit: 'Double',
+                tripleHit: 'Triple',
+                homeRun: 'Home Run',
+                walkFourBalls: 'Walk',
+                hitByPitchDead: 'Hit by Pitch',
+                strikeoutSwing: 'Strikeout',
+                groundBall: 'Groundout',
+                flyBall: 'Flyout',
+                lineDrive: 'Lineout',
+                sacrificeBunt: 'Sacrifice Bunt',
+                sacrificeFly: 'Sacrifice Fly',
+                doublePlayGround: 'Double Play',
+                doublePlayFly: 'Fly Double Play',
+                errorPlay: 'Error',
+                runner: 'Runner',
 
                 // 共通UI要素
                 selectPlaceholder: 'Please select',
@@ -800,6 +862,7 @@ class I18n {
                 rbi: 'CI',
                 recentPlays: 'Jugadas Recientes',
                 noPlaysYet: 'Aún no hay jugadas',
+                pitcherName: 'Nombre del Lanzador',
 
                 // メッセージ
                 gameStarted: 'Juego iniciado',
@@ -813,6 +876,10 @@ class I18n {
                 confirmNoNextInning: '¿Desea evitar avanzar a la próxima entrada después del {half} actual de la entrada {inning}?\n(Límite de tiempo, tiempo de uso del campo, etc.)',
                 confirmForceEndGame: '¿Desea forzar el final del juego?\nRazón: {reason}',
                 noReason: 'Sin razón',
+
+                // Alert messages
+                errorPrefix: 'Error: ',
+                selectStolenBaseRunner: 'Por favor seleccione un corredor para base robada',
 
                 // 言語設定
                 language: 'Idioma',
@@ -901,7 +968,7 @@ class I18n {
                 swapTeams: 'Intercambiar Local/Visitante',
                 cannotEditAfterStart: 'No se puede editar después del inicio del juego',
 
-                // 選手交代関連
+                // Substitution
                 substitutionModalTitle: 'Sustitución de Jugador',
                 offensiveSubstitution: 'Sustitución Ofensiva',
                 defensiveSubstitution: 'Sustitución Defensiva',
@@ -914,7 +981,7 @@ class I18n {
                 selectSubstitutionInfo: 'Por favor seleccione información de sustitución',
                 newPlayerName: 'Nombre del nuevo jugador',
 
-                // 共通UI要素
+                // Common UI
                 selectPlaceholder: 'Por favor seleccione',
                 firstBaseRunner: 'Corredor en 1ra Base',
                 secondBaseRunner: 'Corredor en 2da Base',
@@ -924,7 +991,33 @@ class I18n {
                 addBenchPlayer: 'Agregar Jugador de Banca',
                 benchPlayerNamePlaceholder: 'Nombre del jugador de banca',
                 remove: 'Eliminar',
-                detail: 'Detalle'
+                detail: 'Detalle',
+
+                // Runner situation display
+                noRunners: 'Sin corredores',
+                basesLoaded: 'Bases llenas',
+                basesSuffix: ' base',
+                firstBaseKanji: '1ra',
+                secondBaseKanji: '2da',
+                thirdBaseKanji: '3ra',
+
+                // At-bat result names
+                singleHit: 'Sencillo',
+                doubleHit: 'Doble',
+                tripleHit: 'Triple',
+                homeRun: 'Jonrón',
+                walkFourBalls: 'Base por Bolas',
+                hitByPitchDead: 'Golpeado por Lanzamiento',
+                strikeoutSwing: 'Ponche',
+                groundBall: 'Roletazo',
+                flyBall: 'Elevado',
+                lineDrive: 'Línea',
+                sacrificeBunt: 'Toque de Sacrificio',
+                sacrificeFly: 'Elevado de Sacrificio',
+                doublePlayGround: 'Doble Play',
+                doublePlayFly: 'Doble Play al Vuelo',
+                errorPlay: 'Error',
+                runner: 'Corredor'
             },
 
             // ポルトガル語 (Portuguese)
@@ -1073,6 +1166,7 @@ class I18n {
                 rbi: 'RBI',
                 recentPlays: 'Jogadas Recentes',
                 noPlaysYet: 'Ainda não há jogadas',
+                pitcherName: 'Nome do Arremessador',
 
                 // メッセージ
                 gameStarted: 'Jogo iniciado',
@@ -1086,6 +1180,10 @@ class I18n {
                 confirmNoNextInning: 'Deseja evitar avançar para a próxima entrada após o {half} atual da entrada {inning}?\n(Limite de tempo, tempo de uso do campo, etc.)',
                 confirmForceEndGame: 'Deseja forçar o fim do jogo?\nMotivo: {reason}',
                 noReason: 'Sem motivo',
+
+                // Alert messages
+                errorPrefix: 'Erro: ',
+                selectStolenBaseRunner: 'Por favor selecione um corredor para base roubada',
 
                 // 言語設定
                 language: 'Idioma',
@@ -1174,7 +1272,7 @@ class I18n {
                 swapTeams: 'Trocar Casa/Visitante',
                 cannotEditAfterStart: 'Não pode editar após o início do jogo',
 
-                // 選手交代関連
+                // Substitution
                 substitutionModalTitle: 'Substituição de Jogador',
                 offensiveSubstitution: 'Substituição Ofensiva',
                 defensiveSubstitution: 'Substituição Defensiva',
@@ -1187,7 +1285,7 @@ class I18n {
                 selectSubstitutionInfo: 'Por favor selecione informações de substituição',
                 newPlayerName: 'Nome do novo jogador',
 
-                // 共通UI要素
+                // Common UI
                 selectPlaceholder: 'Por favor selecione',
                 firstBaseRunner: 'Corredor na 1ª Base',
                 secondBaseRunner: 'Corredor na 2ª Base',
@@ -1197,7 +1295,33 @@ class I18n {
                 addBenchPlayer: 'Adicionar Jogador Reserva',
                 benchPlayerNamePlaceholder: 'Nome do jogador reserva',
                 remove: 'Remover',
-                detail: 'Detalhe'
+                detail: 'Detalhe',
+
+                // Runner situation display
+                noRunners: 'Sem corredores',
+                basesLoaded: 'Bases cheias',
+                basesSuffix: ' base',
+                firstBaseKanji: '1ª',
+                secondBaseKanji: '2ª',
+                thirdBaseKanji: '3ª',
+
+                // At-bat result names
+                singleHit: 'Simples',
+                doubleHit: 'Dupla',
+                tripleHit: 'Tripla',
+                homeRun: 'Home Run',
+                walkFourBalls: 'Base por Bola',
+                hitByPitchDead: 'Atingido por Arremesso',
+                strikeoutSwing: 'Strikeout',
+                groundBall: 'Ground Out',
+                flyBall: 'Fly Out',
+                lineDrive: 'Line Out',
+                sacrificeBunt: 'Toque de Sacrifício',
+                sacrificeFly: 'Elevado de Sacrifício',
+                doublePlayGround: 'Jogada Dupla',
+                doublePlayFly: 'Jogada Dupla ao Voo',
+                errorPlay: 'Erro',
+                runner: 'Corredor'
             }
         };
     }

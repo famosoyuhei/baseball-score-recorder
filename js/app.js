@@ -4281,7 +4281,7 @@ class BaseballApp {
     }
 
     showError(message) {
-        alert('エラー: ' + message);
+        alert(i18n.t('errorPrefix') + message);
     }
 
     showSuccess(message) {
@@ -5325,7 +5325,7 @@ class BaseballApp {
         const inPlayer = document.getElementById('benchInPlayer').value;
 
         if (!subType || !outPlayer || !inPlayer) {
-            alert('選手交代の情報を選択してください');
+            alert(i18n.t('selectSubstitutionInfo'));
             return;
         }
 
@@ -5449,7 +5449,7 @@ class BaseballApp {
         const stealTarget = document.getElementById('benchStealTarget').value;
 
         if (!stealRunner) {
-            alert('盗塁走者を選択してください');
+            alert(i18n.t('selectStolenBaseRunner'));
             return;
         }
 
