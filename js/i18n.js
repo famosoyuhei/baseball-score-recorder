@@ -127,6 +127,8 @@ class I18n {
                 // スコアブック
                 standardScoreboard: '標準スコアボード',
                 npbScorebook: '公式スコアブック(MLB方式)',
+                playerNameColumn: '選手名',
+                totalRow: '合計',
 
                 // 選手登録画面
                 playerRegistration: '選手登録',
@@ -426,6 +428,8 @@ class I18n {
                 // スコアブック
                 standardScoreboard: 'Standard Scoreboard',
                 npbScorebook: 'Official Scorebook (MLB Style)',
+                playerNameColumn: 'Player Name',
+                totalRow: 'Total',
 
                 // 選手登録画面
                 playerRegistration: 'Player Registration',
@@ -702,6 +706,8 @@ class I18n {
                 // スコアブック
                 standardScoreboard: 'Marcador Estándar',
                 npbScorebook: 'Libro de Puntuación Oficial (Estilo MLB)',
+                playerNameColumn: 'Nombre del Jugador',
+                totalRow: 'Total',
 
                 // 選手登録画面
                 playerRegistration: 'Registro de Jugadores',
@@ -973,6 +979,8 @@ class I18n {
                 // スコアブック
                 standardScoreboard: 'Placar Padrão',
                 npbScorebook: 'Livro de Pontuação Oficial (Estilo MLB)',
+                playerNameColumn: 'Nome do Jogador',
+                totalRow: 'Total',
 
                 // 選手登録画面
                 playerRegistration: 'Registro de Jogadores',

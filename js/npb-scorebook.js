@@ -211,7 +211,7 @@ class NPBScorebook {
         html += '<table class="npb-scorebook-table">';
 
         // ヘッダー行（イニング番号）
-        html += '<thead><tr><th>選手名</th>';
+        html += `<thead><tr><th>${i18n.t('playerNameColumn')}</th>`;
         for (let i = 1; i <= 9; i++) {
             html += `<th>${i}</th>`;
         }
@@ -250,7 +250,7 @@ class NPBScorebook {
 
         // 合計行
         html += '<tfoot><tr>';
-        html += '<td><strong>合計</strong></td>';
+        html += `<td><strong>${i18n.t('totalRow')}</strong></td>`;
         for (let i = 1; i <= 9; i++) {
             const inningRuns = this.calculateInningRuns(teamData.innings[i - 1]);
             html += `<td class="inning-total">${inningRuns}</td>`;
