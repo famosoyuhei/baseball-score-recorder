@@ -1282,8 +1282,10 @@ class GameManager {
      */
     async updatePlayerInfo(team, playerId, updates) {
         try {
-            const player = this.currentGame.players[team].find(p => p.id === playerId);
+            // IDの型を統一（文字列として比較）
+            const player = this.currentGame.players[team].find(p => String(p.id) === String(playerId));
             if (!player) {
+                console.error('Player not found in updatePlayerInfo. playerId:', playerId, 'available IDs:', this.currentGame.players[team].map(p => p.id));
                 throw new Error('選手が見つかりません');
             }
 

@@ -3362,9 +3362,14 @@ class BaseballApp {
     async showEditPlayerModal(team, playerId) {
         try {
             const players = gameManager.getAllPlayers();
-            const player = players[team].find(p => p.id === playerId);
+            console.log('showEditPlayerModal - team:', team, 'playerId:', playerId, 'type:', typeof playerId);
+            console.log('Available players:', players[team].map(p => ({ id: p.id, type: typeof p.id, name: p.name })));
+
+            // IDの型を統一（文字列として比較）
+            const player = players[team].find(p => String(p.id) === String(playerId));
 
             if (!player) {
+                console.error('Player not found. playerId:', playerId, 'available IDs:', players[team].map(p => p.id));
                 this.showError('選手が見つかりません');
                 return;
             }
