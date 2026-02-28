@@ -3354,14 +3354,14 @@ class BaseballApp {
                                         const needsDetail = player.needsDetailFill;
                                         return `
                                         <div class="player-card ${needsDetail ? 'needs-detail' : ''}" data-player-id="${player.id}" data-team="home">
-                                            ${needsDetail ? '<span class="incomplete-badge" data-i18n="incompletePlayerInfo">未入力</span>' : ''}
+                                            ${needsDetail ? `<span class="incomplete-badge" data-i18n="incompletePlayerInfo">${i18n.t('incompletePlayerInfo')}</span>` : ''}
                                             <div class="player-main-info">
                                                 <span class="player-order">${player.battingOrder}${i18n.t('battingOrderSuffix')}</span>
-                                                <span class="player-name-display">${player.name || '未設定'}</span>
+                                                <span class="player-name-display">${player.name || i18n.t('notSet')}</span>
                                                 <span class="player-position-display">${player.position || '-'}</span>
                                             </div>
                                             <button class="edit-player-btn" data-player-id="${player.id}" data-team="home">
-                                                <span data-i18n="${needsDetail ? 'fillPlayerDetails' : 'edit'}">${needsDetail ? '詳細入力' : '編集'}</span>
+                                                <span data-i18n="${needsDetail ? 'fillPlayerDetails' : 'edit'}">${needsDetail ? i18n.t('fillPlayerDetails') : i18n.t('edit')}</span>
                                             </button>
                                         </div>
                                         `;
@@ -3375,14 +3375,14 @@ class BaseballApp {
                                         const needsDetail = player.needsDetailFill;
                                         return `
                                         <div class="player-card ${needsDetail ? 'needs-detail' : ''}" data-player-id="${player.id}" data-team="away">
-                                            ${needsDetail ? '<span class="incomplete-badge" data-i18n="incompletePlayerInfo">未入力</span>' : ''}
+                                            ${needsDetail ? `<span class="incomplete-badge" data-i18n="incompletePlayerInfo">${i18n.t('incompletePlayerInfo')}</span>` : ''}
                                             <div class="player-main-info">
                                                 <span class="player-order">${player.battingOrder}${i18n.t('battingOrderSuffix')}</span>
-                                                <span class="player-name-display">${player.name || '未設定'}</span>
+                                                <span class="player-name-display">${player.name || i18n.t('notSet')}</span>
                                                 <span class="player-position-display">${player.position || '-'}</span>
                                             </div>
                                             <button class="edit-player-btn" data-player-id="${player.id}" data-team="away">
-                                                <span data-i18n="${needsDetail ? 'fillPlayerDetails' : 'edit'}">${needsDetail ? '詳細入力' : '編集'}</span>
+                                                <span data-i18n="${needsDetail ? 'fillPlayerDetails' : 'edit'}">${needsDetail ? i18n.t('fillPlayerDetails') : i18n.t('edit')}</span>
                                             </button>
                                         </div>
                                         `;

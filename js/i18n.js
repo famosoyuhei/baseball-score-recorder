@@ -291,9 +291,10 @@ class I18n {
                 normalRegistration: '通常登録',
                 incompletePlayerInfo: '未入力',
                 playerDetailIncomplete: '詳細未入力',
-                fillPlayerDetails: '選手詳細を入力',
+                fillPlayerDetails: '詳細入力',
                 incompletePlayers: '未入力の選手',
                 noIncompletePlayers: '未入力の選手はいません',
+                notSet: '未設定',
 
                 // チーム情報編集
                 editTeamInfo: 'チーム情報を編集',
@@ -590,9 +591,10 @@ class I18n {
                 normalRegistration: 'Normal Registration',
                 incompletePlayerInfo: 'Incomplete',
                 playerDetailIncomplete: 'Details Missing',
-                fillPlayerDetails: 'Fill Player Details',
+                fillPlayerDetails: 'Fill Details',
                 incompletePlayers: 'Incomplete Players',
                 noIncompletePlayers: 'No incomplete players',
+                notSet: 'Not Set',
 
                 // Team Info Edit
                 editTeamInfo: 'Edit Team Info',
@@ -858,9 +860,10 @@ class I18n {
                 normalRegistration: 'Registro Normal',
                 incompletePlayerInfo: 'Incompleto',
                 playerDetailIncomplete: 'Detalles Faltantes',
-                fillPlayerDetails: 'Completar Detalles del Jugador',
+                fillPlayerDetails: 'Completar Detalles',
                 incompletePlayers: 'Jugadores Incompletos',
                 noIncompletePlayers: 'No hay jugadores incompletos',
+                notSet: 'No Configurado',
 
                 // Edición de Información del Equipo
                 editTeamInfo: 'Editar Info del Equipo',
@@ -1121,9 +1124,10 @@ class I18n {
                 normalRegistration: 'Registro Normal',
                 incompletePlayerInfo: 'Incompleto',
                 playerDetailIncomplete: 'Detalhes Faltando',
-                fillPlayerDetails: 'Preencher Detalhes do Jogador',
+                fillPlayerDetails: 'Preencher Detalhes',
                 incompletePlayers: 'Jogadores Incompletos',
                 noIncompletePlayers: 'Não há jogadores incompletos',
+                notSet: 'Não Configurado',
 
                 // Edição de Informações da Equipe
                 editTeamInfo: 'Editar Info da Equipe',
