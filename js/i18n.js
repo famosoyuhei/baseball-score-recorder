@@ -480,6 +480,14 @@ class I18n {
                 groundout: 'Groundout',
                 flyout: 'Flyout',
 
+                // 打者情報表示
+                todayStats: 'Today',
+                battingAvg: 'AVG',
+                onBaseAvg: 'OBP',
+                rbi: 'RBI',
+                recentPlays: 'Recent Plays',
+                noPlaysYet: 'No plays yet',
+
                 // メッセージ
                 gameStarted: 'Game started',
                 gameSaved: 'Game saved',
@@ -717,6 +725,14 @@ class I18n {
                 groundout: 'Out por Roletazo',
                 flyout: 'Out por Elevado',
 
+                // 打者情報表示
+                todayStats: 'Hoy',
+                battingAvg: 'AVE',
+                onBaseAvg: 'OBP',
+                rbi: 'CI',
+                recentPlays: 'Jugadas Recientes',
+                noPlaysYet: 'Aún no hay jugadas',
+
                 // メッセージ
                 gameStarted: 'Juego iniciado',
                 gameSaved: 'Juego guardado',
@@ -948,6 +964,14 @@ class I18n {
                 strikeout: 'Strikeout',
                 groundout: 'Out no Solo',
                 flyout: 'Out no Ar',
+
+                // 打者情報表示
+                todayStats: 'Hoje',
+                battingAvg: 'AVE',
+                onBaseAvg: 'OBP',
+                rbi: 'RBI',
+                recentPlays: 'Jogadas Recentes',
+                noPlaysYet: 'Ainda não há jogadas',
 
                 // メッセージ
                 gameStarted: 'Jogo iniciado',
