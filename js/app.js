@@ -488,7 +488,8 @@ class BaseballApp {
                 continue;
             }
             const selected = selectedPosition === key ? 'selected' : '';
-            html += `<option value="${key}" ${selected}>${key}: ${value}</option>`;
+            const positionName = i18n.t(`pos_${key}`);
+            html += `<option value="${key}" ${selected}>${key}: ${positionName}</option>`;
         }
         return html;
     }
@@ -643,7 +644,7 @@ class BaseballApp {
                     if (positions[player.position]) {
                         return {
                             valid: false,
-                            message: `${team === 'home' ? game.homeTeam : game.awayTeam}の守備位置が重複しています: ${BASEBALL_CONFIG.POSITIONS[player.position]}（${player.position}）`
+                            message: `${team === 'home' ? game.homeTeam : game.awayTeam}の守備位置が重複しています: ${i18n.t(`pos_${player.position}`)}（${player.position}）`
                         };
                     }
                     positions[player.position] = true;
@@ -1274,7 +1275,7 @@ class BaseballApp {
                             <div class="player-info">
                                 <span class="batting-order">${player.battingOrder}${i18n.t('battingOrderSuffix')}</span>
                                 <span class="player-name">${player.name}</span>
-                                <span class="position">${BASEBALL_CONFIG.POSITIONS[player.position]}</span>
+                                <span class="position">${i18n.t(`pos_${player.position}`)}</span>
                             </div>
                             <select class="new-position" data-player-id="${player.id}">
                                 ${this.generatePositionOptions(player.position)}
@@ -1294,7 +1295,7 @@ class BaseballApp {
                 ${players.map(player => `
                     <div class="change-item">
                         <div class="current-player">
-                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
+                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${i18n.t(`pos_${player.position}`)})</span>
                         </div>
                         <div class="change-controls">
                             <label>
@@ -1326,7 +1327,7 @@ class BaseballApp {
                 ${players.map(player => `
                     <div class="combo-item">
                         <div class="current-info">
-                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
+                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${i18n.t(`pos_${player.position}`)})</span>
                         </div>
                         <div class="combo-controls">
                             <label>
@@ -1364,7 +1365,7 @@ class BaseballApp {
                             <div class="player-info">
                                 <span class="batting-order">${player.battingOrder}${i18n.t('battingOrderSuffix')}</span>
                                 <span class="player-name">${player.name}</span>
-                                <span class="position">${BASEBALL_CONFIG.POSITIONS[player.position]}</span>
+                                <span class="position">${i18n.t(`pos_${player.position}`)}</span>
                             </div>
                             <select class="new-position" data-player-id="${player.id}">
                                 ${this.generatePositionOptions(player.position)}
@@ -1384,7 +1385,7 @@ class BaseballApp {
                 ${players.map(player => `
                     <div class="change-item">
                         <div class="current-player">
-                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
+                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${i18n.t(`pos_${player.position}`)})</span>
                         </div>
                         <div class="change-controls">
                             <label>
@@ -1416,7 +1417,7 @@ class BaseballApp {
                 ${players.map(player => `
                     <div class="combo-item">
                         <div class="current-info">
-                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
+                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${i18n.t(`pos_${player.position}`)})</span>
                         </div>
                         <div class="combo-controls">
                             <label>
@@ -1784,7 +1785,7 @@ class BaseballApp {
                             ${game.players[battingTeam].filter(p => p.position !== '打' && p.position !== '走').map(player => `
                                 <div class="defense-player">
                                     <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name}</span>
-                                    <span>(${BASEBALL_CONFIG.POSITIONS[player.position] || player.position})</span>
+                                    <span>(${i18n.t(`pos_${player.position}`) || player.position})</span>
                                 </div>
                             `).join('')}
                         </div>
@@ -1854,7 +1855,7 @@ class BaseballApp {
                 }
 
                 if (usedPositions.has(newPosition)) {
-                    throw new Error(`守備位置 ${BASEBALL_CONFIG.POSITIONS[newPosition]} は既に使用されています`);
+                    throw new Error(`守備位置 ${i18n.t(`pos_${newPosition}`)} は既に使用されています`);
                 }
 
                 player.position = newPosition;
@@ -1878,7 +1879,7 @@ class BaseballApp {
                 }
 
                 if (usedPositions.has(replacementPosition)) {
-                    throw new Error(`守備位置 ${BASEBALL_CONFIG.POSITIONS[replacementPosition]} は既に使用されています`);
+                    throw new Error(`守備位置 ${i18n.t(`pos_${replacementPosition}`)} は既に使用されています`);
                 }
 
                 // 新しい選手を作成
@@ -2059,7 +2060,7 @@ class BaseballApp {
 
             const teamName = batter.team === 'home' ? gameManager.currentGame.homeTeam : gameManager.currentGame.awayTeam;
             const positionText = batter.position ?
-                ` (${BASEBALL_CONFIG.POSITIONS[batter.position]})` : '';
+                ` (${i18n.t(`pos_${batter.position}`)})` : '';
 
             // 名前から古い形式のサフィックスを除去
             let cleanName = batter.name;
@@ -2117,7 +2118,7 @@ class BaseballApp {
         const availableResults = gameManager.getAvailableAtBatResults();
 
         container.innerHTML = availableResults.map(result => {
-            const label = BASEBALL_CONFIG.AT_BAT_RESULTS[result] || result;
+            const label = i18n.t(result) || result;
             return `<button class="result-btn" data-result="${result}">${label}</button>`;
         }).join('');
 
@@ -2310,7 +2311,7 @@ class BaseballApp {
         if (batter && display) {
             const teamName = batter.team === 'home' ? gameManager.currentGame.homeTeam : gameManager.currentGame.awayTeam;
             const positionText = batter.position ?
-                ` (${BASEBALL_CONFIG.POSITIONS[batter.position]})` : '';
+                ` (${i18n.t(`pos_${batter.position}`)})` : '';
 
             display.innerHTML = `
                 <div class="batter-info">
@@ -2982,24 +2983,11 @@ class BaseballApp {
     }
 
     formatAtBatResult(result) {
-        const resultMap = {
-            'single': '単打',
-            'double': '二塁打',
-            'triple': '三塁打',
-            'homerun': '本塁打',
-            'walk': '四球',
-            'hit_by_pitch': '死球',
-            'strikeout': '三振',
-            'groundout': 'ゴロアウト',
-            'flyout': 'フライアウト',
-            'lineout': 'ライナーアウト',
-            'sacrifice_bunt': '犠打',
-            'sacrifice_fly': '犠飛',
-            'ground_double_play': '併殺打',
-            'fly_double_play': '飛併殺',
-            'error': 'エラー'
-        };
-        return resultMap[result] || result;
+        return i18n.t(result) || result;
+    }
+
+    formatPosition(positionCode) {
+        return i18n.t(`pos_${positionCode}`) || positionCode;
     }
 
     async showAtBatHistory() {
