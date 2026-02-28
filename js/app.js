@@ -2020,11 +2020,18 @@ class BaseballApp {
             const positionText = batter.position ?
                 ` (${BASEBALL_CONFIG.POSITIONS[batter.position]})` : '';
 
+            // 名前から古い形式のサフィックスを除去
+            let cleanName = batter.name;
+            const match = cleanName.match(/^(\d+)(番|º|°)?$/);
+            if (match) {
+                cleanName = match[1];  // 数字のみ
+            }
+
             display.innerHTML = `
                 <div class="batter-info">
                     <span class="team">${teamName}</span>
                     <span class="order">${batter.battingOrder}${i18n.t('battingOrderSuffix')}</span>
-                    <span class="name">${batter.name}${positionText}</span>
+                    <span class="name">${cleanName}${positionText}</span>
                 </div>
             `;
         }
@@ -3910,10 +3917,18 @@ class BaseballApp {
         if (currentBatterEl && batter) {
             // 打順番号と名前を表示
             const suffix = i18n.t('battingOrderSuffix');
+
+            // 名前から古い形式のサフィックスを除去
+            let cleanName = batter.name;
+            const match = cleanName.match(/^(\d+)(番|º|°)?$/);
+            if (match) {
+                cleanName = match[1];  // 数字のみ
+            }
+
             // 名前が打順番号と同じ（未登録の場合）は、番号のみ表示
-            const displayText = batter.name === String(batter.battingOrder)
+            const displayText = cleanName === String(batter.battingOrder)
                 ? `${batter.battingOrder}${suffix}`
-                : `${batter.battingOrder}${suffix} ${batter.name}`;
+                : `${batter.battingOrder}${suffix} ${cleanName}`;
             console.log('Setting current batter display:', batter, '->', displayText);
             currentBatterEl.textContent = displayText;
         }
