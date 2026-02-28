@@ -97,6 +97,7 @@ class BaseballApp {
                 document.getElementById('currentInning').textContent = gameManager.getCurrentInningDisplay();
                 this.updateDetailedScoreboard();
                 this.updateAttackingTeamHighlight();
+                this.updateBatterDisplay();  // 現在打者表示を更新
             }
         });
 
@@ -4171,6 +4172,10 @@ class BaseballApp {
     async loadGame(gameId) {
         try {
             await gameManager.loadGame(gameId);
+
+            // データマイグレーション: 古い形式の選手名を修正
+            this.migratePlayerNames();
+
             this.setupGameScreen();
             this.showScreen('gameScreen');
             this.updateGameDisplay();
@@ -4178,6 +4183,23 @@ class BaseballApp {
             console.error('試合読み込みエラー:', error);
             this.showError('試合の読み込みに失敗しました');
         }
+    }
+
+    // 古い形式の選手名（「1番」「1º」など）を数字のみに変換
+    migratePlayerNames() {
+        const game = gameManager.currentGame;
+        if (!game) return;
+
+        ['home', 'away'].forEach(team => {
+            game.players[team].forEach(player => {
+                // 名前が「数字+サフィックス」の形式の場合、数字のみに変換
+                const match = player.name.match(/^(\d+)(番|º|°)?$/);
+                if (match) {
+                    player.name = match[1];  // 数字部分のみ
+                    console.log(`Migrated player name: ${match[0]} -> ${player.name}`);
+                }
+            });
+        });
     }
 
     showScreen(screenId) {
