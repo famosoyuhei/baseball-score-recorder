@@ -4,6 +4,7 @@ class I18n {
         this.currentLanguage = localStorage.getItem('selectedLanguage') || this.detectBrowserLanguage();
         this.translations = {};
         this.loadTranslations();
+        this.validateTranslations();
     }
 
     // ブラウザの言語設定を検出
@@ -1063,6 +1064,76 @@ class I18n {
 
         // タイトルも更新
         document.title = this.t('appTitle');
+    }
+
+    // 翻訳の整合性をチェック
+    validateTranslations() {
+        const languages = Object.keys(this.translations);
+        if (languages.length === 0) {
+            console.warn('⚠️ [i18n] No translations loaded');
+            return;
+        }
+
+        // 基準言語として日本語を使用
+        const baseLanguage = 'ja';
+        const baseKeys = this.getAllKeys(this.translations[baseLanguage]);
+
+        console.log(`🌍 [i18n] Translation validation started (base: ${baseLanguage})`);
+        console.log(`📝 [i18n] Total translation keys: ${baseKeys.size}`);
+
+        let totalMissing = 0;
+
+        // 各言語の翻訳漏れをチェック
+        languages.forEach(lang => {
+            if (lang === baseLanguage) return;
+
+            const langKeys = this.getAllKeys(this.translations[lang]);
+            const missingKeys = [...baseKeys].filter(key => !langKeys.has(key));
+            const extraKeys = [...langKeys].filter(key => !baseKeys.has(key));
+
+            if (missingKeys.length > 0) {
+                console.warn(`❌ [i18n] Missing translations in '${lang}' (${missingKeys.length}):`);
+                missingKeys.forEach(key => console.warn(`   - ${key}`));
+                totalMissing += missingKeys.length;
+            }
+
+            if (extraKeys.length > 0) {
+                console.warn(`⚠️ [i18n] Extra translations in '${lang}' (not in base) (${extraKeys.length}):`);
+                extraKeys.forEach(key => console.warn(`   - ${key}`));
+            }
+
+            if (missingKeys.length === 0 && extraKeys.length === 0) {
+                console.log(`✅ [i18n] '${lang}' translations complete (${langKeys.size} keys)`);
+            }
+        });
+
+        if (totalMissing > 0) {
+            console.error(`🚨 [i18n] Total missing translations: ${totalMissing}`);
+            console.error(`💡 [i18n] Please add missing translations to i18n.js`);
+        } else {
+            console.log(`✨ [i18n] All translations complete!`);
+        }
+    }
+
+    // 翻訳キーを再帰的に収集
+    getAllKeys(obj, prefix = '') {
+        const keys = new Set();
+
+        for (const key in obj) {
+            const fullKey = prefix ? `${prefix}.${key}` : key;
+            const value = obj[key];
+
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                // ネストされたオブジェクトの場合、再帰的に処理
+                const nestedKeys = this.getAllKeys(value, fullKey);
+                nestedKeys.forEach(k => keys.add(k));
+            } else {
+                // プリミティブな値の場合、キーを追加
+                keys.add(fullKey);
+            }
+        }
+
+        return keys;
     }
 }
 
