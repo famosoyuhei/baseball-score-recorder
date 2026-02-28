@@ -1,9 +1,33 @@
 // 多言語対応システム (i18n)
 class I18n {
     constructor() {
-        this.currentLanguage = localStorage.getItem('selectedLanguage') || 'ja';
+        this.currentLanguage = localStorage.getItem('selectedLanguage') || this.detectBrowserLanguage();
         this.translations = {};
         this.loadTranslations();
+    }
+
+    // ブラウザの言語設定を検出
+    detectBrowserLanguage() {
+        // ブラウザの言語設定を取得
+        const browserLang = navigator.language || navigator.userLanguage;
+        console.log('Browser language detected:', browserLang);
+
+        // 言語コードを取得（例: "ja-JP" → "ja", "en-US" → "en"）
+        const langCode = browserLang.toLowerCase().split(/[-_]/)[0];
+
+        // 対応言語のマッピング
+        const supportedLanguages = {
+            'ja': 'ja',  // 日本語
+            'en': 'en',  // 英語
+            'es': 'es',  // スペイン語
+            'pt': 'pt'   // ポルトガル語
+        };
+
+        // 対応言語があればそれを返す、なければ英語をデフォルトに
+        const selectedLang = supportedLanguages[langCode] || 'en';
+        console.log('Auto-selected language:', selectedLang);
+
+        return selectedLang;
     }
 
     loadTranslations() {
