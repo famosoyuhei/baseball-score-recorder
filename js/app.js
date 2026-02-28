@@ -389,7 +389,7 @@ class BaseballApp {
                                     <option value="" data-i18n="position">${i18n.t('position')}</option>
                                     ${this.generatePositionOptions(playerPosition)}
                                 </select>`}
-                            <button type="button" class="detail-btn" data-team="${team}" data-order="${i}">詳細</button>
+                            <button type="button" class="detail-btn" data-team="${team}" data-order="${i}">${i18n.t('detail')}</button>
                         </div>
                     </div>
                 `;
@@ -465,11 +465,11 @@ class BaseballApp {
 
         return `
             <div class="bench-players-section">
-                <h4>${teamName} 控え選手</h4>
+                <h4>${teamName} ${i18n.t('benchPlayers')}</h4>
                 <div class="bench-players-list" id="${team}BenchPlayers">
                     ${this.generateBenchPlayerInputs(team)}
                 </div>
-                <button type="button" class="secondary-btn add-bench-player" data-team="${team}">控え選手を追加</button>
+                <button type="button" class="secondary-btn add-bench-player" data-team="${team}">${i18n.t('addBenchPlayer')}</button>
             </div>
         `;
     }
@@ -486,11 +486,11 @@ class BaseballApp {
                     <input type="text"
                            class="bench-player-name"
                            value="${player.name}"
-                           placeholder="控え選手名"
+                           placeholder="${i18n.t('benchPlayerNamePlaceholder')}"
                            data-team="${team}"
                            data-index="${index}">
-                    <button type="button" class="detail-btn bench-detail" data-team="${team}" data-index="${index}">詳細</button>
-                    <button type="button" class="remove-btn" data-team="${team}" data-index="${index}">削除</button>
+                    <button type="button" class="detail-btn bench-detail" data-team="${team}" data-index="${index}">${i18n.t('detail')}</button>
+                    <button type="button" class="remove-btn" data-team="${team}" data-index="${index}">${i18n.t('remove')}</button>
                 </div>
             `;
         });
@@ -501,10 +501,10 @@ class BaseballApp {
                 <div class="bench-player-item" data-team="${team}" data-index="${i}">
                     <input type="text"
                            class="bench-player-name"
-                           placeholder="控え選手名"
+                           placeholder="${i18n.t('benchPlayerNamePlaceholder')}"
                            data-team="${team}"
                            data-index="${i}">
-                    <button type="button" class="detail-btn bench-detail" data-team="${team}" data-index="${i}">詳細</button>
+                    <button type="button" class="detail-btn bench-detail" data-team="${team}" data-index="${i}">${i18n.t('detail')}</button>
                 </div>
             `;
         }
@@ -2293,16 +2293,16 @@ class BaseballApp {
             section.style.display = 'block';
 
             // 走者選択肢を更新
-            runnerSelect.innerHTML = '<option value="">選択してください</option>';
+            runnerSelect.innerHTML = `<option value="">${i18n.t('selectPlaceholder')}</option>`;
 
             if (runners.first) {
-                runnerSelect.innerHTML += '<option value="first">1塁走者</option>';
+                runnerSelect.innerHTML += `<option value="first">${i18n.t('firstBaseRunner')}</option>`;
             }
             if (runners.second) {
-                runnerSelect.innerHTML += '<option value="second">2塁走者</option>';
+                runnerSelect.innerHTML += `<option value="second">${i18n.t('secondBaseRunner')}</option>`;
             }
             if (runners.third) {
-                runnerSelect.innerHTML += '<option value="third">3塁走者</option>';
+                runnerSelect.innerHTML += `<option value="third">${i18n.t('thirdBaseRunner')}</option>`;
             }
         } else {
             section.style.display = 'none';
@@ -2510,7 +2510,7 @@ class BaseballApp {
         const pitches = gameManager.currentAtBat.pitches || [];
 
         if (pitches.length === 0) {
-            historyEl.innerHTML = '<p class="no-pitches">まだ投球がありません</p>';
+            historyEl.innerHTML = `<p class="no-pitches">${i18n.t('noPitchesYet')}</p>`;
             return;
         }
 

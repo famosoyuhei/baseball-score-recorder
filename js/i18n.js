@@ -254,7 +254,19 @@ class I18n {
                 homeTeamNameLabel: 'ホームチーム名',
                 awayTeamNameLabel: 'アウェイチーム名',
                 swapTeams: 'ホーム/アウェイを入れ替え',
-                cannotEditAfterStart: '試合が進行中のため、チーム情報は変更できません'
+                cannotEditAfterStart: '試合が進行中のため、チーム情報は変更できません',
+
+                // 共通UI要素
+                selectPlaceholder: '選択してください',
+                firstBaseRunner: '1塁走者',
+                secondBaseRunner: '2塁走者',
+                thirdBaseRunner: '3塁走者',
+                noPitchesYet: 'まだ投球がありません',
+                benchPlayers: '控え選手',
+                addBenchPlayer: '控え選手を追加',
+                benchPlayerNamePlaceholder: '控え選手名',
+                remove: '削除',
+                detail: '詳細'
             },
 
             // 英語 (English)
@@ -492,7 +504,19 @@ class I18n {
                 homeTeamNameLabel: 'Home Team Name',
                 awayTeamNameLabel: 'Away Team Name',
                 swapTeams: 'Swap Home/Away',
-                cannotEditAfterStart: 'Cannot edit team information after game has started'
+                cannotEditAfterStart: 'Cannot edit team information after game has started',
+
+                // 共通UI要素
+                selectPlaceholder: 'Please select',
+                firstBaseRunner: '1st Base Runner',
+                secondBaseRunner: '2nd Base Runner',
+                thirdBaseRunner: '3rd Base Runner',
+                noPitchesYet: 'No pitches yet',
+                benchPlayers: 'Bench Players',
+                addBenchPlayer: 'Add Bench Player',
+                benchPlayerNamePlaceholder: 'Bench player name',
+                remove: 'Remove',
+                detail: 'Detail'
             },
 
             // スペイン語 (Spanish)
@@ -699,7 +723,19 @@ class I18n {
                 homeTeamNameLabel: 'Nombre del Equipo Local',
                 awayTeamNameLabel: 'Nombre del Equipo Visitante',
                 swapTeams: 'Intercambiar Local/Visitante',
-                cannotEditAfterStart: 'No se puede editar después del inicio del juego'
+                cannotEditAfterStart: 'No se puede editar después del inicio del juego',
+
+                // 共通UI要素
+                selectPlaceholder: 'Por favor seleccione',
+                firstBaseRunner: 'Corredor en 1ra Base',
+                secondBaseRunner: 'Corredor en 2da Base',
+                thirdBaseRunner: 'Corredor en 3ra Base',
+                noPitchesYet: 'Aún no hay lanzamientos',
+                benchPlayers: 'Jugadores de Banca',
+                addBenchPlayer: 'Agregar Jugador de Banca',
+                benchPlayerNamePlaceholder: 'Nombre del jugador de banca',
+                remove: 'Eliminar',
+                detail: 'Detalle'
             },
 
             // ポルトガル語 (Portuguese)
@@ -906,7 +942,19 @@ class I18n {
                 homeTeamNameLabel: 'Nome da Equipe da Casa',
                 awayTeamNameLabel: 'Nome da Equipe Visitante',
                 swapTeams: 'Trocar Casa/Visitante',
-                cannotEditAfterStart: 'Não pode editar após o início do jogo'
+                cannotEditAfterStart: 'Não pode editar após o início do jogo',
+
+                // 共通UI要素
+                selectPlaceholder: 'Por favor selecione',
+                firstBaseRunner: 'Corredor na 1ª Base',
+                secondBaseRunner: 'Corredor na 2ª Base',
+                thirdBaseRunner: 'Corredor na 3ª Base',
+                noPitchesYet: 'Ainda não há arremessos',
+                benchPlayers: 'Jogadores Reservas',
+                addBenchPlayer: 'Adicionar Jogador Reserva',
+                benchPlayerNamePlaceholder: 'Nome do jogador reserva',
+                remove: 'Remover',
+                detail: 'Detalhe'
             }
         };
     }
