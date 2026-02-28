@@ -281,6 +281,24 @@ class I18n {
                 swapTeams: 'ホーム/アウェイを入れ替え',
                 cannotEditAfterStart: '試合が進行中のため、チーム情報は変更できません',
 
+                // 選手交代関連
+                substitutionModalTitle: '選手交代',
+                offensiveSubstitution: '攻撃側選手交代',
+                defensiveSubstitution: '守備側選手交代',
+                pinchHitter: '代打',
+                pinchRunner: '代走',
+                pinchHitterDesc: '現在の打者を代打に交代します',
+                pinchRunnerDesc: '現在の走者を代走に交代します',
+                positionSwap: '守備位置交換',
+                playerChange: '選手変更',
+                substitutionExecuted: '選手交代を実行しました',
+                substitutionFailed: '選手交代の実行に失敗しました',
+                selectSubstitutionInfo: '選手交代の情報を選択してください',
+                newPlayerName: '新しい選手名',
+                targetTeam: '対象チーム',
+                offense: '攻撃',
+                defense: '守備',
+
                 // 共通UI要素
                 selectPlaceholder: '選択してください',
                 firstBaseRunner: '1塁走者',
@@ -531,6 +549,24 @@ class I18n {
                 swapTeams: 'Swap Home/Away',
                 cannotEditAfterStart: 'Cannot edit team information after game has started',
 
+                // 選手交代関連
+                substitutionModalTitle: 'Player Substitution',
+                offensiveSubstitution: 'Offensive Substitution',
+                defensiveSubstitution: 'Defensive Substitution',
+                pinchHitter: 'Pinch Hitter',
+                pinchRunner: 'Pinch Runner',
+                pinchHitterDesc: 'Substitute current batter with a pinch hitter',
+                pinchRunnerDesc: 'Substitute current runner with a pinch runner',
+                positionSwap: 'Position Swap',
+                playerChange: 'Player Change',
+                substitutionExecuted: 'Substitution executed successfully',
+                substitutionFailed: 'Failed to execute substitution',
+                selectSubstitutionInfo: 'Please select substitution information',
+                newPlayerName: 'New player name',
+                targetTeam: 'Target Team',
+                offense: 'Offense',
+                defense: 'Defense',
+
                 // 共通UI要素
                 selectPlaceholder: 'Please select',
                 firstBaseRunner: '1st Base Runner',
@@ -750,6 +786,19 @@ class I18n {
                 swapTeams: 'Intercambiar Local/Visitante',
                 cannotEditAfterStart: 'No se puede editar después del inicio del juego',
 
+                // 選手交代関連
+                substitutionModalTitle: 'Sustitución de Jugador',
+                offensiveSubstitution: 'Sustitución Ofensiva',
+                defensiveSubstitution: 'Sustitución Defensiva',
+                pinchHitter: 'Bateador Emergente',
+                pinchRunner: 'Corredor Emergente',
+                positionSwap: 'Intercambio de Posición',
+                playerChange: 'Cambio de Jugador',
+                substitutionExecuted: 'Sustitución ejecutada con éxito',
+                substitutionFailed: 'Error al ejecutar la sustitución',
+                selectSubstitutionInfo: 'Por favor seleccione información de sustitución',
+                newPlayerName: 'Nombre del nuevo jugador',
+
                 // 共通UI要素
                 selectPlaceholder: 'Por favor seleccione',
                 firstBaseRunner: 'Corredor en 1ra Base',
@@ -968,6 +1017,19 @@ class I18n {
                 awayTeamNameLabel: 'Nome da Equipe Visitante',
                 swapTeams: 'Trocar Casa/Visitante',
                 cannotEditAfterStart: 'Não pode editar após o início do jogo',
+
+                // 選手交代関連
+                substitutionModalTitle: 'Substituição de Jogador',
+                offensiveSubstitution: 'Substituição Ofensiva',
+                defensiveSubstitution: 'Substituição Defensiva',
+                pinchHitter: 'Rebatedor Substituto',
+                pinchRunner: 'Corredor Substituto',
+                positionSwap: 'Troca de Posição',
+                playerChange: 'Mudança de Jogador',
+                substitutionExecuted: 'Substituição executada com sucesso',
+                substitutionFailed: 'Falha ao executar substituição',
+                selectSubstitutionInfo: 'Por favor selecione informações de substituição',
+                newPlayerName: 'Nome do novo jogador',
 
                 // 共通UI要素
                 selectPlaceholder: 'Por favor selecione',

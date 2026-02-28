@@ -1007,22 +1007,22 @@ class BaseballApp {
         modal.className = 'modal substitution-modal';
         modal.innerHTML = `
             <div class="modal-content substitution-modal-content">
-                <h3>選手交代</h3>
+                <h3>${i18n.t('substitutionModalTitle')}</h3>
 
                 <div class="team-situation">
                     <div class="situation-info">
-                        <span class="batting-team">攻撃: ${game.isTopHalf ? game.awayTeam : game.homeTeam}</span>
-                        <span class="fielding-team">守備: ${game.isTopHalf ? game.homeTeam : game.awayTeam}</span>
+                        <span class="batting-team">${i18n.t('offense')}: ${game.isTopHalf ? game.awayTeam : game.homeTeam}</span>
+                        <span class="fielding-team">${i18n.t('defense')}: ${game.isTopHalf ? game.homeTeam : game.awayTeam}</span>
                     </div>
                 </div>
 
                 <div class="substitution-tabs">
-                    <button class="sub-tab active" data-type="batting">攻撃側交代</button>
-                    <button class="sub-tab" data-type="fielding">守備側交代</button>
+                    <button class="sub-tab active" data-type="batting">${i18n.t('offensiveSubstitution')}</button>
+                    <button class="sub-tab" data-type="fielding">${i18n.t('defensiveSubstitution')}</button>
                 </div>
 
                 <div class="team-selection" style="display: none;">
-                    <label>対象チーム:</label>
+                    <label>${i18n.t('targetTeam')}:</label>
                     <select id="substitutionTeam">
                         <option value="home">${game.homeTeam}</option>
                         <option value="away">${game.awayTeam}</option>
@@ -1031,25 +1031,25 @@ class BaseballApp {
 
                 <div class="substitution-content">
                     <div id="battingContent" class="sub-content active">
-                        <h4>攻撃側選手交代</h4>
+                        <h4>${i18n.t('offensiveSubstitution')}</h4>
                         <div class="batting-substitutions">
                             <div class="pinch-hitter-section">
-                                <h5>代打</h5>
-                                <p>現在の打者を代打に交代します</p>
+                                <h5>${i18n.t('pinchHitter')}</h5>
+                                <p>${i18n.t('pinchHitterDesc')}</p>
                                 <div id="pinchHitterArea"></div>
                             </div>
                             <div class="pinch-runner-section">
-                                <h5>代走</h5>
-                                <p>現在の走者を代走に交代します</p>
+                                <h5>${i18n.t('pinchRunner')}</h5>
+                                <p>${i18n.t('pinchRunnerDesc')}</p>
                                 <div id="pinchRunnerArea"></div>
                             </div>
                         </div>
                     </div>
 
                     <div id="fieldingContent" class="sub-content">
-                        <h4>守備側選手交代</h4>
+                        <h4>${i18n.t('defensiveSubstitution')}</h4>
                         <div class="fielding-tabs">
-                            <button class="fielding-tab active" data-field-type="position-swap">守備位置交換</button>
+                            <button class="fielding-tab active" data-field-type="position-swap">${i18n.t('positionSwap')}</button>
                             <button class="fielding-tab" data-field-type="player-change">選手変更</button>
                             <button class="fielding-tab" data-field-type="combination">組み合わせ</button>
                         </div>
