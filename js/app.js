@@ -3184,7 +3184,7 @@ class BaseballApp {
     }
 
     async confirmDeleteAtBat(atBatId) {
-        if (!confirm('この打席を削除してもよろしいですか？\n統計も自動的に再計算されます。')) {
+        if (!confirm(i18n.t('confirmDeleteAtBat'))) {
             return;
         }
 
@@ -4055,10 +4055,10 @@ class BaseballApp {
     }
 
     async endCurrentGame() {
-        if (confirm('試合を終了しますか？')) {
+        if (confirm(i18n.t('confirmEndGame'))) {
             try {
                 await gameManager.endGame();
-                this.showSuccess('試合を終了しました');
+                this.showSuccess(i18n.t('gameEnded'));
                 this.showScreen('welcomeScreen');
             } catch (error) {
                 console.error('試合終了エラー:', error);
@@ -4077,7 +4077,8 @@ class BaseballApp {
         const currentInning = game.currentInning;
         const half = game.isTopHalf ? '表' : '裏';
 
-        if (confirm(`現在の${currentInning}回${half}終了後、次のイニングに進まないよう設定しますか？\n（時刻制限・グラウンド使用時間等）`)) {
+        const message = i18n.t('confirmNoNextInning').replace('{inning}', currentInning).replace('{half}', half);
+        if (confirm(message)) {
             game.manualGameControl.noNextInning = true;
             game.manualGameControl.callGameReason = `手動設定: ${currentInning}回${half}終了後に時刻制限等により終了`;
 
@@ -4099,7 +4100,8 @@ class BaseballApp {
         const reason = prompt('強制終了の理由を入力してください:\n(例: 雨天中止、時間制限、その他)');
         if (reason === null) return; // キャンセル
 
-        if (confirm(`試合を強制終了しますか？\n理由: ${reason || '理由なし'}`)) {
+        const message = i18n.t('confirmForceEndGame').replace('{reason}', reason || i18n.t('noReason'));
+        if (confirm(message)) {
             game.manualGameControl.forceGameEnd = true;
             game.manualGameControl.callGameReason = `強制終了: ${reason || '理由なし'}`;
             game.status = 'called';

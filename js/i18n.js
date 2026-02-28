@@ -218,6 +218,13 @@ class I18n {
                 gameEnded: '試合を終了しました',
                 error: 'エラーが発生しました',
 
+                // 確認ダイアログ
+                confirmEndGame: '試合を終了しますか？',
+                confirmDeleteAtBat: 'この打席を削除してもよろしいですか？\n統計も自動的に再計算されます。',
+                confirmNoNextInning: '現在の{inning}回{half}終了後、次のイニングに進まないよう設定しますか？\n（時刻制限・グラウンド使用時間等）',
+                confirmForceEndGame: '試合を強制終了しますか？\n理由: {reason}',
+                noReason: '理由なし',
+
                 // 言語設定
                 language: '言語',
                 japanese: '日本語',
@@ -518,6 +525,13 @@ class I18n {
                 gameEnded: 'Game ended',
                 error: 'An error occurred',
 
+                // 確認ダイアログ
+                confirmEndGame: 'Do you want to end the game?',
+                confirmDeleteAtBat: 'Are you sure you want to delete this at-bat?\nStatistics will be automatically recalculated.',
+                confirmNoNextInning: 'Do you want to prevent advancing to the next inning after the current {half} of inning {inning}?\n(Time limit, field usage time, etc.)',
+                confirmForceEndGame: 'Do you want to force end the game?\nReason: {reason}',
+                noReason: 'No reason',
+
                 // 言語設定
                 language: 'Language',
                 japanese: '日本語',
@@ -787,6 +801,13 @@ class I18n {
                 gameEnded: 'Juego terminado',
                 error: 'Ocurrió un error',
 
+                // 確認ダイアログ
+                confirmEndGame: '¿Desea terminar el juego?',
+                confirmDeleteAtBat: '¿Está seguro de que desea eliminar este turno al bate?\nLas estadísticas se recalcularán automáticamente.',
+                confirmNoNextInning: '¿Desea evitar avanzar a la próxima entrada después del {half} actual de la entrada {inning}?\n(Límite de tiempo, tiempo de uso del campo, etc.)',
+                confirmForceEndGame: '¿Desea forzar el final del juego?\nRazón: {reason}',
+                noReason: 'Sin razón',
+
                 // 言語設定
                 language: 'Idioma',
                 japanese: '日本語',
@@ -1050,6 +1071,13 @@ class I18n {
                 gameSaved: 'Jogo salvo',
                 gameEnded: 'Jogo terminado',
                 error: 'Ocorreu um erro',
+
+                // 確認ダイアログ
+                confirmEndGame: 'Deseja terminar o jogo?',
+                confirmDeleteAtBat: 'Tem certeza de que deseja excluir esta rebatida?\nAs estatísticas serão recalculadas automaticamente.',
+                confirmNoNextInning: 'Deseja evitar avançar para a próxima entrada após o {half} atual da entrada {inning}?\n(Limite de tempo, tempo de uso do campo, etc.)',
+                confirmForceEndGame: 'Deseja forçar o fim do jogo?\nMotivo: {reason}',
+                noReason: 'Sem motivo',
 
                 // 言語設定
                 language: 'Idioma',
