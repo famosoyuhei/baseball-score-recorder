@@ -249,6 +249,18 @@ class I18n {
                 recordButton: '記録',
                 correctPreviousAtBat: '前打席修正',
 
+                // 選手交代モーダル
+                usePinchHitter: '代打を使用する',
+                pinchHitterNamePlaceholder: '代打選手名',
+                currentRunners: '現在の走者:',
+                noRunnersOnBase: '現在走者はいません',
+                pinchRunnerLabel: '代走',
+                pinchRunnerNamePlaceholder: '代走選手名',
+                executeButton: '実行',
+                cancelButton: 'キャンセル',
+                currentBatterLabel: '現在の打者:',
+                noInfo: '情報なし',
+
                 // クイック記録機能
                 fillDetails: '詳細追記',
                 incomplete: '要追記',
@@ -536,6 +548,18 @@ class I18n {
                 recordButton: 'Record',
                 correctPreviousAtBat: 'Correct Previous At-Bat',
 
+                // 選手交代モーダル
+                usePinchHitter: 'Use Pinch Hitter',
+                pinchHitterNamePlaceholder: 'Pinch hitter name',
+                currentRunners: 'Current Runners:',
+                noRunnersOnBase: 'No runners on base',
+                pinchRunnerLabel: 'Pinch Runner',
+                pinchRunnerNamePlaceholder: 'Pinch runner name',
+                executeButton: 'Execute',
+                cancelButton: 'Cancel',
+                currentBatterLabel: 'Current Batter:',
+                noInfo: 'No info',
+
                 // クイック記録機能
                 fillDetails: 'Fill Details',
                 incomplete: 'Incomplete',
@@ -792,6 +816,18 @@ class I18n {
                 recordButton: 'Registrar',
                 correctPreviousAtBat: 'Corregir Turno Anterior',
 
+                // 選手交代モーダル
+                usePinchHitter: 'Usar Bateador Emergente',
+                pinchHitterNamePlaceholder: 'Nombre del bateador emergente',
+                currentRunners: 'Corredores Actuales:',
+                noRunnersOnBase: 'No hay corredores en base',
+                pinchRunnerLabel: 'Corredor Emergente',
+                pinchRunnerNamePlaceholder: 'Nombre del corredor emergente',
+                executeButton: 'Ejecutar',
+                cancelButton: 'Cancelar',
+                currentBatterLabel: 'Bateador Actual:',
+                noInfo: 'Sin información',
+
                 // クイック記録機能
                 fillDetails: 'Completar Detalles',
                 incomplete: 'Incompleto',
@@ -1042,6 +1078,18 @@ class I18n {
                 rbiLabel: 'RBIs:',
                 recordButton: 'Registrar',
                 correctPreviousAtBat: 'Corrigir Rebatida Anterior',
+
+                // 選手交代モーダル
+                usePinchHitter: 'Usar Rebatedor Substituto',
+                pinchHitterNamePlaceholder: 'Nome do rebatedor substituto',
+                currentRunners: 'Corredores Atuais:',
+                noRunnersOnBase: 'Não há corredores nas bases',
+                pinchRunnerLabel: 'Corredor Substituto',
+                pinchRunnerNamePlaceholder: 'Nome do corredor substituto',
+                executeButton: 'Executar',
+                cancelButton: 'Cancelar',
+                currentBatterLabel: 'Rebatedor Atual:',
+                noInfo: 'Sem informação',
 
                 // クイック記録機能
                 fillDetails: 'Preencher Detalhes',

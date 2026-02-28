@@ -1105,8 +1105,8 @@ class BaseballApp {
                 </div>
 
                 <div class="modal-buttons">
-                    <button id="executeSubstitution" class="primary-btn">実行</button>
-                    <button id="cancelSubstitution" class="secondary-btn">キャンセル</button>
+                    <button id="executeSubstitution" class="primary-btn" data-i18n="executeButton">${i18n.t('executeButton')}</button>
+                    <button id="cancelSubstitution" class="secondary-btn" data-i18n="cancelButton">${i18n.t('cancelButton')}</button>
                 </div>
             </div>
         `;
@@ -1183,14 +1183,14 @@ class BaseballApp {
         pinchHitterArea.innerHTML = `
             <div class="pinch-hitter-controls">
                 <div class="current-batter-info">
-                    <span>現在の打者: ${currentBatter ? `${currentBatter.battingOrder}${i18n.t('battingOrderSuffix')} ${currentBatter.name}` : '情報なし'}</span>
+                    <span data-i18n="currentBatterLabel">${i18n.t('currentBatterLabel')}</span> ${currentBatter ? `${currentBatter.battingOrder}${i18n.t('battingOrderSuffix')} ${currentBatter.name}` : `<span data-i18n="noInfo">${i18n.t('noInfo')}</span>`}
                 </div>
                 <div class="pinch-hitter-input">
                     <label>
                         <input type="checkbox" id="usePinchHitter">
-                        代打を使用する
+                        <span data-i18n="usePinchHitter">${i18n.t('usePinchHitter')}</span>
                     </label>
-                    <input type="text" id="pinchHitterName" placeholder="代打選手名" disabled>
+                    <input type="text" id="pinchHitterName" data-i18n-placeholder="pinchHitterNamePlaceholder" placeholder="${i18n.t('pinchHitterNamePlaceholder')}" disabled>
                 </div>
             </div>
         `;
@@ -1207,23 +1207,23 @@ class BaseballApp {
             <div class="pinch-runner-controls">
                 ${runnerOptions.length > 0 ? `
                     <div class="current-runners">
-                        <h6>現在の走者:</h6>
+                        <h6 data-i18n="currentRunners">${i18n.t('currentRunners')}</h6>
                         ${runnerOptions.map(runner => `
                             <div class="runner-substitution">
                                 <div class="runner-info">
-                                    <span>${runner.base === 'first' ? '1塁' : runner.base === 'second' ? '2塁' : '3塁'}: ${runner.name}</span>
+                                    <span>${runner.base === 'first' ? i18n.t('firstBase') : runner.base === 'second' ? i18n.t('secondBase') : i18n.t('thirdBase')}: ${runner.name}</span>
                                 </div>
                                 <div class="runner-controls">
                                     <label>
                                         <input type="checkbox" class="pinch-runner-checkbox" data-base="${runner.base}">
-                                        代走
+                                        <span data-i18n="pinchRunnerLabel">${i18n.t('pinchRunnerLabel')}</span>
                                     </label>
-                                    <input type="text" class="pinch-runner-name" data-base="${runner.base}" placeholder="代走選手名" disabled>
+                                    <input type="text" class="pinch-runner-name" data-base="${runner.base}" data-i18n-placeholder="pinchRunnerNamePlaceholder" placeholder="${i18n.t('pinchRunnerNamePlaceholder')}" disabled>
                                 </div>
                             </div>
                         `).join('')}
                     </div>
-                ` : '<p>現在走者はいません</p>'}
+                ` : `<p data-i18n="noRunnersOnBase">${i18n.t('noRunnersOnBase')}</p>`}
             </div>
         `;
 
