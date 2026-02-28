@@ -89,7 +89,7 @@ class RealtimeUI {
                     <div class="timeline-content">
                         <span class="player-name">${play.batterName}</span>
                         <span class="result"> ${this.formatResult(play.result)}</span>
-                        ${play.runs > 0 ? `<span class="runs"> ${play.runs}点</span>` : ''}
+                        ${play.runs > 0 ? `<span class="runs"> ${play.runs}${i18n.t('points')}</span>` : ''}
                     </div>
                 </div>
             `;
