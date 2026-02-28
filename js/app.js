@@ -528,7 +528,7 @@ class BaseballApp {
             for (let input of playerInputs) {
                 const team = input.dataset.team;
                 const order = parseInt(input.dataset.order);
-                const name = input.value.trim() || `${order}${i18n.t('playerNumber')}`; // 空の場合は打順番号を使用
+                const name = input.value.trim() || `${order}`; // 空の場合は打順番号のみを使用
 
                 // 簡易登録フラグを設定（名前が未入力の場合）
                 const isQuickRegistered = !input.value.trim();
@@ -3909,7 +3909,10 @@ class BaseballApp {
         if (currentBatterEl && batter) {
             // 打順番号と名前を表示
             const suffix = i18n.t('battingOrderSuffix');
-            const displayText = `${batter.battingOrder}${suffix} ${batter.name}`;
+            // 名前が打順番号と同じ（未登録の場合）は、番号のみ表示
+            const displayText = batter.name === String(batter.battingOrder)
+                ? `${batter.battingOrder}${suffix}`
+                : `${batter.battingOrder}${suffix} ${batter.name}`;
             console.log('Setting current batter display:', batter, '->', displayText);
             currentBatterEl.textContent = displayText;
         }
