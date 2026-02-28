@@ -678,7 +678,7 @@ class BaseballApp {
                 <h3>選手詳細情報</h3>
                 <div class="player-detail-form">
                     <div class="basic-info">
-                        <h4>${teamName} ${order}番打者</h4>
+                        <h4>${teamName} ${order}${i18n.t('battingOrderSuffix')}打者</h4>
                         <div class="form-group">
                             <label for="playerName">選手名:</label>
                             <input type="text" id="playerName" value="${existingPlayer?.name || ''}" required>
@@ -1149,7 +1149,7 @@ class BaseballApp {
         pinchHitterArea.innerHTML = `
             <div class="pinch-hitter-controls">
                 <div class="current-batter-info">
-                    <span>現在の打者: ${currentBatter ? `${currentBatter.battingOrder}番 ${currentBatter.name}` : '情報なし'}</span>
+                    <span>現在の打者: ${currentBatter ? `${currentBatter.battingOrder}${i18n.t('battingOrderSuffix')} ${currentBatter.name}` : '情報なし'}</span>
                 </div>
                 <div class="pinch-hitter-input">
                     <label>
@@ -1238,7 +1238,7 @@ class BaseballApp {
                     ${players.map(player => `
                         <div class="lineup-item" data-player-id="${player.id}">
                             <div class="player-info">
-                                <span class="batting-order">${player.battingOrder}番</span>
+                                <span class="batting-order">${player.battingOrder}${i18n.t('battingOrderSuffix')}</span>
                                 <span class="player-name">${player.name}</span>
                                 <span class="position">${BASEBALL_CONFIG.POSITIONS[player.position]}</span>
                             </div>
@@ -1260,7 +1260,7 @@ class BaseballApp {
                 ${players.map(player => `
                     <div class="change-item">
                         <div class="current-player">
-                            <span>${player.battingOrder}番 ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
+                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
                         </div>
                         <div class="change-controls">
                             <label>
@@ -1292,7 +1292,7 @@ class BaseballApp {
                 ${players.map(player => `
                     <div class="combo-item">
                         <div class="current-info">
-                            <span>${player.battingOrder}番 ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
+                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
                         </div>
                         <div class="combo-controls">
                             <label>
@@ -1328,7 +1328,7 @@ class BaseballApp {
                     ${players.map(player => `
                         <div class="lineup-item" data-player-id="${player.id}">
                             <div class="player-info">
-                                <span class="batting-order">${player.battingOrder}番</span>
+                                <span class="batting-order">${player.battingOrder}${i18n.t('battingOrderSuffix')}</span>
                                 <span class="player-name">${player.name}</span>
                                 <span class="position">${BASEBALL_CONFIG.POSITIONS[player.position]}</span>
                             </div>
@@ -1350,7 +1350,7 @@ class BaseballApp {
                 ${players.map(player => `
                     <div class="change-item">
                         <div class="current-player">
-                            <span>${player.battingOrder}番 ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
+                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
                         </div>
                         <div class="change-controls">
                             <label>
@@ -1382,7 +1382,7 @@ class BaseballApp {
                 ${players.map(player => `
                     <div class="combo-item">
                         <div class="current-info">
-                            <span>${player.battingOrder}番 ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
+                            <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${BASEBALL_CONFIG.POSITIONS[player.position]})</span>
                         </div>
                         <div class="combo-controls">
                             <label>
@@ -1708,7 +1708,7 @@ class BaseballApp {
                                     <div class="player-info">
                                         <span class="player-name">${player.name}</span>
                                         <span class="current-status">${player.position === '打' ? '代打' : '代走'}</span>
-                                        ${player.battingOrder ? `<span class="batting-order">${player.battingOrder}番</span>` : ''}
+                                        ${player.battingOrder ? `<span class="batting-order">${player.battingOrder}${i18n.t('battingOrderSuffix')}</span>` : ''}
                                     </div>
 
                                     <div class="position-choice">
@@ -1749,7 +1749,7 @@ class BaseballApp {
                         <div class="current-defense-list">
                             ${game.players[battingTeam].filter(p => p.position !== '打' && p.position !== '走').map(player => `
                                 <div class="defense-player">
-                                    <span>${player.battingOrder}番 ${player.name}</span>
+                                    <span>${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name}</span>
                                     <span>(${BASEBALL_CONFIG.POSITIONS[player.position] || player.position})</span>
                                 </div>
                             `).join('')}
@@ -2022,7 +2022,7 @@ class BaseballApp {
             display.innerHTML = `
                 <div class="batter-info">
                     <span class="team">${teamName}</span>
-                    <span class="order">${batter.battingOrder}番</span>
+                    <span class="order">${batter.battingOrder}${i18n.t('battingOrderSuffix')}</span>
                     <span class="name">${batter.name}${positionText}</span>
                 </div>
             `;
@@ -2261,7 +2261,7 @@ class BaseballApp {
             display.innerHTML = `
                 <div class="batter-info">
                     <span class="team">${teamName}</span>
-                    <span class="order">${batter.battingOrder}番</span>
+                    <span class="order">${batter.battingOrder}${i18n.t('battingOrderSuffix')}</span>
                     <span class="name">${batter.name}${positionText}</span>
                 </div>
             `;
@@ -2810,7 +2810,7 @@ class BaseballApp {
                 isTopHalf: gameManager.currentGame.isTopHalf,
                 outs: gameManager.currentGame.outs,
                 runners: { ...gameManager.currentGame.runnersOnBase },
-                batterName: batter.name || `${batter.battingOrder}番`,
+                batterName: batter.name || `${batter.battingOrder}${i18n.t('battingOrderSuffix')}`,
                 result: result,
                 runs: advancement.runsScored
             });
@@ -3302,7 +3302,7 @@ class BaseballApp {
                                         <div class="player-card ${needsDetail ? 'needs-detail' : ''}" data-player-id="${player.id}" data-team="home">
                                             ${needsDetail ? '<span class="incomplete-badge" data-i18n="incompletePlayerInfo">未入力</span>' : ''}
                                             <div class="player-main-info">
-                                                <span class="player-order">${player.battingOrder}番</span>
+                                                <span class="player-order">${player.battingOrder}${i18n.t('battingOrderSuffix')}</span>
                                                 <span class="player-name-display">${player.name || '未設定'}</span>
                                                 <span class="player-position-display">${player.position || '-'}</span>
                                             </div>
@@ -3323,7 +3323,7 @@ class BaseballApp {
                                         <div class="player-card ${needsDetail ? 'needs-detail' : ''}" data-player-id="${player.id}" data-team="away">
                                             ${needsDetail ? '<span class="incomplete-badge" data-i18n="incompletePlayerInfo">未入力</span>' : ''}
                                             <div class="player-main-info">
-                                                <span class="player-order">${player.battingOrder}番</span>
+                                                <span class="player-order">${player.battingOrder}${i18n.t('battingOrderSuffix')}</span>
                                                 <span class="player-name-display">${player.name || '未設定'}</span>
                                                 <span class="player-position-display">${player.position || '-'}</span>
                                             </div>
@@ -3387,7 +3387,7 @@ class BaseballApp {
                             <div class="form-group">
                                 <label data-i18n="currentPlayerInfo">現在の情報</label>
                                 <div class="current-player-display">
-                                    <strong>${player.battingOrder}番</strong>
+                                    <strong>${player.battingOrder}${i18n.t('battingOrderSuffix')}</strong>
                                     ${player.name || '(名前未設定)'}
                                     <span>${player.position || '(守備位置未設定)'}</span>
                                 </div>
@@ -3907,13 +3907,9 @@ class BaseballApp {
         // 現在打者表示
         const currentBatterEl = document.getElementById('current-batter-name');
         if (currentBatterEl && batter) {
-            // batter.nameが既に「X番」の形式の場合は重複を避ける
-            let displayText;
-            if (batter.name && batter.name.includes('番')) {
-                displayText = batter.name;
-            } else {
-                displayText = `${batter.battingOrder}番 ${batter.name}`;
-            }
+            // 打順番号と名前を表示
+            const suffix = i18n.t('battingOrderSuffix');
+            const displayText = `${batter.battingOrder}${suffix} ${batter.name}`;
             console.log('Setting current batter display:', batter, '->', displayText);
             currentBatterEl.textContent = displayText;
         }
@@ -3965,9 +3961,9 @@ class BaseballApp {
         console.log('getRunnerDisplayName called with:', runnerId);
 
         if (runnerId === 'batter') return i18n.t('batter');
-        if (runnerId === 'first' || runnerId === 'second' || runnerId === 'third') {
-            return `${runnerId}番`;
-        }
+        if (runnerId === 'first') return i18n.t('firstBaseRunner');
+        if (runnerId === 'second') return i18n.t('secondBaseRunner');
+        if (runnerId === 'third') return i18n.t('thirdBaseRunner');
         return runnerId.length > 8 ? runnerId.substring(0, 8) + '...' : runnerId;
     }
 
@@ -4382,7 +4378,7 @@ class BaseballApp {
 
                 <div class="situation-summary">
                     <div class="play-summary">
-                        <strong>${batter.battingOrder}番 ${batter.name}</strong> → ${resultLabel}
+                        <strong>${batter.battingOrder}${i18n.t('battingOrderSuffix')} ${batter.name}</strong> → ${resultLabel}
                         ${resultDetail ? `(${resultDetail})` : ''}
                     </div>
                     <div class="before-situation">
@@ -4979,10 +4975,10 @@ class BaseballApp {
 
         if (players && players.length > 0) {
             const player = players.find(p => p.battingOrder === battingOrder);
-            return player ? player.name : `${battingOrder}番`;
+            return player ? player.name : `${battingOrder}${i18n.t('battingOrderSuffix')}`;
         }
 
-        return `${battingOrder}番`;
+        return `${battingOrder}${i18n.t('battingOrderSuffix')}`;
     }
 
     setRunner(base, runnerName) {
@@ -5180,14 +5176,14 @@ class BaseballApp {
             if (dhPlayer) {
                 const option = document.createElement('option');
                 option.value = dhPlayer.id || dhPlayer.name;
-                option.textContent = `10番 ${dhPlayer.name} (DH)`;
+                option.textContent = `10${i18n.t('battingOrderSuffix')} ${dhPlayer.name} (DH)`;
                 outPlayerSelect.appendChild(option);
             }
 
             if (currentPitcher) {
                 const option = document.createElement('option');
                 option.value = currentPitcher.id || currentPitcher.name;
-                option.textContent = `${currentPitcher.battingOrder}番 ${currentPitcher.name} (P)`;
+                option.textContent = `${currentPitcher.battingOrder}${i18n.t('battingOrderSuffix')} ${currentPitcher.name} (P)`;
                 inPlayerSelect.appendChild(option);
             }
         } else {
@@ -5197,7 +5193,7 @@ class BaseballApp {
             activePlayers.forEach(player => {
                 const option = document.createElement('option');
                 option.value = player.id || player.name;
-                option.textContent = `${player.battingOrder}番 ${player.name} (${player.position || ''})`;
+                option.textContent = `${player.battingOrder}${i18n.t('battingOrderSuffix')} ${player.name} (${player.position || ''})`;
                 outPlayerSelect.appendChild(option);
             });
         }
@@ -5218,7 +5214,7 @@ class BaseballApp {
             for (let i = 1; i <= 9; i++) {
                 const option = document.createElement('option');
                 option.value = `player-${i}`;
-                option.textContent = `${i}番選手`;
+                option.textContent = `${i}${i18n.t('battingOrderSuffix')} 選手`;
                 outPlayerSelect.appendChild(option);
             }
         }
@@ -5291,8 +5287,8 @@ class BaseballApp {
         }
 
         console.log('DH→投手交代実行:', {
-            dh: `${dhPlayer.name} (${dhPlayer.battingOrder}番)`,
-            pitcher: `${pitcher.name} (${pitcher.battingOrder}番)`
+            dh: `${dhPlayer.name} (${dhPlayer.battingOrder}${i18n.t('battingOrderSuffix')})`,
+            pitcher: `${pitcher.name} (${pitcher.battingOrder}${i18n.t('battingOrderSuffix')})`
         });
 
         // 1. DH選手をピッチャーに変更
