@@ -238,6 +238,17 @@ class I18n {
                 rbis: '打点',
                 battingOrderSuffix: '番',
 
+                // 打者記録画面
+                batterRecord: '打者記録',
+                currentBatter: '現在の打者',
+                batterInfoLoading: '打者情報読み込み中...',
+                atBatResult: '打席結果',
+                hitDirection: '打球方向・詳細:',
+                hitDirectionPlaceholder: '例: センター前、ライト線',
+                rbiLabel: '打点:',
+                recordButton: '記録',
+                correctPreviousAtBat: '前打席修正',
+
                 // クイック記録機能
                 fillDetails: '詳細追記',
                 incomplete: '要追記',
@@ -514,6 +525,17 @@ class I18n {
                 rbis: 'RBIs',
                 battingOrderSuffix: '',
 
+                // 打者記録画面
+                batterRecord: 'Batter Record',
+                currentBatter: 'Current Batter',
+                batterInfoLoading: 'Loading batter info...',
+                atBatResult: 'At-Bat Result',
+                hitDirection: 'Hit Direction/Details:',
+                hitDirectionPlaceholder: 'e.g., Center, Right field line',
+                rbiLabel: 'RBIs:',
+                recordButton: 'Record',
+                correctPreviousAtBat: 'Correct Previous At-Bat',
+
                 // クイック記録機能
                 fillDetails: 'Fill Details',
                 incomplete: 'Incomplete',
@@ -759,6 +781,17 @@ class I18n {
                 rbis: 'Carreras Impulsadas',
                 battingOrderSuffix: 'º',
 
+                // 打者記録画面
+                batterRecord: 'Registro del Bateador',
+                currentBatter: 'Bateador Actual',
+                batterInfoLoading: 'Cargando información del bateador...',
+                atBatResult: 'Resultado del Turno',
+                hitDirection: 'Dirección del Bateo/Detalles:',
+                hitDirectionPlaceholder: 'ej: Centro, Línea de derecha',
+                rbiLabel: 'Carreras Impulsadas:',
+                recordButton: 'Registrar',
+                correctPreviousAtBat: 'Corregir Turno Anterior',
+
                 // クイック記録機能
                 fillDetails: 'Completar Detalles',
                 incomplete: 'Incompleto',
@@ -998,6 +1031,17 @@ class I18n {
                 resultDetail: 'Detalhes',
                 rbis: 'RBIs',
                 battingOrderSuffix: 'º',
+
+                // 打者記録画面
+                batterRecord: 'Registro do Rebatedor',
+                currentBatter: 'Rebatedor Atual',
+                batterInfoLoading: 'Carregando informações do rebatedor...',
+                atBatResult: 'Resultado da Rebatida',
+                hitDirection: 'Direção da Rebatida/Detalhes:',
+                hitDirectionPlaceholder: 'ex: Centro, Linha direita',
+                rbiLabel: 'RBIs:',
+                recordButton: 'Registrar',
+                correctPreviousAtBat: 'Corrigir Rebatida Anterior',
 
                 // クイック記録機能
                 fillDetails: 'Preencher Detalhes',

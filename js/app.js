@@ -1975,31 +1975,31 @@ class BaseballApp {
     setupBatterLevelInterface(container) {
         container.innerHTML = `
             <div class="batter-interface">
-                <h3>打者記録</h3>
+                <h3 data-i18n="batterRecord">打者記録</h3>
 
                 <div class="current-batter-info">
                     <div class="batter-display">
-                        <h4>現在の打者</h4>
-                        <div id="currentBatterDisplay">打者情報読み込み中...</div>
+                        <h4 data-i18n="currentBatter">現在の打者</h4>
+                        <div id="currentBatterDisplay"></div>
                     </div>
 
                     <div class="game-situation">
                         <div class="runners-display">
-                            <h5>走者状況</h5>
+                            <h5 data-i18n="runnersSituation">走者状況</h5>
                             <div class="bases">
-                                <span id="base1" class="base">1塁</span>
-                                <span id="base2" class="base">2塁</span>
-                                <span id="base3" class="base">3塁</span>
+                                <span id="base1" class="base" data-i18n="firstBase">1塁</span>
+                                <span id="base2" class="base" data-i18n="secondBase">2塁</span>
+                                <span id="base3" class="base" data-i18n="thirdBase">3塁</span>
                             </div>
                         </div>
                         <div class="count-display">
-                            <span>アウト: <span id="outsDisplay">0</span></span>
+                            <span data-i18n="outs">アウト</span>: <span id="outsDisplay">0</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="result-selection">
-                    <h4>打席結果</h4>
+                    <h4 data-i18n="atBatResult">打席結果</h4>
                     <div id="resultButtons" class="result-buttons">
                         <!-- 動的に生成 -->
                     </div>
@@ -2007,23 +2007,23 @@ class BaseballApp {
 
                 <div class="detail-inputs">
                     <div class="input-group">
-                        <label for="resultDetail">打球方向・詳細:</label>
-                        <input type="text" id="resultDetail" placeholder="例: センター前、ライト線">
+                        <label for="resultDetail" data-i18n="hitDirection">打球方向・詳細:</label>
+                        <input type="text" id="resultDetail" data-i18n-placeholder="hitDirectionPlaceholder" placeholder="例: センター前、ライト線">
                     </div>
 
                     <div class="input-group">
-                        <label for="rbis">打点:</label>
+                        <label for="rbis" data-i18n="rbiLabel">打点:</label>
                         <input type="number" id="rbis" min="0" max="4" value="0">
                     </div>
                 </div>
 
                 <div class="batter-controls">
-                    <button id="recordAtBat" class="primary-btn">記録</button>
-                    <button id="correctLastAtBat" class="secondary-btn">前打席修正</button>
+                    <button id="recordAtBat" class="primary-btn" data-i18n="recordButton">記録</button>
+                    <button id="correctLastAtBat" class="secondary-btn" data-i18n="correctPreviousAtBat">前打席修正</button>
                 </div>
 
                 <div class="at-bat-history">
-                    <h4>打席履歴</h4>
+                    <h4 data-i18n="atBatHistory">打席履歴</h4>
                     <div id="atBatHistoryList"></div>
                 </div>
             </div>
