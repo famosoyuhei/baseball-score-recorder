@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baseball-score-v21';
+const CACHE_NAME = 'baseball-score-v24';
 const urlsToCache = [
   './',
   './index.html',

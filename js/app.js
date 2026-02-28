@@ -84,20 +84,53 @@ class BaseballApp {
 
         // 言語切り替え
         document.getElementById('languageSelect').addEventListener('change', (e) => {
+            console.log('🌐 Language change event fired, selected value:', e.target.value);
+            console.log('Before setLanguage - current language:', i18n.getCurrentLanguage());
+
             i18n.setLanguage(e.target.value);
+
+            console.log('After setLanguage - current language:', i18n.getCurrentLanguage());
+            console.log('battingOrderSuffix:', i18n.t('battingOrderSuffix'));
+            console.log('localStorage selectedLanguage:', localStorage.getItem('selectedLanguage'));
 
             // 選手登録画面が表示されている場合は再描画
             if (this.currentScreen === 'gameScreen' &&
                 document.querySelector('.player-setup-section')) {
+                console.log('Redrawing player setup screen');
                 this.showPlayerSetupScreen();
             }
 
             // ゲーム進行中の場合はイニング表示を更新
             if (this.currentScreen === 'gameScreen' && gameManager.currentGame) {
+                console.log('Updating game screen elements');
                 document.getElementById('currentInning').textContent = gameManager.getCurrentInningDisplay();
                 this.updateDetailedScoreboard();
                 this.updateAttackingTeamHighlight();
+                console.log('Calling updateBatterDisplay...');
                 this.updateBatterDisplay();  // 現在打者表示を更新
+            }
+
+            // 選手登録中や試合開始直後で打者表示要素が存在する場合も更新
+            const currentBatterEl = document.getElementById('current-batter-name');
+            if (currentBatterEl && gameManager.getCurrentBatter()) {
+                console.log('Updating current batter display during setup/early game');
+                const batter = gameManager.getCurrentBatter();
+                const suffix = i18n.t('battingOrderSuffix');
+
+                // 名前から古い形式のサフィックスを除去
+                let cleanName = batter.name;
+                const match = cleanName.match(/^(\d+)(番|º|°)?$/);
+                if (match) {
+                    cleanName = match[1];  // 数字のみ
+                }
+
+                // 名前が打順番号と同じ（未登録の場合）は、番号のみ表示
+                const displayText = cleanName === String(batter.battingOrder)
+                    ? `${batter.battingOrder}${suffix}`
+                    : `${batter.battingOrder}${suffix} ${cleanName}`;
+
+                console.log('Updated batter display to:', displayText);
+                currentBatterEl.textContent = displayText;
             }
         });
 
@@ -2012,10 +2045,18 @@ class BaseballApp {
     }
 
     updateBatterDisplay() {
+        console.log('📊 updateBatterDisplay called');
         const batter = gameManager.getCurrentBatter();
         const display = document.getElementById('currentBatterDisplay');
 
+        console.log('Current batter:', batter);
+        console.log('Display element:', display);
+
         if (batter && display) {
+            const currentLang = i18n.getCurrentLanguage();
+            const suffix = i18n.t('battingOrderSuffix');
+            console.log('In updateBatterDisplay - Language:', currentLang, 'Suffix:', suffix);
+
             const teamName = batter.team === 'home' ? gameManager.currentGame.homeTeam : gameManager.currentGame.awayTeam;
             const positionText = batter.position ?
                 ` (${BASEBALL_CONFIG.POSITIONS[batter.position]})` : '';
@@ -2024,16 +2065,21 @@ class BaseballApp {
             let cleanName = batter.name;
             const match = cleanName.match(/^(\d+)(番|º|°)?$/);
             if (match) {
+                console.log('Cleaning old suffix from name:', cleanName, '→', match[1]);
                 cleanName = match[1];  // 数字のみ
             }
+
+            const finalDisplay = `${batter.battingOrder}${suffix}`;
+            console.log('Final display text for order:', finalDisplay);
 
             display.innerHTML = `
                 <div class="batter-info">
                     <span class="team">${teamName}</span>
-                    <span class="order">${batter.battingOrder}${i18n.t('battingOrderSuffix')}</span>
+                    <span class="order">${finalDisplay}</span>
                     <span class="name">${cleanName}${positionText}</span>
                 </div>
             `;
+            console.log('Display updated with innerHTML:', display.innerHTML);
         }
 
         this.updateRunnersDisplay();

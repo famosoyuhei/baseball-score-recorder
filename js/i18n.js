@@ -1103,10 +1103,18 @@ class I18n {
 
     // 言語を変更
     setLanguage(lang) {
+        console.log('🔧 setLanguage called with:', lang);
+        console.log('Before change - currentLanguage:', this.currentLanguage);
+
         if (this.translations[lang]) {
             this.currentLanguage = lang;
             localStorage.setItem('selectedLanguage', lang);
+            console.log('After change - currentLanguage:', this.currentLanguage);
+            console.log('localStorage updated to:', localStorage.getItem('selectedLanguage'));
             this.updatePageContent();
+            console.log('Page content updated');
+        } else {
+            console.error('Language not found in translations:', lang);
         }
     }
 

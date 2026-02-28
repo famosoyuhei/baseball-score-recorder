@@ -48,7 +48,45 @@ class GameManager {
         this.currentGame.players.home = players.map(player => Player.fromJSON(player));
         this.currentGame.players.away = awayPlayers.map(player => Player.fromJSON(player));
 
+        // 古い形式のサフィックス（番、º、°）を選手名から除去
+        const cleaned = await this.cleanPlayerNameSuffixes();
+
+        // クリーニングが実行された場合は保存
+        if (cleaned) {
+            console.log('💾 Saving cleaned player data...');
+            await this.saveGame();
+        }
+
         return this.currentGame;
+    }
+
+    // 選手名から古い形式のサフィックスを除去するヘルパーメソッド
+    async cleanPlayerNameSuffixes() {
+        if (!this.currentGame) return false;
+
+        console.log('🧹 Cleaning old suffixes from player names...');
+
+        let cleanedCount = 0;
+
+        ['home', 'away'].forEach(team => {
+            this.currentGame.players[team].forEach(player => {
+                const originalName = player.name;
+                const match = player.name.match(/^(\d+)(番|º|°)?$/);
+                if (match && match[2]) {  // サフィックスが存在する場合のみ
+                    player.name = match[1];  // 数字部分のみに修正
+                    console.log(`  Cleaned ${team} player: "${originalName}" → "${player.name}"`);
+                    cleanedCount++;
+                }
+            });
+        });
+
+        if (cleanedCount > 0) {
+            console.log(`✅ Cleaned ${cleanedCount} player names`);
+            return true;
+        } else {
+            console.log('✅ No cleaning needed - all player names are already clean');
+            return false;
+        }
     }
 
     async saveGame() {
