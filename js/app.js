@@ -7,6 +7,12 @@ class BaseballApp {
     async init() {
         try {
             await storage.init();
+
+            // i18n初期化とページコンテンツの翻訳適用
+            if (typeof i18n !== 'undefined') {
+                i18n.updatePageContent();
+            }
+
             this.setupEventListeners();
             this.setupServiceWorker();
             this.isInitialized = true;
@@ -2033,6 +2039,11 @@ class BaseballApp {
         this.updateBatterDisplay();
         this.updateResultButtons();
         this.setupBatterEventListeners();
+
+        // 翻訳を適用
+        if (typeof i18n !== 'undefined') {
+            i18n.updatePageContent();
+        }
     }
 
     setupBatterEventListeners() {
