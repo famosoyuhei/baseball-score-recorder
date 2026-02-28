@@ -665,7 +665,7 @@ class GameManager {
         console.log('getCurrentBatter - no player found, using default');
         return {
             battingOrder: battingOrder,
-            name: `${battingOrder}番`,
+            name: `${battingOrder}`,  // 数字のみ（サフィックスは表示時に追加）
             team: team
         };
     }
