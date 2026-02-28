@@ -3916,7 +3916,9 @@ class BaseballApp {
         const currentBatterEl = document.getElementById('current-batter-name');
         if (currentBatterEl && batter) {
             // 打順番号と名前を表示
+            const currentLang = i18n.getCurrentLanguage();
             const suffix = i18n.t('battingOrderSuffix');
+            console.log('Current language:', currentLang, 'Suffix:', suffix);
 
             // 名前から古い形式のサフィックスを除去
             let cleanName = batter.name;
