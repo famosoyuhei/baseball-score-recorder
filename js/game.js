@@ -715,6 +715,55 @@ class GameManager {
         this.currentBattingOrder[team] = (this.currentBattingOrder[team] % 9) + 1;
     }
 
+    // 局面に応じた打席結果カテゴリを取得
+    getAvailableResultCategories() {
+        if (!this.currentGame) return [];
+
+        const outs = this.currentGame.outs;
+        const runners = this.currentGame.runnersOnBase;
+        const hasRunners = runners.first || runners.second || runners.third;
+        const runnerCount = (runners.first ? 1 : 0) + (runners.second ? 1 : 0) + (runners.third ? 1 : 0);
+
+        const categories = ['hit', 'out', 'walk', 'sacrifice', 'error'];
+
+        // 併殺（走者ありかつ二死未満の場合のみ）
+        if (hasRunners && outs < 2) {
+            categories.push('double_play');
+        }
+
+        // 三重殺（無死かつ走者二人以上の場合のみ）
+        if (outs === 0 && runnerCount >= 2) {
+            categories.push('triple_play');
+        }
+
+        categories.push('special');
+
+        return categories;
+    }
+
+    // カテゴリ内の具体的な打席結果を取得
+    getResultsForCategory(category) {
+        if (!BASEBALL_CONFIG.AT_BAT_RESULT_CATEGORIES[category]) {
+            return [];
+        }
+
+        const outs = this.currentGame.outs;
+        const runners = this.currentGame.runnersOnBase;
+        const categoryConfig = BASEBALL_CONFIG.AT_BAT_RESULT_CATEGORIES[category];
+        let results = [...categoryConfig.children];
+
+        // 特殊カテゴリの場合、三振+振り逃げのフィルタリング
+        if (category === 'special') {
+            // 無死/一死 + 1塁走者ありの場合は三振+振り逃げを除外
+            if (outs < 2 && runners.first) {
+                results = results.filter(r => r !== 'strikeout_passed_ball');
+            }
+        }
+
+        return results;
+    }
+
+    // 後方互換性のための従来のメソッド
     getAvailableAtBatResults() {
         if (!this.currentGame) return [];
 

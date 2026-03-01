@@ -402,6 +402,42 @@ const BASEBALL_CONFIG = {
         'obstruction': '走塁阻害'
     },
 
+    // 階層的な打席結果カテゴリ
+    AT_BAT_RESULT_CATEGORIES: {
+        'hit': {
+            label: 'hit_category',
+            children: ['single', 'double', 'triple', 'homerun']
+        },
+        'out': {
+            label: 'out_category',
+            children: ['strikeout', 'groundout', 'flyout', 'lineout', 'popout', 'foulout']
+        },
+        'walk': {
+            label: 'walk_category',
+            children: ['walk', 'intentional_walk', 'hit_by_pitch']
+        },
+        'sacrifice': {
+            label: 'sacrifice_category',
+            children: ['sacrifice_bunt', 'sacrifice_fly']
+        },
+        'error': {
+            label: 'error_category',
+            children: ['reached_on_error', 'single_error', 'double_error', 'triple_error']
+        },
+        'double_play': {
+            label: 'double_play_category',
+            children: ['ground_double_play', 'fly_double_play', 'liner_double_play']
+        },
+        'triple_play': {
+            label: 'triple_play_category',
+            children: ['ground_triple_play', 'fly_triple_play', 'liner_triple_play']
+        },
+        'special': {
+            label: 'special_category',
+            children: ['fielders_choice', 'infield_fly', 'interference', 'obstruction', 'strikeout_passed_ball']
+        }
+    },
+
     PITCH_TYPES: {
         'fastball': 'ストレート',
         'curveball': 'カーブ',

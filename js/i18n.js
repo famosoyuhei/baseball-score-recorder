@@ -419,7 +419,18 @@ class I18n {
                 pos_LF: 'レフト',
                 pos_CF: 'センター',
                 pos_RF: 'ライト',
-                pos_DH: '指名打者'
+                pos_DH: '指名打者',
+
+                // 打席結果カテゴリ (At-bat result categories)
+                hit_category: '安打',
+                out_category: '凡退',
+                walk_category: '四死球',
+                sacrifice_category: '犠打・犠飛',
+                error_category: 'エラー',
+                double_play_category: '併殺',
+                triple_play_category: '三重殺',
+                special_category: 'その他',
+                back_button: '戻る'
             },
 
             // 英語 (English)
@@ -795,7 +806,18 @@ class I18n {
                 pos_RF: 'Right Field',
                 pos_DH: 'Designated Hitter',
 
-                // 共通UI要素
+                // At-bat result categories
+                hit_category: 'Hit',
+                out_category: 'Out',
+                walk_category: 'Walk',
+                sacrifice_category: 'Sacrifice',
+                error_category: 'Error',
+                double_play_category: 'Double Play',
+                triple_play_category: 'Triple Play',
+                special_category: 'Other',
+                back_button: 'Back',
+
+                // Common UI
                 selectPlaceholder: 'Please select',
                 firstBaseRunner: '1st Base Runner',
                 secondBaseRunner: '2nd Base Runner',
@@ -1155,7 +1177,18 @@ class I18n {
                 pos_LF: 'Jardinero Izquierdo',
                 pos_CF: 'Jardinero Central',
                 pos_RF: 'Jardinero Derecho',
-                pos_DH: 'Bateador Designado'
+                pos_DH: 'Bateador Designado',
+
+                // At-bat result categories
+                hit_category: 'Hit',
+                out_category: 'Out',
+                walk_category: 'Base por Bolas',
+                sacrifice_category: 'Sacrificio',
+                error_category: 'Error',
+                double_play_category: 'Doble Play',
+                triple_play_category: 'Triple Play',
+                special_category: 'Otro',
+                back_button: 'Volver'
             },
 
             // ポルトガル語 (Portuguese)
@@ -1505,7 +1538,18 @@ class I18n {
                 pos_LF: 'Campo Esquerdo',
                 pos_CF: 'Campo Central',
                 pos_RF: 'Campo Direito',
-                pos_DH: 'Rebatedor Designado'
+                pos_DH: 'Rebatedor Designado',
+
+                // At-bat result categories
+                hit_category: 'Rebatida',
+                out_category: 'Out',
+                walk_category: 'Base por Bola',
+                sacrifice_category: 'Sacrifício',
+                error_category: 'Erro',
+                double_play_category: 'Jogada Dupla',
+                triple_play_category: 'Jogada Tripla',
+                special_category: 'Outro',
+                back_button: 'Voltar'
             }
         };
     }
