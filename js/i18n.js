@@ -233,6 +233,12 @@ class I18n {
                 selectStolenBaseRunner: '盗塁走者を選択してください',
                 errorSelectResult: '結果を選択してください',
 
+                // 共通UI
+                result: '結果',
+                confirm: '決定',
+                cancel: 'キャンセル',
+                runsScored: '得点',
+
                 // 言語設定
                 language: '言語',
                 japanese: '日本語',
@@ -647,6 +653,12 @@ class I18n {
                 selectStolenBaseRunner: 'Please select a runner for stolen base',
                 errorSelectResult: 'Please select a result',
 
+                // 共通UI
+                result: 'Result',
+                confirm: 'Confirm',
+                cancel: 'Cancel',
+                runsScored: 'Runs Scored',
+
                 // 言語設定
                 language: 'Language',
                 japanese: '日本語',
@@ -1030,6 +1042,12 @@ class I18n {
                 selectStolenBaseRunner: 'Por favor seleccione un corredor para base robada',
                 errorSelectResult: 'Por favor seleccione un resultado',
 
+                // 共通UI
+                result: 'Resultado',
+                confirm: 'Confirmar',
+                cancel: 'Cancelar',
+                runsScored: 'Carreras Anotadas',
+
                 // 言語設定
                 language: 'Idioma',
                 japanese: '日本語',
@@ -1407,6 +1425,12 @@ class I18n {
                 errorPrefix: 'Erro: ',
                 selectStolenBaseRunner: 'Por favor selecione um corredor para base roubada',
                 errorSelectResult: 'Por favor selecione um resultado',
+
+                // 共通UI
+                result: 'Resultado',
+                confirm: 'Confirmar',
+                cancel: 'Cancelar',
+                runsScored: 'Corridas Marcadas',
 
                 // 言語設定
                 language: 'Idioma',

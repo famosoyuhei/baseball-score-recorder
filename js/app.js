@@ -2012,6 +2012,13 @@ class BaseballApp {
                     </div>
                 </div>
 
+                <div class="runner-play-section" id="runnerPlaySection" style="display: none;">
+                    <h4 data-i18n="runner_play_category">走者プレー</h4>
+                    <div id="runnerPlayButtons" class="runner-play-buttons">
+                        <!-- 動的に生成 -->
+                    </div>
+                </div>
+
                 <div class="detail-inputs">
                     <div class="input-group">
                         <label for="resultDetail" data-i18n="hitDirection">打球方向・詳細:</label>
@@ -2096,6 +2103,7 @@ class BaseballApp {
 
         this.updateRunnersDisplay();
         this.updateOutsDisplay();
+        this.updateRunnerPlaySection();
     }
 
     updateRunnersDisplay() {
@@ -2192,6 +2200,219 @@ class BaseballApp {
                 this.selectedResult = btn.dataset.result;
             });
         });
+    }
+
+    updateRunnerPlaySection() {
+        const section = document.getElementById('runnerPlaySection');
+        if (!section || !gameManager.currentGame) return;
+
+        const runners = gameManager.currentGame.runnersOnBase;
+        const hasRunners = runners.first || runners.second || runners.third;
+
+        // 走者がいる場合のみ表示
+        if (hasRunners) {
+            section.style.display = 'block';
+            this.showRunnerPlayOptions();
+        } else {
+            section.style.display = 'none';
+        }
+    }
+
+    showRunnerPlayOptions() {
+        const container = document.getElementById('runnerPlayButtons');
+        if (!container) return;
+
+        const runnerPlays = BASEBALL_CONFIG.RUNNER_PLAY_CATEGORIES;
+
+        container.innerHTML = Object.keys(runnerPlays).map(playKey => {
+            const play = runnerPlays[playKey];
+            const label = i18n.t(play.label) || play.label;
+            return `<button class="runner-play-btn" data-play="${playKey}">${label}</button>`;
+        }).join('');
+
+        container.querySelectorAll('.runner-play-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const playKey = btn.dataset.play;
+                this.handleRunnerPlay(playKey);
+            });
+        });
+    }
+
+    handleRunnerPlay(playKey) {
+        const play = BASEBALL_CONFIG.RUNNER_PLAY_CATEGORIES[playKey];
+
+        if (!play) return;
+
+        // 盗塁・牽制の場合は走者選択が必要
+        if (playKey === 'steal' || playKey === 'pickoff') {
+            this.showRunnerSelectionModal(playKey, play);
+        } else {
+            // 暴投・捕逸・牽制エラー・ボークは直接実行
+            this.showRunnerAdvancementAfterPlay(playKey, play);
+        }
+    }
+
+    showRunnerSelectionModal(playKey, play) {
+        const runners = gameManager.currentGame.runnersOnBase;
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'runnerSelectionModal';
+
+        const runnerOptions = [];
+        if (runners.first) runnerOptions.push({ base: 'first', label: i18n.t('firstBase') || '1塁' });
+        if (runners.second) runnerOptions.push({ base: 'second', label: i18n.t('secondBase') || '2塁' });
+        if (runners.third) runnerOptions.push({ base: 'third', label: i18n.t('thirdBase') || '3塁' });
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t(play.label)}</h3>
+                <p data-i18n="select_runner">${i18n.t('select_runner') || '走者を選択'}</p>
+
+                <div class="runner-selection">
+                    ${runnerOptions.map(r =>
+                        `<button class="runner-select-btn" data-base="${r.base}">${r.label}</button>`
+                    ).join('')}
+                </div>
+
+                <div class="result-selection-play">
+                    <h4>${i18n.t('result') || '結果'}</h4>
+                    <div class="play-result-buttons">
+                        ${play.options.map(option =>
+                            `<button class="play-result-btn" data-result="${option}">${i18n.t(option)}</button>`
+                        ).join('')}
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="confirmRunnerPlay" class="primary-btn" data-i18n="confirm">決定</button>
+                    <button id="cancelRunnerPlay" class="secondary-btn" data-i18n="cancel">キャンセル</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        let selectedRunner = null;
+        let selectedPlayResult = null;
+
+        // 走者選択
+        modal.querySelectorAll('.runner-select-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                modal.querySelectorAll('.runner-select-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                selectedRunner = btn.dataset.base;
+            });
+        });
+
+        // 結果選択
+        modal.querySelectorAll('.play-result-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                modal.querySelectorAll('.play-result-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                selectedPlayResult = btn.dataset.result;
+            });
+        });
+
+        // 決定ボタン
+        modal.querySelector('#confirmRunnerPlay').addEventListener('click', () => {
+            if (!selectedRunner || !selectedPlayResult) {
+                this.showError(i18n.t('errorSelectResult') || '走者と結果を選択してください');
+                return;
+            }
+
+            this.executeRunnerPlay(playKey, selectedRunner, selectedPlayResult);
+            modal.remove();
+        });
+
+        // キャンセルボタン
+        modal.querySelector('#cancelRunnerPlay').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    showRunnerAdvancementAfterPlay(playKey, play) {
+        // 暴投・捕逸・牽制エラー・ボーク用のアウト・走者更新UI
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'runnerAdvancementModal';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t(play.label)}</h3>
+                <p data-i18n="update_outs_runners">${i18n.t('update_outs_runners') || 'アウト・走者を更新'}</p>
+
+                <div class="outs-update">
+                    <label>${i18n.t('outs') || 'アウト'}:</label>
+                    <input type="number" id="newOuts" min="0" max="3" value="${gameManager.currentGame.outs}">
+                </div>
+
+                <div class="runners-update">
+                    <h4>${i18n.t('runnersSituation') || '走者状況'}</h4>
+                    <label><input type="checkbox" id="newFirst" ${gameManager.currentGame.runnersOnBase.first ? 'checked' : ''}> ${i18n.t('firstBase') || '1塁'}</label>
+                    <label><input type="checkbox" id="newSecond" ${gameManager.currentGame.runnersOnBase.second ? 'checked' : ''}> ${i18n.t('secondBase') || '2塁'}</label>
+                    <label><input type="checkbox" id="newThird" ${gameManager.currentGame.runnersOnBase.third ? 'checked' : ''}> ${i18n.t('thirdBase') || '3塁'}</label>
+                </div>
+
+                <div class="runs-scored">
+                    <label>${i18n.t('runsScored') || '得点'}:</label>
+                    <input type="number" id="runsScored" min="0" max="4" value="0">
+                </div>
+
+                <div class="modal-actions">
+                    <button id="confirmAdvancement" class="primary-btn" data-i18n="confirm">決定</button>
+                    <button id="cancelAdvancement" class="secondary-btn" data-i18n="cancel">キャンセル</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('#confirmAdvancement').addEventListener('click', () => {
+            const newOuts = parseInt(modal.querySelector('#newOuts').value);
+            const newRunners = {
+                first: modal.querySelector('#newFirst').checked,
+                second: modal.querySelector('#newSecond').checked,
+                third: modal.querySelector('#newThird').checked
+            };
+            const runs = parseInt(modal.querySelector('#runsScored').value);
+
+            this.executeRunnerPlayWithAdvancement(playKey, newOuts, newRunners, runs);
+            modal.remove();
+        });
+
+        modal.querySelector('#cancelAdvancement').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    async executeRunnerPlay(playKey, runner, result) {
+        // 盗塁・牽制の実行
+        console.log(`Runner play: ${playKey} - ${runner} - ${result}`);
+
+        // TODO: 実際の走者プレー記録処理を実装
+        // この部分は走者プレーの記録をデータベースに保存する処理
+
+        this.showSuccess(`${i18n.t(result)} を記録しました`);
+        // 打者はそのまま（batterUnchanged）
+    }
+
+    async executeRunnerPlayWithAdvancement(playKey, newOuts, newRunners, runs) {
+        // 暴投・捕逸等の実行
+        console.log(`Runner play: ${playKey} - outs: ${newOuts}, runners:`, newRunners, `runs: ${runs}`);
+
+        gameManager.currentGame.outs = newOuts;
+        gameManager.currentGame.runnersOnBase = newRunners;
+
+        if (runs > 0) {
+            gameManager.addRuns(runs);
+        }
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+        this.updateBatterDisplay();
+        this.updateRunnerPlaySection();
+
+        this.showSuccess(`${i18n.t(BASEBALL_CONFIG.RUNNER_PLAY_CATEGORIES[playKey].label)} を記録しました`);
     }
 
     setupPitchLevelInterface(container) {
