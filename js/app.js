@@ -2126,17 +2126,70 @@ class BaseballApp {
         const container = document.getElementById('resultButtons');
         if (!container) return;
 
-        const availableResults = gameManager.getAvailableAtBatResults();
+        // 現在の選択状態を初期化（カテゴリビューから開始）
+        if (!this.currentResultView) {
+            this.currentResultView = 'categories';
+            this.selectedCategory = null;
+            this.selectedResult = null;
+        }
 
-        container.innerHTML = availableResults.map(result => {
+        if (this.currentResultView === 'categories') {
+            this.showResultCategories(container);
+        } else if (this.currentResultView === 'results') {
+            this.showCategoryResults(container);
+        }
+    }
+
+    showResultCategories(container) {
+        const categories = gameManager.getAvailableResultCategories();
+
+        container.innerHTML = categories.map(category => {
+            const label = i18n.t(`${category}_category`) || category;
+            return `<button class="result-btn category-btn" data-category="${category}">${label}</button>`;
+        }).join('');
+
+        container.querySelectorAll('.category-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const category = btn.dataset.category;
+                this.selectedCategory = category;
+                this.currentResultView = 'results';
+                this.showCategoryResults(container);
+            });
+        });
+    }
+
+    showCategoryResults(container) {
+        const results = gameManager.getResultsForCategory(this.selectedCategory);
+        const categoryLabel = i18n.t(`${this.selectedCategory}_category`) || this.selectedCategory;
+
+        const backButton = `<button class="result-btn back-btn" data-action="back">← ${i18n.t('back') || '戻る'}</button>`;
+        const resultButtons = results.map(result => {
             const label = i18n.t(result) || result;
             return `<button class="result-btn" data-result="${result}">${label}</button>`;
         }).join('');
 
-        container.querySelectorAll('.result-btn').forEach(btn => {
+        container.innerHTML = `
+            <div class="category-header">
+                <strong>${categoryLabel}</strong>
+            </div>
+            ${backButton}
+            ${resultButtons}
+        `;
+
+        // 戻るボタン
+        container.querySelector('.back-btn').addEventListener('click', () => {
+            this.currentResultView = 'categories';
+            this.selectedCategory = null;
+            this.selectedResult = null;
+            this.showResultCategories(container);
+        });
+
+        // 結果選択ボタン
+        container.querySelectorAll('.result-btn:not(.back-btn)').forEach(btn => {
             btn.addEventListener('click', () => {
-                container.querySelectorAll('.result-btn').forEach(b => b.classList.remove('selected'));
+                container.querySelectorAll('.result-btn:not(.back-btn)').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
+                this.selectedResult = btn.dataset.result;
             });
         });
     }
@@ -2812,13 +2865,13 @@ class BaseballApp {
     }
 
     async recordAtBatData() {
-        const selectedResult = document.querySelector('.result-btn.selected');
-        if (!selectedResult) {
-            this.showError('結果を選択してください');
+        // 階層的選択からの結果を使用
+        if (!this.selectedResult) {
+            this.showError(i18n.t('errorSelectResult') || '結果を選択してください');
             return;
         }
 
-        const result = selectedResult.dataset.result;
+        const result = this.selectedResult;
         const resultDetail = document.getElementById('resultDetail').value;
 
         try {
@@ -3874,9 +3927,13 @@ class BaseballApp {
         if (resultDetailEl) resultDetailEl.value = '';
         if (rbisEl) rbisEl.value = '0';
 
-        document.querySelectorAll('.result-btn').forEach(btn => {
-            btn.classList.remove('selected');
-        });
+        // 階層的選択状態をリセット
+        this.currentResultView = 'categories';
+        this.selectedCategory = null;
+        this.selectedResult = null;
+
+        // ボタンの選択状態をクリアして、カテゴリビューに戻る
+        this.updateResultButtons();
     }
 
     clearPitchForm() {

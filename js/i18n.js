@@ -231,6 +231,7 @@ class I18n {
                 // アラートメッセージ (Alert messages)
                 errorPrefix: 'エラー: ',
                 selectStolenBaseRunner: '盗塁走者を選択してください',
+                errorSelectResult: '結果を選択してください',
 
                 // 言語設定
                 language: '言語',
@@ -262,6 +263,7 @@ class I18n {
                 rbiLabel: '打点:',
                 recordButton: '記録',
                 correctPreviousAtBat: '前打席修正',
+                back: '戻る',
 
                 // 選手交代モーダル
                 usePinchHitter: '代打を使用する',
@@ -643,6 +645,7 @@ class I18n {
                 // Alert messages
                 errorPrefix: 'Error: ',
                 selectStolenBaseRunner: 'Please select a runner for stolen base',
+                errorSelectResult: 'Please select a result',
 
                 // 言語設定
                 language: 'Language',
@@ -674,6 +677,7 @@ class I18n {
                 rbiLabel: 'RBIs:',
                 recordButton: 'Record',
                 correctPreviousAtBat: 'Correct Previous At-Bat',
+                back: 'Back',
 
                 // 選手交代モーダル
                 usePinchHitter: 'Use Pinch Hitter',
@@ -1024,6 +1028,7 @@ class I18n {
                 // Alert messages
                 errorPrefix: 'Error: ',
                 selectStolenBaseRunner: 'Por favor seleccione un corredor para base robada',
+                errorSelectResult: 'Por favor seleccione un resultado',
 
                 // 言語設定
                 language: 'Idioma',
@@ -1055,6 +1060,7 @@ class I18n {
                 rbiLabel: 'Carreras Impulsadas:',
                 recordButton: 'Registrar',
                 correctPreviousAtBat: 'Corregir Turno Anterior',
+                back: 'Volver',
 
                 // 選手交代モーダル
                 usePinchHitter: 'Usar Bateador Emergente',
@@ -1400,6 +1406,7 @@ class I18n {
                 // Alert messages
                 errorPrefix: 'Erro: ',
                 selectStolenBaseRunner: 'Por favor selecione um corredor para base roubada',
+                errorSelectResult: 'Por favor selecione um resultado',
 
                 // 言語設定
                 language: 'Idioma',
@@ -1431,6 +1438,7 @@ class I18n {
                 rbiLabel: 'RBIs:',
                 recordButton: 'Registrar',
                 correctPreviousAtBat: 'Corrigir Rebatida Anterior',
+                back: 'Voltar',
 
                 // 選手交代モーダル
                 usePinchHitter: 'Usar Rebatedor Substituto',
