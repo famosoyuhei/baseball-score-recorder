@@ -430,7 +430,22 @@ class I18n {
                 double_play_category: '併殺',
                 triple_play_category: '三重殺',
                 special_category: 'その他',
-                back_button: '戻る'
+                back_button: '戻る',
+
+                // 走者プレーカテゴリ (Runner play categories)
+                runner_play_category: '走者プレー',
+                steal_category: '盗塁',
+                pickoff_category: '牽制',
+                wild_pitch_play: '暴投',
+                passed_ball_play: '捕逸',
+                pickoff_error_play: '牽制エラー',
+                balk_play: 'ボーク',
+                steal_success: '盗塁成功',
+                steal_failure: '盗塁失敗',
+                pickoff_safe: '牽制セーフ',
+                pickoff_out: '牽制アウト',
+                select_runner: '走者を選択',
+                update_outs_runners: 'アウト・走者を更新'
             },
 
             // 英語 (English)
@@ -817,6 +832,21 @@ class I18n {
                 special_category: 'Other',
                 back_button: 'Back',
 
+                // Runner play categories
+                runner_play_category: 'Runner Play',
+                steal_category: 'Steal',
+                pickoff_category: 'Pickoff',
+                wild_pitch_play: 'Wild Pitch',
+                passed_ball_play: 'Passed Ball',
+                pickoff_error_play: 'Pickoff Error',
+                balk_play: 'Balk',
+                steal_success: 'Stolen Base',
+                steal_failure: 'Caught Stealing',
+                pickoff_safe: 'Pickoff Safe',
+                pickoff_out: 'Picked Off',
+                select_runner: 'Select Runner',
+                update_outs_runners: 'Update Outs & Runners',
+
                 // Common UI
                 selectPlaceholder: 'Please select',
                 firstBaseRunner: '1st Base Runner',
@@ -1188,7 +1218,22 @@ class I18n {
                 double_play_category: 'Doble Play',
                 triple_play_category: 'Triple Play',
                 special_category: 'Otro',
-                back_button: 'Volver'
+                back_button: 'Volver',
+
+                // Runner play categories
+                runner_play_category: 'Jugada de Corredor',
+                steal_category: 'Robo de Base',
+                pickoff_category: 'Pickoff',
+                wild_pitch_play: 'Lanzamiento Salvaje',
+                passed_ball_play: 'Bola Pasada',
+                pickoff_error_play: 'Error en Pickoff',
+                balk_play: 'Balk',
+                steal_success: 'Base Robada',
+                steal_failure: 'Atrapado Robando',
+                pickoff_safe: 'Pickoff Seguro',
+                pickoff_out: 'Pickoff Out',
+                select_runner: 'Seleccionar Corredor',
+                update_outs_runners: 'Actualizar Outs y Corredores'
             },
 
             // ポルトガル語 (Portuguese)
@@ -1549,7 +1594,22 @@ class I18n {
                 double_play_category: 'Jogada Dupla',
                 triple_play_category: 'Jogada Tripla',
                 special_category: 'Outro',
-                back_button: 'Voltar'
+                back_button: 'Voltar',
+
+                // Runner play categories
+                runner_play_category: 'Jogada de Corredor',
+                steal_category: 'Roubo de Base',
+                pickoff_category: 'Pickoff',
+                wild_pitch_play: 'Arremesso Descontrolado',
+                passed_ball_play: 'Bola Passada',
+                pickoff_error_play: 'Erro no Pickoff',
+                balk_play: 'Balk',
+                steal_success: 'Base Roubada',
+                steal_failure: 'Pego Roubando',
+                pickoff_safe: 'Pickoff Seguro',
+                pickoff_out: 'Pickoff Out',
+                select_runner: 'Selecionar Corredor',
+                update_outs_runners: 'Atualizar Outs e Corredores'
             }
         };
     }

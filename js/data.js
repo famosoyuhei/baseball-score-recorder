@@ -438,6 +438,40 @@ const BASEBALL_CONFIG = {
         }
     },
 
+    // 走者プレーのカテゴリ (打者の打席結果とは独立)
+    RUNNER_PLAY_CATEGORIES: {
+        'steal': {
+            label: 'steal_category',
+            requiresRunner: true,
+            options: ['steal_success', 'steal_failure']
+        },
+        'pickoff': {
+            label: 'pickoff_category',
+            requiresRunner: true,
+            options: ['pickoff_safe', 'pickoff_out']
+        },
+        'wild_pitch': {
+            label: 'wild_pitch_play',
+            requiresRunner: true,
+            batterUnchanged: true
+        },
+        'passed_ball': {
+            label: 'passed_ball_play',
+            requiresRunner: true,
+            batterUnchanged: true
+        },
+        'pickoff_error': {
+            label: 'pickoff_error_play',
+            requiresRunner: true,
+            batterUnchanged: true
+        },
+        'balk': {
+            label: 'balk_play',
+            requiresRunner: true,
+            batterUnchanged: true
+        }
+    },
+
     PITCH_TYPES: {
         'fastball': 'ストレート',
         'curveball': 'カーブ',
