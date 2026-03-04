@@ -453,7 +453,27 @@ class I18n {
                 pickoff_safe: '牽制セーフ',
                 pickoff_out: '牽制アウト',
                 select_runner: '走者を選択',
-                update_outs_runners: 'アウト・走者を更新'
+                update_outs_runners: 'アウト・走者を更新',
+
+                // エラータイプ (Error types)
+                add_error: 'エラーを追加',
+                error_type: 'エラーの種類',
+                error_position: 'エラーした守備位置',
+                fielding_error: '捕球エラー',
+                throwing_error: '送球エラー',
+                pickoff_throwing_error: '牽制悪送球',
+                foul_fly_drop: 'ファウルフライ落球',
+                passed_ball_error: '捕逸エラー',
+                interference_error: '妨害エラー',
+                select_error_position: '守備位置を選択してください',
+                runner_advancement: '走者進塁',
+                batter_runner_to: '打者走者 →',
+                first_runner_to: '一塁走者 →',
+                second_runner_to: '二塁走者 →',
+                third_runner_to: '三塁走者 →',
+                stays: '残塁',
+                out_on_bases: '塁上アウト',
+                scored: '得点'
             },
 
             // 英語 (English)
@@ -863,6 +883,26 @@ class I18n {
                 select_runner: 'Select Runner',
                 update_outs_runners: 'Update Outs & Runners',
 
+                // Error types
+                add_error: 'Add Error',
+                error_type: 'Error Type',
+                error_position: 'Fielding Position with Error',
+                fielding_error: 'Fielding Error',
+                throwing_error: 'Throwing Error',
+                pickoff_throwing_error: 'Pickoff Throwing Error',
+                foul_fly_drop: 'Foul Fly Dropped',
+                passed_ball_error: 'Passed Ball Error',
+                interference_error: 'Interference Error',
+                select_error_position: 'Please select fielding position',
+                runner_advancement: 'Runner Advancement',
+                batter_runner_to: 'Batter-Runner →',
+                first_runner_to: '1st Base Runner →',
+                second_runner_to: '2nd Base Runner →',
+                third_runner_to: '3rd Base Runner →',
+                stays: 'Stays',
+                out_on_bases: 'Out on Bases',
+                scored: 'Scored',
+
                 // Common UI
                 selectPlaceholder: 'Please select',
                 firstBaseRunner: '1st Base Runner',
@@ -1257,7 +1297,27 @@ class I18n {
                 pickoff_safe: 'Pickoff Seguro',
                 pickoff_out: 'Pickoff Out',
                 select_runner: 'Seleccionar Corredor',
-                update_outs_runners: 'Actualizar Outs y Corredores'
+                update_outs_runners: 'Actualizar Outs y Corredores',
+
+                // Error types
+                add_error: 'Agregar Error',
+                error_type: 'Tipo de Error',
+                error_position: 'Posición Defensiva con Error',
+                fielding_error: 'Error de Fildeo',
+                throwing_error: 'Error de Lanzamiento',
+                pickoff_throwing_error: 'Error de Lanzamiento en Pickoff',
+                foul_fly_drop: 'Foul Fly Caído',
+                passed_ball_error: 'Error de Bola Pasada',
+                interference_error: 'Error de Interferencia',
+                select_error_position: 'Por favor seleccione la posición defensiva',
+                runner_advancement: 'Avance de Corredores',
+                batter_runner_to: 'Bateador-Corredor →',
+                first_runner_to: 'Corredor de 1ra Base →',
+                second_runner_to: 'Corredor de 2da Base →',
+                third_runner_to: 'Corredor de 3ra Base →',
+                stays: 'Permanece',
+                out_on_bases: 'Out en Bases',
+                scored: 'Anotó'
             },
 
             // ポルトガル語 (Portuguese)
@@ -1641,7 +1701,27 @@ class I18n {
                 pickoff_safe: 'Pickoff Seguro',
                 pickoff_out: 'Pickoff Out',
                 select_runner: 'Selecionar Corredor',
-                update_outs_runners: 'Atualizar Outs e Corredores'
+                update_outs_runners: 'Atualizar Outs e Corredores',
+
+                // Error types
+                add_error: 'Adicionar Erro',
+                error_type: 'Tipo de Erro',
+                error_position: 'Posição Defensiva com Erro',
+                fielding_error: 'Erro de Defesa',
+                throwing_error: 'Erro de Arremesso',
+                pickoff_throwing_error: 'Erro de Arremesso no Pickoff',
+                foul_fly_drop: 'Foul Fly Derrubado',
+                passed_ball_error: 'Erro de Bola Passada',
+                interference_error: 'Erro de Interferência',
+                select_error_position: 'Por favor selecione a posição defensiva',
+                runner_advancement: 'Avanço dos Corredores',
+                batter_runner_to: 'Rebatedor-Corredor →',
+                first_runner_to: 'Corredor da 1ª Base →',
+                second_runner_to: 'Corredor da 2ª Base →',
+                third_runner_to: 'Corredor da 3ª Base →',
+                stays: 'Permanece',
+                out_on_bases: 'Out nas Bases',
+                scored: 'Pontuou'
             }
         };
     }

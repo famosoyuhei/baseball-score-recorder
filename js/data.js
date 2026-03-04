@@ -472,6 +472,41 @@ const BASEBALL_CONFIG = {
         }
     },
 
+    // エラータイプ（守備エラー）
+    ERROR_TYPES: {
+        'fielding_error': {
+            label: 'fielding_error',
+            batterContinues: false,  // 打席終了
+            allowsAdvancement: true  // 進塁あり
+        },
+        'throwing_error': {
+            label: 'throwing_error',
+            batterContinues: false,
+            allowsAdvancement: true
+        },
+        'pickoff_throwing_error': {
+            label: 'pickoff_throwing_error',
+            batterContinues: true,   // 打席継続
+            allowsAdvancement: true,
+            noBatterRunnerAdvancement: true  // 打者走者の進塁なし
+        },
+        'foul_fly_drop': {
+            label: 'foul_fly_drop',
+            batterContinues: true,
+            allowsAdvancement: false  // 進塁なし（ファウル扱い）
+        },
+        'passed_ball_error': {
+            label: 'passed_ball_error',
+            batterContinues: false,
+            allowsAdvancement: true
+        },
+        'interference_error': {
+            label: 'interference_error',
+            batterContinues: false,
+            allowsAdvancement: true
+        }
+    },
+
     PITCH_TYPES: {
         'fastball': 'ストレート',
         'curveball': 'カーブ',
