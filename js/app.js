@@ -2019,6 +2019,11 @@ class BaseballApp {
                     </div>
                 </div>
 
+                <div class="error-section">
+                    <button id="addErrorButton" class="secondary-btn" data-i18n="add_error">エラーを追加</button>
+                    <div id="errorsList"></div>
+                </div>
+
                 <div class="detail-inputs">
                     <div class="input-group">
                         <label for="resultDetail" data-i18n="hitDirection">打球方向・詳細:</label>
@@ -2061,6 +2066,13 @@ class BaseballApp {
         document.getElementById('correctLastAtBat').addEventListener('click', () => {
             this.correctLastAtBat();
         });
+
+        document.getElementById('addErrorButton').addEventListener('click', () => {
+            this.showAddErrorModal();
+        });
+
+        // エラー配列を初期化
+        this.currentErrors = [];
     }
 
     updateBatterDisplay() {
@@ -2413,6 +2425,224 @@ class BaseballApp {
         this.updateRunnerPlaySection();
 
         this.showSuccess(`${i18n.t(BASEBALL_CONFIG.RUNNER_PLAY_CATEGORIES[playKey].label)} を記録しました`);
+    }
+
+    // ========== エラーシステム ==========
+
+    showAddErrorModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'addErrorModal';
+
+        const errorTypes = BASEBALL_CONFIG.ERROR_TYPES;
+        const positions = BASEBALL_CONFIG.POSITIONS;
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3 data-i18n="add_error">${i18n.t('add_error')}</h3>
+
+                <div class="input-group">
+                    <label data-i18n="error_type">${i18n.t('error_type')}</label>
+                    <select id="errorTypeSelect">
+                        <option value="">${i18n.t('selectPlaceholder') || '選択してください'}</option>
+                        ${Object.keys(errorTypes).map(key =>
+                            `<option value="${key}">${i18n.t(errorTypes[key].label)}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label data-i18n="error_position">${i18n.t('error_position')}</label>
+                    <select id="errorPositionSelect">
+                        <option value="">${i18n.t('selectPlaceholder') || '選択してください'}</option>
+                        ${Object.keys(positions).map(pos =>
+                            `<option value="${pos}">${i18n.t(`pos_${pos}`)}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="confirmError" class="primary-btn" data-i18n="confirm">${i18n.t('confirm')}</button>
+                    <button id="cancelError" class="secondary-btn" data-i18n="cancel">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('#confirmError').addEventListener('click', () => {
+            const errorType = modal.querySelector('#errorTypeSelect').value;
+            const errorPosition = modal.querySelector('#errorPositionSelect').value;
+
+            if (!errorType) {
+                this.showError(i18n.t('errorSelectResult') || 'エラータイプを選択してください');
+                return;
+            }
+
+            if (!errorPosition) {
+                this.showError(i18n.t('select_error_position'));
+                return;
+            }
+
+            // エラーを追加
+            this.addError(errorType, errorPosition);
+            modal.remove();
+        });
+
+        modal.querySelector('#cancelError').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    addError(errorType, position) {
+        const errorConfig = BASEBALL_CONFIG.ERROR_TYPES[errorType];
+
+        // エラーを配列に追加
+        this.currentErrors.push({
+            type: errorType,
+            position: position,
+            config: errorConfig
+        });
+
+        // エラーリストを更新
+        this.updateErrorsList();
+
+        // エラーの処理タイプに応じて次のアクションを決定
+        if (errorConfig.allowsAdvancement) {
+            // 進塁選択が必要
+            this.showRunnerAdvancementForError(errorType, position);
+        } else {
+            // ファウルフライ落球など、進塁なし
+            this.showSuccess(`${i18n.t(errorConfig.label)} を追加しました`);
+        }
+    }
+
+    updateErrorsList() {
+        const list = document.getElementById('errorsList');
+        if (!list) return;
+
+        if (this.currentErrors.length === 0) {
+            list.innerHTML = '';
+            return;
+        }
+
+        list.innerHTML = this.currentErrors.map((error, index) => `
+            <div class="error-item">
+                <span>${i18n.t(error.config.label)} - ${i18n.t(`pos_${error.position}`)}</span>
+                <button class="remove-error-btn" data-index="${index}">×</button>
+            </div>
+        `).join('');
+
+        // 削除ボタンのイベントリスナー
+        list.querySelectorAll('.remove-error-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const index = parseInt(btn.dataset.index);
+                this.currentErrors.splice(index, 1);
+                this.updateErrorsList();
+            });
+        });
+    }
+
+    showRunnerAdvancementForError(errorType, position) {
+        const errorConfig = BASEBALL_CONFIG.ERROR_TYPES[errorType];
+        const runners = gameManager.currentGame.runnersOnBase;
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'runnerAdvancementErrorModal';
+
+        // 進塁選択肢
+        const advancementOptions = [
+            { value: 'stay', label: i18n.t('stays') },
+            { value: '1B', label: '1' + i18n.t('baseSuffix') || '塁' },
+            { value: '2B', label: '2' + i18n.t('baseSuffix') || '塁' },
+            { value: '3B', label: '3' + i18n.t('baseSuffix') || '塁' },
+            { value: 'home', label: i18n.t('scored') },
+            { value: 'out', label: i18n.t('out_on_bases') }
+        ];
+
+        // 打者走者の選択肢（牽制悪送球の場合は表示しない）
+        const batterRunnerHTML = errorConfig.noBatterRunnerAdvancement ? '' : `
+            <div class="runner-advancement-row">
+                <label>${i18n.t('batter_runner_to')}</label>
+                <select id="batterRunnerAdv">
+                    ${advancementOptions.map(opt =>
+                        `<option value="${opt.value}"${opt.value === '1B' ? ' selected' : ''}>${opt.label}</option>`
+                    ).join('')}
+                </select>
+            </div>
+        `;
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('runner_advancement')}</h3>
+                <p>${i18n.t(errorConfig.label)} - ${i18n.t(`pos_${position}`)}</p>
+
+                ${batterRunnerHTML}
+
+                ${runners.first ? `
+                    <div class="runner-advancement-row">
+                        <label>${i18n.t('first_runner_to')}</label>
+                        <select id="firstRunnerAdv">
+                            ${advancementOptions.map(opt =>
+                                `<option value="${opt.value}"${opt.value === '2B' ? ' selected' : ''}>${opt.label}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                ` : ''}
+
+                ${runners.second ? `
+                    <div class="runner-advancement-row">
+                        <label>${i18n.t('second_runner_to')}</label>
+                        <select id="secondRunnerAdv">
+                            ${advancementOptions.map(opt =>
+                                `<option value="${opt.value}"${opt.value === '3B' ? ' selected' : ''}>${opt.label}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                ` : ''}
+
+                ${runners.third ? `
+                    <div class="runner-advancement-row">
+                        <label>${i18n.t('third_runner_to')}</label>
+                        <select id="thirdRunnerAdv">
+                            ${advancementOptions.map(opt =>
+                                `<option value="${opt.value}"${opt.value === 'home' ? ' selected' : ''}>${opt.label}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                ` : ''}
+
+                <div class="modal-actions">
+                    <button id="confirmAdvancement" class="primary-btn" data-i18n="confirm">${i18n.t('confirm')}</button>
+                    <button id="cancelAdvancement" class="secondary-btn" data-i18n="cancel">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('#confirmAdvancement').addEventListener('click', () => {
+            // 進塁情報を収集
+            const advancement = {
+                batterRunner: errorConfig.noBatterRunnerAdvancement ? null : modal.querySelector('#batterRunnerAdv')?.value,
+                first: runners.first ? modal.querySelector('#firstRunnerAdv').value : null,
+                second: runners.second ? modal.querySelector('#secondRunnerAdv').value : null,
+                third: runners.third ? modal.querySelector('#thirdRunnerAdv').value : null
+            };
+
+            // 最後のエラーに進塁情報を保存
+            this.currentErrors[this.currentErrors.length - 1].advancement = advancement;
+
+            modal.remove();
+            this.showSuccess(`${i18n.t(errorConfig.label)} の進塁を記録しました`);
+        });
+
+        modal.querySelector('#cancelAdvancement').addEventListener('click', () => {
+            // エラーを取り消し
+            this.currentErrors.pop();
+            this.updateErrorsList();
+            modal.remove();
+        });
     }
 
     setupPitchLevelInterface(container) {
@@ -4152,6 +4382,10 @@ class BaseballApp {
         this.currentResultView = 'categories';
         this.selectedCategory = null;
         this.selectedResult = null;
+
+        // エラー配列をクリア
+        this.currentErrors = [];
+        this.updateErrorsList();
 
         // ボタンの選択状態をクリアして、カテゴリビューに戻る
         this.updateResultButtons();

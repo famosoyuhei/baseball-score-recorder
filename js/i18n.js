@@ -473,7 +473,9 @@ class I18n {
                 third_runner_to: '三塁走者 →',
                 stays: '残塁',
                 out_on_bases: '塁上アウト',
-                scored: '得点'
+                scored: '得点',
+                baseSuffix: '塁',
+                selectPlaceholder: '選択してください'
             },
 
             // 英語 (English)
@@ -902,6 +904,7 @@ class I18n {
                 stays: 'Stays',
                 out_on_bases: 'Out on Bases',
                 scored: 'Scored',
+                baseSuffix: 'B',
 
                 // Common UI
                 selectPlaceholder: 'Please select',
@@ -1317,7 +1320,9 @@ class I18n {
                 third_runner_to: 'Corredor de 3ra Base →',
                 stays: 'Permanece',
                 out_on_bases: 'Out en Bases',
-                scored: 'Anotó'
+                scored: 'Anotó',
+                baseSuffix: 'B',
+                selectPlaceholder: 'Por favor seleccione'
             },
 
             // ポルトガル語 (Portuguese)
@@ -1721,7 +1726,9 @@ class I18n {
                 third_runner_to: 'Corredor da 3ª Base →',
                 stays: 'Permanece',
                 out_on_bases: 'Out nas Bases',
-                scored: 'Pontuou'
+                scored: 'Pontuou',
+                baseSuffix: 'B',
+                selectPlaceholder: 'Por favor selecione'
             }
         };
     }
