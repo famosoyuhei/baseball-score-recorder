@@ -475,7 +475,8 @@ class I18n {
                 out_on_bases: '塁上アウト',
                 scored: '得点',
                 baseSuffix: '塁',
-                selectPlaceholder: '選択してください'
+                selectPlaceholder: '選択してください',
+                batter_continues: '打席継続'
             },
 
             // 英語 (English)
@@ -905,6 +906,7 @@ class I18n {
                 out_on_bases: 'Out on Bases',
                 scored: 'Scored',
                 baseSuffix: 'B',
+                batter_continues: 'Batter Continues',
 
                 // Common UI
                 selectPlaceholder: 'Please select',
@@ -1322,6 +1324,7 @@ class I18n {
                 out_on_bases: 'Out en Bases',
                 scored: 'Anotó',
                 baseSuffix: 'B',
+                batter_continues: 'Bateador Continúa',
                 selectPlaceholder: 'Por favor seleccione'
             },
 
@@ -1728,6 +1731,7 @@ class I18n {
                 out_on_bases: 'Out nas Bases',
                 scored: 'Pontuou',
                 baseSuffix: 'B',
+                batter_continues: 'Rebatedor Continua',
                 selectPlaceholder: 'Por favor selecione'
             }
         };

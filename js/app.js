@@ -3328,8 +3328,36 @@ class BaseballApp {
         try {
             const batter = gameManager.getCurrentBatter();
 
+            // エラーで打席継続するかチェック
+            const batterContinues = this.checkBatterContinues();
+
+            if (batterContinues) {
+                // 打席継続の場合（牽制悪送球、ファウルフライ落球）
+                // エラー情報のみを処理して、打者はそのまま
+                if (this.currentErrors && this.currentErrors.length > 0) {
+                    await this.processErrors();
+                }
+
+                // 表示を更新
+                this.updateGameDisplay();
+                this.updateBatterDisplay();
+
+                // エラーリストをクリア（打席は継続）
+                this.currentErrors = [];
+                this.updateErrorsList();
+
+                this.showSuccess(i18n.t('batter_continues') || '打席継続');
+                return;
+            }
+
+            // 通常の打席記録処理
             // 打席開始
             await gameManager.startAtBat(batter.name, batter.battingOrder);
+
+            // エラー情報を処理
+            if (this.currentErrors && this.currentErrors.length > 0) {
+                await this.processErrors();
+            }
 
             // 走者進塁・得点を自動計算
             const advancement = gameManager.calculateRunnerAdvancement(result);
@@ -3345,6 +3373,148 @@ class BaseballApp {
         } catch (error) {
             console.error('打席記録エラー:', error);
             this.showError('打席の記録に失敗しました');
+        }
+    }
+
+    checkBatterContinues() {
+        // エラーがある場合、打席継続するエラーがあるかチェック
+        if (!this.currentErrors || this.currentErrors.length === 0) {
+            return false;
+        }
+
+        return this.currentErrors.some(error => error.config.batterContinues);
+    }
+
+    async processErrors() {
+        // 守備チームを特定（攻撃チームの逆）
+        const fieldingTeam = gameManager.currentGame.isTopHalf ? 'home' : 'away';
+
+        for (const error of this.currentErrors) {
+            // チーム統計にエラーを加算
+            gameManager.currentGame.teamStats[fieldingTeam].errors += 1;
+
+            // 選手統計にエラーを加算
+            await this.addPlayerError(fieldingTeam, error.position);
+
+            // エラー情報をログに記録（将来の詳細分析用）
+            console.log(`Error recorded: ${error.type} by ${error.position} (${fieldingTeam})`);
+
+            // エラーの進塁情報があれば適用
+            if (error.advancement) {
+                this.applyErrorAdvancement(error.advancement);
+            }
+        }
+
+        await gameManager.saveGame();
+    }
+
+    async addPlayerError(team, position) {
+        // 該当ポジションの選手を探してエラー数を加算
+        const players = gameManager.currentGame.players[team];
+        const player = players.find(p => p.position === position);
+
+        if (player) {
+            // 選手の統計情報を初期化（なければ）
+            if (!player.stats) {
+                player.stats = { errors: 0 };
+            }
+            if (typeof player.stats.errors === 'undefined') {
+                player.stats.errors = 0;
+            }
+
+            player.stats.errors += 1;
+
+            // データベースに保存
+            await storage.savePlayer(player.toJSON ? player.toJSON() : player);
+        }
+    }
+
+    applyErrorAdvancement(advancement) {
+        const newRunners = { first: null, second: null, third: null };
+        let runsScored = 0;
+        let outsAdded = 0;
+
+        // 打者走者の処理
+        if (advancement.batterRunner) {
+            switch (advancement.batterRunner) {
+                case '1B':
+                    newRunners.first = true;
+                    break;
+                case '2B':
+                    newRunners.second = true;
+                    break;
+                case '3B':
+                    newRunners.third = true;
+                    break;
+                case 'home':
+                    runsScored++;
+                    break;
+                case 'out':
+                    outsAdded++;
+                    break;
+            }
+        }
+
+        // 各走者の処理
+        const runners = gameManager.currentGame.runnersOnBase;
+
+        if (runners.first && advancement.first) {
+            switch (advancement.first) {
+                case 'stay':
+                    newRunners.first = true;
+                    break;
+                case '2B':
+                    newRunners.second = true;
+                    break;
+                case '3B':
+                    newRunners.third = true;
+                    break;
+                case 'home':
+                    runsScored++;
+                    break;
+                case 'out':
+                    outsAdded++;
+                    break;
+            }
+        }
+
+        if (runners.second && advancement.second) {
+            switch (advancement.second) {
+                case 'stay':
+                    newRunners.second = true;
+                    break;
+                case '3B':
+                    newRunners.third = true;
+                    break;
+                case 'home':
+                    runsScored++;
+                    break;
+                case 'out':
+                    outsAdded++;
+                    break;
+            }
+        }
+
+        if (runners.third && advancement.third) {
+            switch (advancement.third) {
+                case 'stay':
+                    newRunners.third = true;
+                    break;
+                case 'home':
+                    runsScored++;
+                    break;
+                case 'out':
+                    outsAdded++;
+                    break;
+            }
+        }
+
+        // ゲーム状態を更新
+        gameManager.currentGame.runnersOnBase = newRunners;
+        gameManager.currentGame.outs += outsAdded;
+
+        if (runsScored > 0) {
+            gameManager.addRuns(runsScored);
         }
     }
 
