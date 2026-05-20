@@ -1,3 +1,13 @@
+// コールドゲームルールのプリセット定義
+// 各エントリ: { inning: N回以降, points: P点差以上 }
+const MERCY_RULE_PRESETS = {
+    none:         null,
+    highSchool:   [{ inning: 5, points: 10 }, { inning: 6, points: 10 }, { inning: 7, points: 7 }, { inning: 8, points: 7 }],
+    youth:        [{ inning: 3, points: 10 }, { inning: 5, points: 7 }],
+    youthLow:     [{ inning: 3, points: 12 }, { inning: 5, points: 7 }],
+    amateur:      [{ inning: 5, points: 10 }, { inning: 7, points: 7 }],
+};
+
 class Game {
     constructor(homeTeam, awayTeam, recordingLevel = 'inning', playerDetailLevel = 'basic', recordingMode = 'bench') {
         this.id = null;
@@ -7,6 +17,7 @@ class Game {
         this.playerDetailLevel = playerDetailLevel; // 'basic', 'standard', 'detailed'
         this.recordingMode = recordingMode; // 'bench', 'tv'
         this.dhRule = false; // DH制の有無
+        this.dhActive = false; // DH制が現在有効かどうか（一度解除したら false のまま）
         this.date = new Date().toISOString();
         this.status = 'active'; // 'active', 'completed', 'suspended'
         this.currentInning = 1;
@@ -17,12 +28,15 @@ class Game {
         this.balls = 0;
         this.strikes = 0;
         this.runnersOnBase = {
-            first: null,
+            first: null,  // { name: string, battingOrder: number, playerId: string } or null
             second: null,
             third: null
         };
+        // 塁上の各走者が自責点対象か（false = 非自責、true = 自責）
+        this.runnersEarnedStatus = { first: true, second: true, third: true };
         this.currentBatter = null;
         this.currentPitcher = null;
+        this.batterContinuesNextInning = false; // 打席継続中にイニングが終了した場合true
         this.innings = [];
         this.players = {
             home: [],
@@ -55,9 +69,17 @@ class Game {
         };
         this.gameRules = {
             extraInnings: true,        // 延長戦あり
-            maxInnings: null,          // 最大イニング数（null = 無制限）
+            regulationInnings: 9,      // 規定回数（設定最終回）
+            maxInnings: null,          // 最大イニング数（タイブレークなし延長時の上限、null = 未設定）
+            tiebreaker: null,          // null=未設定, true=タイブレークあり, false=タイブレークなし
+            tiebreakerRunners: {       // タイブレーク時の各回開始時ランナー配置
+                first: false,
+                second: true,          // デフォルト: 2塁のみ
+                third: false
+            },
+            minInningsForOfficial: 5,  // 試合成立に必要な完了イニング数（NPB:5、高校野球:7）
             timeLimit: null,           // 時間制限（分）
-            mercyRule: null,           // コールドルール（点差）
+            mercyRule: null,           // コールドルール: null=なし, または [{inning:N, points:P}, ...] の配列
             dhRule: false,             // DH制
             pitchClock: false,         // ピッチクロック
             challengeSystem: false     // チャレンジシステム
@@ -86,6 +108,7 @@ class Game {
             recordingLevel: this.recordingLevel,
             playerDetailLevel: this.playerDetailLevel,
             dhRule: this.dhRule,
+            dhActive: this.dhActive,
             date: this.date,
             status: this.status,
             currentInning: this.currentInning,
@@ -125,7 +148,7 @@ class Player {
         this.id = null;
         this.name = name;
         this.team = team;
-        this.position = position; // 守備位置
+        this.position = position; // 守備位置（「打」「走」「投」「DH」も含む）
         this.battingOrder = battingOrder; // 打順
         this.isActive = true; // 出場中かどうか
         this.isStarter = false; // スターティングメンバーかどうか
@@ -133,6 +156,9 @@ class Player {
         this.substitutedBy = null; // 交代選手ID
         this.substitutedAt = null; // 交代時刻
         this.enteredGameAt = null; // 途中出場時刻
+        this.isPinchHitter = false; // 代打として起用されたか（「打」表示）
+        this.isPinchRunner = false; // 代走として起用されたか（「走」表示）
+        this.needsDefensiveSubstitution = false; // 次の守備で強制的に守備交代が必要
         this.stats = {
             atBats: 0,
             hits: 0,
@@ -148,11 +174,20 @@ class Player {
             sacrificeBunts: 0,
             sacrificeFlies: 0,
             hitByPitch: 0,
+            doublePlaysBatted: 0,  // 打者として記録された併殺打数（GIDP）
+            triplePlaysBatted: 0,  // 打者として記録された三重殺数
             stolenBases: 0,
             caughtStealing: 0,
             fieldingChances: 0,
             fieldingAssists: 0,
-            fieldingPutouts: 0
+            fieldingPutouts: 0,
+            // 投手統計
+            inningsPitched: 0,        // イニング数（アウト数で記録、3アウト=1イニング）
+            strikeoutsPitched: 0,     // 奪三振
+            walksAllowed: 0,          // 与四球
+            hitByPitchAllowed: 0,     // 与死球
+            runsAllowed: 0,           // 失点
+            earnedRuns: 0             // 自責点
         };
         // 詳細レベル用の追加情報
         this.playerInfo = {
@@ -183,6 +218,9 @@ class Player {
             substitutedBy: this.substitutedBy,
             substitutedAt: this.substitutedAt,
             enteredGameAt: this.enteredGameAt,
+            isPinchHitter: this.isPinchHitter,
+            isPinchRunner: this.isPinchRunner,
+            needsDefensiveSubstitution: this.needsDefensiveSubstitution,
             stats: this.stats,
             playerInfo: this.playerInfo,
             isQuickRegistered: this.isQuickRegistered,
@@ -212,6 +250,12 @@ class Inning {
         this.startTime = new Date().toISOString();
         this.endTime = null;
         this.notes = '';
+        this.incomplete = false;       // 途中コールド等で未完了のままになった半イニング
+        this.incompleteReason = null;  // 未完了の理由（'weather', 'darkness' 等）
+        this.pitcherId = null;         // この半イニングを投げた投手のplayerId（後方互換）
+        this.pitcherStints = [];       // [{pitcherId, runnersInherited, runsAtEntry, earnedRunsAtEntry}] 投手交代履歴
+        this.earnedRuns = 0;           // 自責点（投手記録配分用）
+        this.virtualOuts = 0;          // 仮想アウト数（エラーなければアウトになっていた打者の累計）
     }
 
     toJSON() {
@@ -227,7 +271,13 @@ class Inning {
             leftOnBase: this.leftOnBase,
             startTime: this.startTime,
             endTime: this.endTime,
-            notes: this.notes
+            notes: this.notes,
+            incomplete: this.incomplete,
+            incompleteReason: this.incompleteReason,
+            pitcherId: this.pitcherId,
+            pitcherStints: this.pitcherStints,
+            earnedRuns: this.earnedRuns ?? 0,
+            virtualOuts: this.virtualOuts ?? 0
         };
     }
 
@@ -254,7 +304,7 @@ class AtBat {
         this.startTime = new Date().toISOString();
         this.endTime = null;
         this.runnersBeforePlay = {
-            first: null,
+            first: null,  // { name: string, battingOrder: number, playerId: string } or null
             second: null,
             third: null
         };
@@ -263,10 +313,28 @@ class AtBat {
             second: null,
             third: null
         };
+        // 故意落球・エラーなど守備側関与プレー用
+        this.fielderPlayerId = null;
+        // 責任走者追跡用：当打席中のファウルフライ落球回数
+        this.foulFlyDroppedCount = 0;
+        // 責任走者追跡用：打席途中投手交代情報
+        this.midAtBatPitchChange = null; // { previousPitcherId, balls, strikes } | null
         // クイック記録モード用フラグ
         this.isQuickRecord = false; // クイック記録で作成されたか
         this.needsDetailFill = false; // 詳細情報の追記が必要か
         this.quickRecordNote = ''; // クイック記録時のメモ
+        // 打席前のゲーム状態スナップショット（undo用）
+        this.gameStateBefore = {
+            outs: 0,
+            balls: 0,
+            strikes: 0,
+            runnersOnBase: { first: null, second: null, third: null },
+            battingOrderHome: 1,
+            battingOrderAway: 1,
+            inningId: null,
+            inningNumber: 1,
+            isTopHalf: true
+        };
     }
 
     toJSON() {
@@ -287,7 +355,11 @@ class AtBat {
             runnersAfterPlay: this.runnersAfterPlay,
             isQuickRecord: this.isQuickRecord,
             needsDetailFill: this.needsDetailFill,
-            quickRecordNote: this.quickRecordNote
+            quickRecordNote: this.quickRecordNote,
+            gameStateBefore: this.gameStateBefore,
+            fielderPlayerId: this.fielderPlayerId || null,
+            foulFlyDroppedCount: this.foulFlyDroppedCount || 0,
+            midAtBatPitchChange: this.midAtBatPitchChange || null
         };
     }
 
@@ -383,6 +455,7 @@ const BASEBALL_CONFIG = {
         'strikeout': '三振',
         'strikeout_swinging': '空振り三振',
         'strikeout_looking': '見逃し三振',
+        'strikeout_bunt': 'スリーバント失敗',
         'strikeout_passed_ball': '三振+振り逃げ',
         'groundout': 'ゴロアウト',
         'flyout': 'フライアウト',
@@ -398,6 +471,7 @@ const BASEBALL_CONFIG = {
         'fielders_choice': 'フィルダースチョイス',
         'reached_on_error': 'エラー出塁',
         'infield_fly': 'インフィールドフライ',
+        'intentional_drop': '故意落球',
         'interference': '打撃妨害',
         'obstruction': '走塁阻害'
     },
@@ -434,7 +508,7 @@ const BASEBALL_CONFIG = {
         },
         'special': {
             label: 'special_category',
-            children: ['fielders_choice', 'infield_fly', 'interference', 'obstruction', 'strikeout_passed_ball']
+            children: ['fielders_choice', 'infield_fly', 'intentional_drop', 'interference', 'obstruction', 'strikeout_passed_ball']
         }
     },
 
@@ -443,32 +517,39 @@ const BASEBALL_CONFIG = {
         'steal': {
             label: 'steal_category',
             requiresRunner: true,
-            options: ['steal_success', 'steal_failure']
+            options: ['steal_success', 'steal_failure'],
+            completesAtBat: false  // 打席継続
         },
         'pickoff': {
             label: 'pickoff_category',
             requiresRunner: true,
-            options: ['pickoff_safe', 'pickoff_out']
+            options: ['pickoff_safe', 'pickoff_out'],
+            completesAtBat: false  // 打席継続
         },
         'wild_pitch': {
             label: 'wild_pitch_play',
             requiresRunner: true,
-            batterUnchanged: true
+            batterUnchanged: true,
+            completesAtBat: false  // 打席継続
         },
         'passed_ball': {
             label: 'passed_ball_play',
             requiresRunner: true,
-            batterUnchanged: true
+            batterUnchanged: true,
+            completesAtBat: false  // 打席継続
         },
         'pickoff_error': {
             label: 'pickoff_error_play',
             requiresRunner: true,
-            batterUnchanged: true
+            batterUnchanged: true,
+            completesAtBat: false  // 打席継続
         },
         'balk': {
             label: 'balk_play',
             requiresRunner: true,
-            batterUnchanged: true
+            batterUnchanged: true,
+            completesAtBat: false,  // 打席継続
+            allRunnersAdvance: true // 全走者が1塁進塁（強制・任意関係なし）
         }
     },
 
@@ -504,6 +585,180 @@ const BASEBALL_CONFIG = {
             label: 'interference_error',
             batterContinues: false,
             allowsAdvancement: true
+        }
+    },
+
+    // 打球方向（単打・二塁打・三塁打用）
+    HIT_DIRECTIONS: {
+        'P': { label: 'pos_P', positionCode: 'P' },    // ピッチャー
+        'C': { label: 'pos_C', positionCode: 'C' },    // キャッチャー
+        '1B': { label: 'pos_1B', positionCode: '1B' }, // ファースト
+        '2B': { label: 'pos_2B', positionCode: '2B' }, // セカンド
+        '3B': { label: 'pos_3B', positionCode: '3B' }, // サード
+        'SS': { label: 'pos_SS', positionCode: 'SS' }, // ショート
+        'LF': { label: 'pos_LF', positionCode: 'LF' }, // レフト
+        'CF': { label: 'pos_CF', positionCode: 'CF' }, // センター
+        'RF': { label: 'pos_RF', positionCode: 'RF' }  // ライト
+    },
+
+    // 本塁打方向
+    HOMERUN_DIRECTIONS: {
+        'left': { label: 'homerun_left' },      // 左越え
+        'center': { label: 'homerun_center' },  // 中越え
+        'right': { label: 'homerun_right' },    // 右越え
+        'running': { label: 'homerun_running' } // ランニング
+    },
+
+    // 打席結果の階層構造
+    AT_BAT_RESULTS: {
+        // 安打
+        'hit': {
+            label: 'hit',
+            completesAtBat: true,  // 打席完結
+            children: {
+                'single': { label: 'single', requiresDirection: true },
+                'double': { label: 'double', requiresDirection: true },
+                'triple': { label: 'triple', requiresDirection: true },
+                'homerun': { label: 'homerun', requiresDirection: true, isHomerun: true }
+            }
+        },
+        // 凡退
+        'out': {
+            label: 'out',
+            completesAtBat: true,  // 打席完結
+            children: {
+                'groundout': { label: 'groundout', requiresDirection: true },
+                'flyout': { label: 'flyout', requiresDirection: true, requiresFairFoul: true },
+                'lineout': { label: 'lineout', requiresDirection: true },
+                'strikeout': { label: 'strikeout', hasDetails: true },
+                'illegal_batted_ball': { label: 'illegal_batted_ball' } // 反則打球
+            }
+        },
+        // 四球
+        'walk': {
+            label: 'walk',
+            completesAtBat: true,  // 打席完結
+            children: {
+                'walk': { label: 'walk_normal' },
+                'intentional_walk': { label: 'intentional_walk' }
+            }
+        },
+        // 死球
+        'hit_by_pitch': {
+            label: 'hit_by_pitch',
+            completesAtBat: true  // 打席完結
+        },
+        // 野選出塁
+        'fielders_choice': {
+            label: 'fielders_choice',
+            completesAtBat: true  // 打席完結
+        },
+        // エラー（打撃妨害、走塁妨害を含む）
+        'error': {
+            label: 'error_including_interference',
+            hasErrorType: true,
+            completesAtBat: true  // 打席完結（エラーにより出塁）
+        },
+        // 守備妨害（攻撃側の妨害）
+        'offensive_interference': {
+            label: 'offensive_interference',
+            hasInterferenceType: true,
+            completesAtBat: true  // 打席完結
+        },
+        // 走塁妨害（守備側の妨害）
+        'obstruction': {
+            label: 'obstruction',
+            requiresObstructionDetails: true,
+            completesAtBat: true  // 打席完結
+        }
+    },
+
+    // エラーの種類
+    ERROR_TYPES: {
+        // 通常のエラー（既存）
+        'throwing_error': { label: 'throwing_error', selectPosition: true },
+        'fielding_error': { label: 'fielding_error', selectPosition: true },
+        'dropped_ball_error': { label: 'dropped_ball_error', selectPosition: true },
+        // 妨害系（新規）
+        'catchers_interference': {
+            label: 'catchers_interference',
+            selectPosition: false,  // キャッチャー固定
+            isCatcherOnly: true,
+            batterToFirst: true,    // 打者は1塁へ
+            allRunnersAdvance: true // 全走者が1塁進塁（強制・任意関係なし）
+        },
+        'fielders_obstruction': {
+            label: 'fielders_obstruction',
+            selectPosition: true  // 走塁妨害した野手を選択
+        }
+    },
+
+    // 三振の詳細
+    STRIKEOUT_DETAILS: {
+        'looking': { label: 'strikeout_looking' },      // 見逃し
+        'swinging': { label: 'strikeout_swinging' },   // 空振り
+        'bunt': { label: 'strikeout_bunt' }            // スリーバント失敗
+    },
+
+    // 走塁妨害（守備側の妨害）の設定
+    OBSTRUCTION_CONFIG: {
+        // 妨害された走者に最低1つの進塁権を与える
+        minimumAdvancement: 1,
+        // エラーを記録
+        recordError: true,
+        // 打数にカウントしない
+        noAtBat: true
+    },
+
+    // 守備妨害（攻撃側の妨害）の種類
+    OFFENSIVE_INTERFERENCE_TYPES: {
+        // 走者の守備妨害（走者アウト）
+        'runner_touches_fair_ball': {
+            label: 'runner_touches_fair_ball',
+            runnerOut: true,           // 妨害した走者がアウト
+            batterResult: 'safe',      // 打者は基本的にセーフ
+            allowBatterHit: true,      // ヒット性なら安打を記録可能
+            requiresRunnerSelection: true
+        },
+        'runner_interferes_fielder': {
+            label: 'runner_interferes_fielder',
+            runnerOut: true,
+            batterResult: 'safe',
+            allowBatterHit: true,      // 記録員判断で安打の可能性
+            requiresRunnerSelection: true
+        },
+
+        // 打者走者の守備妨害（打者走者アウト）
+        'batter_runner_touches_ball': {
+            label: 'batter_runner_touches_ball',
+            runnerOut: false,
+            batterResult: 'out',       // 打者走者がアウト
+            allowBatterHit: false,
+            requiresRunnerSelection: false
+        },
+        'batter_runner_interferes': {
+            label: 'batter_runner_interferes',
+            runnerOut: false,
+            batterResult: 'out',
+            allowBatterHit: false,
+            requiresRunnerSelection: false
+        },
+        'three_foot_lane_violation': {
+            label: 'three_foot_lane_violation',
+            runnerOut: false,
+            batterResult: 'out',
+            allowBatterHit: false,
+            requiresRunnerSelection: false
+        },
+
+        // 併殺阻止妨害（走者と打者走者の両方アウト）
+        'double_play_interference': {
+            label: 'double_play_interference',
+            runnerOut: true,           // 妨害した走者アウト
+            batterResult: 'out',       // 打者走者もアウト
+            allowBatterHit: false,
+            isDoublePlay: true,
+            requiresRunnerSelection: true
         }
     },
 

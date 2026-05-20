@@ -17,6 +17,7 @@ class BaseballApp {
             this.setupServiceWorker();
             this.isInitialized = true;
             console.log('アプリケーション初期化完了');
+            this.loadActiveGamesOnWelcome();
         } catch (error) {
             console.error('アプリケーション初期化エラー:', error);
             this.showError('アプリケーションの初期化に失敗しました');
@@ -57,6 +58,57 @@ class BaseballApp {
             this.startNewGame();
         });
 
+        // コールドゲームルール プリセット選択（セットアップ画面）
+        document.querySelectorAll('#gameSetupForm .mercy-preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.onMercyPresetSelect(btn, 'setup'));
+        });
+        document.getElementById('addMercyRuleBtn').addEventListener('click', () => {
+            this.addMercyCustomRow('setup');
+        });
+
+        // 試合詳細閲覧モーダル
+        document.getElementById('gameDetailCloseBtn').addEventListener('click', () => {
+            document.getElementById('gameDetailModal').classList.add('modal--hidden');
+        });
+        document.getElementById('gameDetailClose2Btn').addEventListener('click', () => {
+            document.getElementById('gameDetailModal').classList.add('modal--hidden');
+        });
+
+        // ゲームルール設定モーダル（試合中）
+        document.getElementById('gameRulesBtn').addEventListener('click', () => {
+            this.showGameRulesModal();
+        });
+        document.querySelectorAll('#gameRulesMercyPresets .mercy-preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.onMercyPresetSelect(btn, 'modal'));
+        });
+        document.getElementById('addGameRulesMercyRuleBtn').addEventListener('click', () => {
+            this.addMercyCustomRow('modal');
+        });
+        document.getElementById('gameRulesSaveBtn').addEventListener('click', () => {
+            this.saveGameRules();
+        });
+        document.getElementById('gameRulesCancelBtn').addEventListener('click', () => {
+            this.hideGameRulesModal();
+        });
+        document.querySelectorAll('#gameRulesModal .official-preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.getElementById('minInningsForOfficialInput').value = btn.dataset.min;
+                document.querySelectorAll('#gameRulesModal .official-preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        // 雨天等コールド
+        document.getElementById('weatherCallBtn').addEventListener('click', () => {
+            this.showWeatherCallModal();
+        });
+        document.getElementById('weatherCallConfirmBtn').addEventListener('click', () => {
+            this.confirmWeatherCall();
+        });
+        document.getElementById('weatherCallCancelBtn').addEventListener('click', () => {
+            document.getElementById('weatherCallModal').classList.add('modal--hidden');
+        });
+
         document.getElementById('saveGame').addEventListener('click', () => {
             this.saveCurrentGame();
         });
@@ -82,6 +134,17 @@ class BaseballApp {
         });
         document.getElementById('showGameTime').addEventListener('click', () => {
             this.showGameTimeInfo();
+        });
+        document.getElementById('abandonGameBtn').addEventListener('click', () => {
+            this.abandonCurrentGame();
+        });
+
+        document.getElementById('confirmGameBtn').addEventListener('click', () => {
+            this.confirmGame();
+        });
+
+        document.getElementById('undoFromEndBtn').addEventListener('click', () => {
+            this.undoFromGameEnd();
         });
 
         document.getElementById('recordingLevel').addEventListener('change', (e) => {
@@ -149,6 +212,56 @@ class BaseballApp {
 
         // NPBスコアブック切り替え機能
         this.setupNPBScoreboardToggle();
+
+        // 追加プレー確認モーダル
+        document.getElementById('yesAdditionalPlayBtn').addEventListener('click', () => {
+            this.onAdditionalPlayYes();
+        });
+        document.getElementById('noAdditionalPlayBtn').addEventListener('click', () => {
+            this.onAdditionalPlayNo();
+        });
+
+        // 追加プレー記録モーダル
+        document.getElementById('completeAdditionalPlayBtn').addEventListener('click', () => {
+            this.onCompleteAdditionalPlay();
+        });
+
+        // ボールデッドバナー「プレー再開」
+        document.getElementById('resumePlayBtn').addEventListener('click', () => {
+            this.hideBallDeadBanner();
+            // 投球記録モード中の場合は投球UIも更新
+            if (document.querySelector('.pitch-interface')) {
+                this.updatePitchDisplay();
+            }
+        });
+
+        // ホームラン柵越え確認モーダル
+        document.getElementById('fenceOverYesBtn').addEventListener('click', () => {
+            this.onHomerunFenceOver(true);
+        });
+        document.getElementById('fenceOverNoBtn').addEventListener('click', () => {
+            this.onHomerunFenceOver(false);
+        });
+
+        // タイブレーク設定モーダル
+        document.getElementById('tiebreakerYesBtn').addEventListener('click', () => {
+            this.onTiebreakerYes();
+        });
+        document.getElementById('tiebreakerNoBtn').addEventListener('click', () => {
+            this.onTiebreakerNo();
+        });
+        document.getElementById('tiebreakerNoneBtn').addEventListener('click', () => {
+            this.onTiebreakerNone();
+        });
+        document.getElementById('tiebreakerRunnerConfirmBtn').addEventListener('click', () => {
+            this.onTiebreakerRunnerConfirm();
+        });
+        document.getElementById('tiebreakerMaxInningsConfirmBtn').addEventListener('click', () => {
+            this.onTiebreakerMaxInningsConfirm();
+        });
+        document.querySelectorAll('.runner-option-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.onTiebreakerRunnerOptionSelect(e.currentTarget));
+        });
     }
 
     async startNewGame() {
@@ -165,6 +278,13 @@ class BaseballApp {
 
         try {
             await gameManager.createNewGame(homeTeam, awayTeam, recordingLevel, playerDetailLevel, recordingMode);
+
+            // コールドゲームルールを適用
+            const mercyRule = this.getMercyRuleFromSetup();
+            if (mercyRule !== undefined) {
+                gameManager.currentGame.gameRules.mercyRule = mercyRule;
+            }
+
             this.setupGameScreen();
             this.showScreen('gameScreen');
             this.updateGameDisplay();
@@ -1867,6 +1987,12 @@ class BaseballApp {
                 player.position = newPosition;
                 usedPositions.add(newPosition);
                 await storage.savePlayer(player.toJSON());
+                // 投手交代をスティントに記録
+                if (newPosition === 'P') {
+                    const oldPitcherId = gameManager.getCurrentPitcherId();
+                    gameManager.notifyPitcherChange(player.id);
+                    await this.handleMidAtBatPitcherChange(oldPitcherId);
+                }
 
             } else {
                 // 別の選手と交代する場合
@@ -1899,6 +2025,12 @@ class BaseballApp {
                 }
 
                 usedPositions.add(replacementPosition);
+                // 投手交代をスティントに記録
+                if (replacementPosition === 'P') {
+                    const oldPitcherId = gameManager.getCurrentPitcherId();
+                    gameManager.notifyPitcherChange(newPlayer.id);
+                    await this.handleMidAtBatPitcherChange(oldPitcherId);
+                }
             }
         }
 
@@ -1943,19 +2075,18 @@ class BaseballApp {
                     <div class="stat-group">
                         <h4><span data-i18n="currentInningHits">安打数</span>: <span id="currentInningHits">0</span></h4>
                         <button id="addHit" class="stat-btn"><span data-i18n="hits">H</span> +1</button>
-                        <button id="undoHit" class="undo-btn" data-i18n="undo">取消</button>
                     </div>
 
                     <div class="stat-group">
                         <h4><span data-i18n="currentInningErrors">失策数</span>: <span id="currentInningErrors">0</span></h4>
                         <button id="addError" class="stat-btn"><span data-i18n="errors">E</span> +1</button>
-                        <button id="undoError" class="undo-btn" data-i18n="undo">取消</button>
                     </div>
+
                 </div>
 
                 <div class="inning-controls">
                     <button id="endHalfInning" class="primary-btn" data-i18n="endHalfInning">攻撃終了</button>
-                    <button id="correctInning" class="secondary-btn" data-i18n="correct">修正</button>
+                    <button id="undoInningAction" class="undo-btn" disabled data-i18n="undo">取消</button>
                     <button id="saveInning" class="save-btn" data-i18n="save">保存</button>
                 </div>
 
@@ -1971,6 +2102,7 @@ class BaseballApp {
             </div>
         `;
 
+        this.inningActionHistory = [];
         this.setupInningEventListeners();
         this.updateCurrentInningDisplay();
         this.loadInningHistory();
@@ -2038,7 +2170,14 @@ class BaseballApp {
 
                 <div class="batter-controls">
                     <button id="recordAtBat" class="primary-btn" data-i18n="recordButton">記録</button>
+                    <button id="undoLastAtBatBtn" class="undo-btn" data-i18n="undoLastAtBat">前打席に戻す</button>
                     <button id="correctLastAtBat" class="secondary-btn" data-i18n="correctPreviousAtBat">前打席修正</button>
+                </div>
+
+                <div class="earned-runs-adjust">
+                    <span data-i18n="earnedRunsLabel">自責点</span>: <span id="currentInningEarnedRuns">0</span>
+                    <button id="markUnearnedBtn" class="stat-btn" disabled data-i18n="markUnearned">−自責点</button>
+                    <button id="undoMarkUnearnedBtn" class="stat-btn" disabled data-i18n="undoMarkUnearned">+自責点</button>
                 </div>
 
                 <div class="at-bat-history">
@@ -2063,6 +2202,10 @@ class BaseballApp {
             this.recordAtBatData();
         });
 
+        document.getElementById('undoLastAtBatBtn').addEventListener('click', () => {
+            this.undoLastAtBat();
+        });
+
         document.getElementById('correctLastAtBat').addEventListener('click', () => {
             this.correctLastAtBat();
         });
@@ -2070,6 +2213,11 @@ class BaseballApp {
         document.getElementById('addErrorButton').addEventListener('click', () => {
             this.showAddErrorModal();
         });
+
+        const bMarkBtn = document.getElementById('markUnearnedBtn');
+        if (bMarkBtn) bMarkBtn.addEventListener('click', () => this.addMarkUnearned());
+        const bUndoMarkBtn = document.getElementById('undoMarkUnearnedBtn');
+        if (bUndoMarkBtn) bUndoMarkBtn.addEventListener('click', () => this.addUndoMarkUnearned());
 
         // エラー配列を初期化
         this.currentErrors = [];
@@ -2146,46 +2294,129 @@ class BaseballApp {
         const container = document.getElementById('resultButtons');
         if (!container) return;
 
-        // 現在の選択状態を初期化（カテゴリビューから開始）
+        // 現在の選択状態を初期化（トップレベルから開始）
         if (!this.currentResultView) {
-            this.currentResultView = 'categories';
+            this.currentResultView = 'top';
             this.selectedCategory = null;
+            this.selectedSubCategory = null;
             this.selectedResult = null;
         }
 
-        if (this.currentResultView === 'categories') {
-            this.showResultCategories(container);
-        } else if (this.currentResultView === 'results') {
-            this.showCategoryResults(container);
+        if (this.currentResultView === 'top') {
+            this.showTopLevelResults(container);
+        } else if (this.currentResultView === 'sub') {
+            this.showSubLevelResults(container);
         }
     }
 
-    showResultCategories(container) {
-        const categories = gameManager.getAvailableResultCategories();
+    showTopLevelResults(container) {
+        // AT_BAT_RESULTSのトップレベルキーを取得
+        const topLevel = BASEBALL_CONFIG.AT_BAT_RESULTS;
+        const runnerPlays = BASEBALL_CONFIG.RUNNER_PLAY_CATEGORIES;
 
-        container.innerHTML = categories.map(category => {
-            const label = i18n.t(`${category}_category`) || category;
-            return `<button class="result-btn category-btn" data-category="${category}">${label}</button>`;
-        }).join('');
+        // 打席完結と打席継続を分けて表示
+        const completingResults = Object.keys(topLevel).filter(key =>
+            topLevel[key].completesAtBat !== false
+        );
+
+        const continuingPlays = Object.keys(runnerPlays);
+
+        container.innerHTML = `
+            <div class="result-section">
+                <h4 class="section-title completing-title">打席完結</h4>
+                <div class="result-buttons-group completing-group">
+                    ${completingResults.map(key => {
+                        const config = topLevel[key];
+                        const label = i18n.t(config.label) || key;
+                        return `<button class="result-btn category-btn completing-btn" data-key="${key}" data-type="result">${label}</button>`;
+                    }).join('')}
+                </div>
+            </div>
+            <div class="result-section">
+                <h4 class="section-title continuing-title">打席継続中の事象</h4>
+                <div class="result-buttons-group continuing-group">
+                    ${continuingPlays.map(key => {
+                        const config = runnerPlays[key];
+                        const label = i18n.t(config.label) || key;
+                        return `<button class="result-btn category-btn continuing-btn" data-key="${key}" data-type="play">${label}</button>`;
+                    }).join('')}
+                </div>
+            </div>
+        `;
 
         container.querySelectorAll('.category-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const category = btn.dataset.category;
-                this.selectedCategory = category;
-                this.currentResultView = 'results';
-                this.showCategoryResults(container);
+                const key = btn.dataset.key;
+                const type = btn.dataset.type;
+
+                if (type === 'result') {
+                    const config = topLevel[key];
+                    // 打席結果の処理
+                    // 子要素がある場合はサブレベルへ
+                    if (config.children) {
+                        this.selectedCategory = key;
+                        this.currentResultView = 'sub';
+                        this.showSubLevelResults(container);
+                    }
+                    // 守備妨害の場合は妨害タイプ選択へ
+                    else if (config.hasInterferenceType) {
+                        this.selectedCategory = key;
+                        this.showInterferenceTypeModal();
+                    }
+                    // 走塁妨害の場合は妨害詳細選択へ
+                    else if (config.requiresObstructionDetails) {
+                        this.selectedCategory = key;
+                        this.showObstructionModal();
+                    }
+                    // エラーの場合はエラータイプ選択へ
+                    else if (config.hasErrorType) {
+                        this.selectedCategory = key;
+                        this.showErrorTypeModal();
+                    }
+                    else {
+                        // 子要素がない場合は直接選択（死球、野選出塁）
+                        container.querySelectorAll('.category-btn').forEach(b => b.classList.remove('selected'));
+                        btn.classList.add('selected');
+                        this.selectedResult = key;
+                        this.selectedSubCategory = null;
+                        this.selectedHitDirection = null;
+                    }
+                } else if (type === 'play') {
+                    // 打席継続中の走者プレイ処理
+                    const config = runnerPlays[key];
+
+                    // 各プレイタイプに応じた処理
+                    if (key === 'balk') {
+                        this.processBalk();
+                    } else if (key === 'steal') {
+                        this.showStealModal();
+                    } else if (key === 'pickoff') {
+                        this.showPickoffModal();
+                    } else if (key === 'wild_pitch') {
+                        this.showWildPitchModal();
+                    } else if (key === 'passed_ball') {
+                        this.showPassedBallModal();
+                    } else if (key === 'pickoff_error') {
+                        this.showPickoffErrorModal();
+                    } else {
+                        console.log('Runner play selected:', key, config);
+                        this.showInfo('このプレイの処理は今後実装予定です');
+                    }
+                }
             });
         });
     }
 
-    showCategoryResults(container) {
-        const results = gameManager.getResultsForCategory(this.selectedCategory);
-        const categoryLabel = i18n.t(`${this.selectedCategory}_category`) || this.selectedCategory;
+    showSubLevelResults(container) {
+        const topLevel = BASEBALL_CONFIG.AT_BAT_RESULTS;
+        const categoryConfig = topLevel[this.selectedCategory];
+        const categoryLabel = i18n.t(categoryConfig.label) || this.selectedCategory;
 
-        const backButton = `<button class="result-btn back-btn" data-action="back">← ${i18n.t('back') || '戻る'}</button>`;
-        const resultButtons = results.map(result => {
-            const label = i18n.t(result) || result;
-            return `<button class="result-btn" data-result="${result}">${label}</button>`;
+        const backButton = `<button class="result-btn back-btn" data-action="back">← ${i18n.t('back_button') || '戻る'}</button>`;
+        const resultButtons = Object.keys(categoryConfig.children).map(key => {
+            const childConfig = categoryConfig.children[key];
+            const label = i18n.t(childConfig.label) || key;
+            return `<button class="result-btn" data-result="${key}">${label}</button>`;
         }).join('');
 
         container.innerHTML = `
@@ -2198,19 +2429,391 @@ class BaseballApp {
 
         // 戻るボタン
         container.querySelector('.back-btn').addEventListener('click', () => {
-            this.currentResultView = 'categories';
+            this.currentResultView = 'top';
             this.selectedCategory = null;
+            this.selectedSubCategory = null;
             this.selectedResult = null;
-            this.showResultCategories(container);
+            this.showTopLevelResults(container);
         });
 
         // 結果選択ボタン
         container.querySelectorAll('.result-btn:not(.back-btn)').forEach(btn => {
             btn.addEventListener('click', () => {
-                container.querySelectorAll('.result-btn:not(.back-btn)').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                this.selectedResult = btn.dataset.result;
+                const result = btn.dataset.result;
+                const childConfig = categoryConfig.children[result];
+
+                // 安打の場合は打球方向選択モーダルを表示
+                if (this.selectedCategory === 'hit' && childConfig.requiresDirection) {
+                    this.showHitDirectionModal(result);
+                }
+                // 凡退の場合
+                else if (this.selectedCategory === 'out') {
+                    // 三振の場合は三振詳細選択モーダル
+                    if (result === 'strikeout' && childConfig.hasDetails) {
+                        this.showStrikeoutDetailsModal(result);
+                    }
+                    // ゴロ・フライ・ライナーの場合は守備位置選択モーダル
+                    else if (childConfig.requiresDirection) {
+                        this.showOutDirectionModal(result, childConfig);
+                    }
+                    // 反則打球は直接選択
+                    else {
+                        container.querySelectorAll('.result-btn:not(.back-btn)').forEach(b => b.classList.remove('selected'));
+                        btn.classList.add('selected');
+                        this.selectedResult = result;
+                        this.selectedSubCategory = result;
+                        this.selectedHitDirection = null;
+                    }
+                }
+                // 四球の場合
+                else if (this.selectedCategory === 'walk') {
+                    container.querySelectorAll('.result-btn:not(.back-btn)').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    this.selectedResult = result;
+                    this.selectedSubCategory = result;
+                    this.selectedHitDirection = null;
+                }
+                // その他の結果は直接選択
+                else {
+                    container.querySelectorAll('.result-btn:not(.back-btn)').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    this.selectedResult = result;
+                    this.selectedSubCategory = result;
+                    this.selectedHitDirection = null;
+                }
             });
+        });
+    }
+
+    showHitDirectionModal(hitType) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'hitDirectionModal';
+
+        // 本塁打の場合は特殊な方向選択肢
+        const isHomerun = hitType === 'homerun';
+        const directions = isHomerun ?
+            BASEBALL_CONFIG.HOMERUN_DIRECTIONS :
+            BASEBALL_CONFIG.HIT_DIRECTIONS;
+
+        let directionOptions = Object.keys(directions).map(key => {
+            const dir = directions[key];
+            return `<option value="${key}">${i18n.t(dir.label)}</option>`;
+        }).join('');
+
+        // 単打で走者がいる場合は「走者の守備妨害」を追加
+        const runners = gameManager.currentGame.runnersOnBase;
+        const hasRunners = runners.first || runners.second || runners.third;
+        if (hitType === 'single' && hasRunners) {
+            directionOptions += `<option value="runner_interference">${i18n.t('runner_interference')}</option>`;
+        }
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3 data-i18n="hit_direction">${i18n.t('hit_direction')}</h3>
+                <p>${i18n.t(hitType)}</p>
+                <div class="input-group">
+                    <label data-i18n="select_hit_direction">${i18n.t('select_hit_direction')}</label>
+                    <select id="hitDirectionSelect">
+                        <option value="">${i18n.t('selectPlaceholder')}</option>
+                        ${directionOptions}
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button id="confirmHitDirection" class="primary-btn">${i18n.t('confirm')}</button>
+                    <button id="cancelHitDirection" class="secondary-btn">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Confirm button
+        document.getElementById('confirmHitDirection').addEventListener('click', () => {
+            const direction = document.getElementById('hitDirectionSelect').value;
+            if (!direction) {
+                alert(i18n.t('select_hit_direction'));
+                return;
+            }
+
+            // 走者の守備妨害の場合は走者選択モーダルを表示
+            if (direction === 'runner_interference') {
+                modal.remove();
+                this.showInterferingRunnerModal(hitType);
+                return;
+            }
+
+            // 結果と方向を保存
+            this.selectedResult = hitType;
+            this.selectedHitDirection = direction;
+
+            // 結果ボタンを選択状態にする
+            const container = document.getElementById('resultButtons');
+            if (container) {
+                const btn = Array.from(container.querySelectorAll('.result-btn')).find(
+                    b => b.dataset.result === hitType
+                );
+                if (btn) {
+                    container.querySelectorAll('.result-btn:not(.back-btn)').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                }
+            }
+
+            modal.remove();
+        });
+
+        // Cancel button
+        document.getElementById('cancelHitDirection').addEventListener('click', () => {
+            modal.remove();
+        });
+
+        // Close on outside click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
+    showInterferingRunnerModal(hitType) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'interferingRunnerModal';
+
+        const runners = gameManager.currentGame.runnersOnBase;
+        const runnerOptions = [];
+
+        if (runners.first) {
+            runnerOptions.push({ value: 'first', label: i18n.t('first_base_runner') });
+        }
+        if (runners.second) {
+            runnerOptions.push({ value: 'second', label: i18n.t('second_base_runner') });
+        }
+        if (runners.third) {
+            runnerOptions.push({ value: 'third', label: i18n.t('third_base_runner') });
+        }
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('runner_interference')}</h3>
+                <p>${i18n.t(hitType)}</p>
+                <div class="input-group">
+                    <label>${i18n.t('select_interfering_runner')}</label>
+                    <select id="interferingRunnerSelect">
+                        <option value="">${i18n.t('selectPlaceholder')}</option>
+                        ${runnerOptions.map(opt =>
+                            `<option value="${opt.value}">${opt.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button id="confirmInterference" class="primary-btn">${i18n.t('confirm')}</button>
+                    <button id="cancelInterference" class="secondary-btn">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Confirm button
+        document.getElementById('confirmInterference').addEventListener('click', () => {
+            const interferingRunner = document.getElementById('interferingRunnerSelect').value;
+            if (!interferingRunner) {
+                alert(i18n.t('select_interfering_runner'));
+                return;
+            }
+
+            // 結果と方向、妨害走者を保存
+            this.selectedResult = hitType;
+            this.selectedHitDirection = 'runner_interference';
+            this.selectedInterferingRunner = interferingRunner;
+
+            // 結果ボタンを選択状態にする
+            const container = document.getElementById('resultButtons');
+            if (container) {
+                const btn = Array.from(container.querySelectorAll('.result-btn')).find(
+                    b => b.dataset.result === hitType
+                );
+                if (btn) {
+                    container.querySelectorAll('.result-btn:not(.back-btn)').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                }
+            }
+
+            modal.remove();
+        });
+
+        // Cancel button
+        document.getElementById('cancelInterference').addEventListener('click', () => {
+            modal.remove();
+        });
+
+        // Close on outside click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
+    showStrikeoutDetailsModal(outType) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'strikeoutDetailsModal';
+
+        const details = BASEBALL_CONFIG.STRIKEOUT_DETAILS;
+        const canDroppedThird = gameManager.isDroppedThirdStrikeEligible();
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('strikeout')}</h3>
+                <p>三振の種類を選択してください</p>
+                <div class="input-group">
+                    <label>三振詳細:</label>
+                    <select id="strikeoutDetailSelect">
+                        <option value="">${i18n.t('selectPlaceholder')}</option>
+                        ${Object.keys(details).map(key =>
+                            `<option value="${key}">${i18n.t(details[key].label)}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                ${canDroppedThird ? `
+                <div class="input-group">
+                    <label>振り逃げ:</label>
+                    <select id="droppedThirdStrikeSelect">
+                        <option value="no">振り逃げなし（通常の三振）</option>
+                        <option value="yes">振り逃げあり</option>
+                    </select>
+                </div>
+                ` : ''}
+                <div class="modal-actions">
+                    <button id="confirmStrikeoutDetail" class="primary-btn">${i18n.t('confirm')}</button>
+                    <button id="cancelStrikeoutDetail" class="secondary-btn">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('confirmStrikeoutDetail').addEventListener('click', () => {
+            const detail = document.getElementById('strikeoutDetailSelect').value;
+            if (!detail) {
+                alert('三振の種類を選択してください');
+                return;
+            }
+
+            const droppedThird = canDroppedThird ?
+                document.getElementById('droppedThirdStrikeSelect').value : 'no';
+
+            // 結果と詳細を保存
+            this.selectedResult = outType;
+            this.selectedOutDetail = detail;
+            this.selectedDroppedThird = droppedThird;
+
+            // 結果ボタンを選択状態にする
+            const container = document.getElementById('resultButtons');
+            if (container) {
+                const btn = Array.from(container.querySelectorAll('.result-btn')).find(
+                    b => b.dataset.result === outType
+                );
+                if (btn) {
+                    container.querySelectorAll('.result-btn:not(.back-btn)').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                }
+            }
+
+            modal.remove();
+        });
+
+        document.getElementById('cancelStrikeoutDetail').addEventListener('click', () => {
+            modal.remove();
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
+    showOutDirectionModal(outType, childConfig) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'outDirectionModal';
+
+        // フライアウトの場合はFair/Foul選択も必要
+        const requiresFairFoul = childConfig.requiresFairFoul;
+        const directions = BASEBALL_CONFIG.HIT_DIRECTIONS;
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t(outType)}</h3>
+                <p>守備位置を選択してください</p>
+                ${requiresFairFoul ? `
+                <div class="input-group">
+                    <label>Fair/Foul:</label>
+                    <select id="fairFoulSelect">
+                        <option value="fair">Fair</option>
+                        <option value="foul">Foul</option>
+                    </select>
+                </div>
+                ` : ''}
+                <div class="input-group">
+                    <label>守備位置:</label>
+                    <select id="outDirectionSelect">
+                        <option value="">${i18n.t('selectPlaceholder')}</option>
+                        ${Object.keys(directions).map(key => {
+                            const dir = directions[key];
+                            return `<option value="${key}">${i18n.t(dir.label)}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button id="confirmOutDirection" class="primary-btn">${i18n.t('confirm')}</button>
+                    <button id="cancelOutDirection" class="secondary-btn">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('confirmOutDirection').addEventListener('click', () => {
+            const direction = document.getElementById('outDirectionSelect').value;
+            if (!direction) {
+                alert('守備位置を選択してください');
+                return;
+            }
+
+            const fairFoul = requiresFairFoul ? document.getElementById('fairFoulSelect').value : null;
+
+            // 結果と方向を保存
+            this.selectedResult = outType;
+            this.selectedHitDirection = direction;
+            this.selectedFairFoul = fairFoul;
+
+            // 結果ボタンを選択状態にする
+            const container = document.getElementById('resultButtons');
+            if (container) {
+                const btn = Array.from(container.querySelectorAll('.result-btn')).find(
+                    b => b.dataset.result === outType
+                );
+                if (btn) {
+                    container.querySelectorAll('.result-btn:not(.back-btn)').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                }
+            }
+
+            modal.remove();
+        });
+
+        document.getElementById('cancelOutDirection').addEventListener('click', () => {
+            modal.remove();
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
         });
     }
 
@@ -2401,8 +3004,36 @@ class BaseballApp {
         // 盗塁・牽制の実行
         console.log(`Runner play: ${playKey} - ${runner} - ${result}`);
 
-        // TODO: 実際の走者プレー記録処理を実装
-        // この部分は走者プレーの記録をデータベースに保存する処理
+        // アウトになる結果の場合、アウトカウントを増やす
+        if (result.includes('out')) {
+            const previousOuts = gameManager.currentGame.outs;
+            gameManager.currentGame.outs++;
+
+            // 3アウトチェンジ判定
+            if (gameManager.currentGame.outs >= 3) {
+                // 打席継続フラグを立てる
+                gameManager.currentGame.batterContinuesNextInning = true;
+
+                await gameManager.saveGame();
+                this.updateGameDisplay();
+
+                this.showSuccess(`${i18n.t(result)} を記録しました（3アウトチェンジ、打席継続）`);
+
+                // イニング終了処理
+                await gameManager.endHalfInning();
+                this.updateCurrentInningDisplay();
+                this.loadInningHistory();
+                return;
+            }
+        }
+
+        // 走者の塁を更新（成功の場合）
+        // TODO: 実際の走者進塁処理を実装
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+        this.updateBatterDisplay();
+        this.updateRunnerPlaySection();
 
         this.showSuccess(`${i18n.t(result)} を記録しました`);
         // 打者はそのまま（batterUnchanged）
@@ -2412,11 +3043,29 @@ class BaseballApp {
         // 暴投・捕逸等の実行
         console.log(`Runner play: ${playKey} - outs: ${newOuts}, runners:`, newRunners, `runs: ${runs}`);
 
+        const previousOuts = gameManager.currentGame.outs;
         gameManager.currentGame.outs = newOuts;
         gameManager.currentGame.runnersOnBase = newRunners;
 
         if (runs > 0) {
             gameManager.addRuns(runs);
+        }
+
+        // 3アウトチェンジ判定
+        if (newOuts >= 3 && previousOuts < 3) {
+            // 打席継続フラグを立てる
+            gameManager.currentGame.batterContinuesNextInning = true;
+
+            await gameManager.saveGame();
+            this.updateGameDisplay();
+
+            this.showSuccess(`${i18n.t(BASEBALL_CONFIG.RUNNER_PLAY_CATEGORIES[playKey].label)} を記録しました（3アウトチェンジ、打席継続）`);
+
+            // イニング終了処理
+            await gameManager.endHalfInning();
+            this.updateCurrentInningDisplay();
+            this.loadInningHistory();
+            return;
         }
 
         await gameManager.saveGame();
@@ -2645,6 +3294,3612 @@ class BaseballApp {
         });
     }
 
+    // ========== 守備妨害（攻撃側の妨害）システム ==========
+
+    showInterferenceTypeModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'interferenceTypeModal';
+
+        const interferenceTypes = BASEBALL_CONFIG.OFFENSIVE_INTERFERENCE_TYPES;
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('interference_type')}</h3>
+                <p>妨害の種類を選択してください</p>
+                <div class="interference-type-buttons">
+                    ${Object.keys(interferenceTypes).map(key => `
+                        <button class="interference-type-btn" data-type="${key}">
+                            ${i18n.t(interferenceTypes[key].label)}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelInterference">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelectorAll('.interference-type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const type = btn.dataset.type;
+                this.selectedInterferenceType = type;
+                const config = interferenceTypes[type];
+
+                modal.remove();
+
+                // 走者の妨害なら妨害者を選択
+                if (config.requiresRunnerSelection) {
+                    this.showInterferingRunnerModal(type);
+                } else {
+                    // 打者走者の妨害なら直接処理
+                    this.processInterference(type, null);
+                }
+            });
+        });
+
+        modal.querySelector('#cancelInterference').addEventListener('click', () => {
+            modal.remove();
+            // 結果選択をリセット
+            this.currentResultView = 'top';
+            this.selectedCategory = null;
+            this.updateResultButtons();
+        });
+    }
+
+    showInterferingRunnerModal(interferenceType) {
+        const runners = gameManager.currentGame.runnersOnBase;
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'interferingRunnerModal';
+
+        const runnerOptions = [];
+        if (runners.first) runnerOptions.push({ base: 'first', label: i18n.t('firstBase') || '1塁走者' });
+        if (runners.second) runnerOptions.push({ base: 'second', label: i18n.t('secondBase') || '2塁走者' });
+        if (runners.third) runnerOptions.push({ base: 'third', label: i18n.t('thirdBase') || '3塁走者' });
+
+        if (runnerOptions.length === 0) {
+            this.showError('走者がいません');
+            return;
+        }
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('select_interfering_runner')}</h3>
+                <div class="runner-selection">
+                    ${runnerOptions.map(r => `
+                        <button class="runner-select-btn" data-base="${r.base}">
+                            ${r.label}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelRunnerSelection">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelectorAll('.runner-select-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const runnerBase = btn.dataset.base;
+                this.selectedInterferingRunner = runnerBase;
+                modal.remove();
+                this.processInterference(interferenceType, runnerBase);
+            });
+        });
+
+        modal.querySelector('#cancelRunnerSelection').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    async processInterference(interferenceType, interferingRunner) {
+        const config = BASEBALL_CONFIG.OFFENSIVE_INTERFERENCE_TYPES[interferenceType];
+
+        console.log(`Processing interference: ${interferenceType}, runner: ${interferingRunner}`);
+
+        // 併殺阻止妨害の特別処理
+        if (config.isDoublePlay) {
+            await this.processDoublePlayInterference(interferingRunner);
+            return;
+        }
+
+        // 打者走者の妨害（打者アウト）
+        if (config.batterResult === 'out') {
+            await this.processBatterRunnerInterference(interferenceType);
+            return;
+        }
+
+        // 走者の妨害（走者アウト、打者は基本セーフ）
+        if (config.runnerOut && interferingRunner) {
+            await this.processRunnerInterference(interferenceType, interferingRunner, config);
+            return;
+        }
+    }
+
+    async processDoublePlayInterference(interferingRunner) {
+        // 妨害した走者をアウト
+        if (interferingRunner) {
+            gameManager.currentGame.runnersOnBase[interferingRunner] = null;
+            gameManager.currentGame.outs++;
+        }
+
+        // 打者走者もアウト（ダブルプレー成立）
+        gameManager.currentGame.outs++;
+
+        // 他の走者は元の塁に戻る（ボールデッド）
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+
+        this.showSuccess('併殺阻止妨害：妨害した走者と打者走者がアウト');
+
+        // 3アウトチェック
+        if (gameManager.currentGame.outs >= 3) {
+            await gameManager.endHalfInning();
+            this.updateCurrentInningDisplay();
+            this.loadInningHistory();
+        }
+    }
+
+    async processBatterRunnerInterference(interferenceType) {
+        // 打者走者アウト、打席記録
+        gameManager.currentGame.outs++;
+
+        // 打席記録（安打なし、打数カウント）
+        const batter = gameManager.getCurrentBatter();
+        await gameManager.startAtBat(batter.name, batter.battingOrder);
+
+        await gameManager.recordAtBat({
+            result: 'offensive_interference',
+            resultDetail: i18n.t(interferenceType),
+            runs: 0,
+            rbis: 0,
+            runnersAfter: gameManager.currentGame.runnersOnBase
+        });
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+        this.clearBatterForm();
+
+        this.showSuccess(`${i18n.t(interferenceType)}：打者走者アウト`);
+
+        // 3アウトチェック
+        if (gameManager.currentGame.outs >= 3) {
+            await gameManager.endHalfInning();
+            this.updateCurrentInningDisplay();
+            this.loadInningHistory();
+        }
+    }
+
+    async processRunnerInterference(interferenceType, interferingRunner, config) {
+        // 妨害した走者をアウト
+        gameManager.currentGame.runnersOnBase[interferingRunner] = null;
+        gameManager.currentGame.outs++;
+
+        // 打者は基本的にセーフ
+        // ヒット性の打球だったかを判定
+        if (config.allowBatterHit) {
+            this.showBatterHitJudgmentModal(interferenceType, interferingRunner);
+        } else {
+            // 野選扱いで1塁へ
+            await this.recordInterferenceFieldersChoice(interferenceType, interferingRunner);
+        }
+    }
+
+    showBatterHitJudgmentModal(interferenceType, interferingRunner) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'batterHitJudgmentModal';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('hit_judgment')}</h3>
+                <p>${i18n.t('hit_judgment_question')}</p>
+                <div class="judgment-buttons">
+                    <button class="primary-btn" id="judgmentHit">${i18n.t('hit_quality_ball')}</button>
+                    <button class="secondary-btn" id="judgmentNoHit">${i18n.t('not_hit_quality')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('#judgmentHit').addEventListener('click', () => {
+            modal.remove();
+            // 安打として記録、打球方向選択へ
+            this.selectedResult = 'single';
+            this.selectedInterferenceContext = { interferenceType, interferingRunner };
+            this.showHitDirectionModal('single');
+        });
+
+        modal.querySelector('#judgmentNoHit').addEventListener('click', () => {
+            modal.remove();
+            // 野選として記録
+            this.recordInterferenceFieldersChoice(interferenceType, interferingRunner);
+        });
+    }
+
+    async recordInterferenceFieldersChoice(interferenceType, interferingRunner) {
+        const batter = gameManager.getCurrentBatter();
+        await gameManager.startAtBat(batter.name, batter.battingOrder);
+
+        // 打者を1塁に
+        gameManager.currentGame.runnersOnBase.first = 'batter';
+
+        await gameManager.recordAtBat({
+            result: 'fielders_choice',
+            resultDetail: `${i18n.t(interferenceType)}（${i18n.t(interferingRunner + 'Base')}走者アウト）`,
+            runs: 0,
+            rbis: 0,
+            runnersAfter: gameManager.currentGame.runnersOnBase
+        });
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+        this.clearBatterForm();
+
+        this.showSuccess(`${i18n.t(interferenceType)}：走者アウト、打者は野選出塁`);
+
+        // 3アウトチェック
+        if (gameManager.currentGame.outs >= 3) {
+            await gameManager.endHalfInning();
+            this.updateCurrentInningDisplay();
+            this.loadInningHistory();
+        }
+    }
+
+    // ===== 走塁妨害（守備側の妨害）処理 =====
+
+    showObstructionModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'obstructionModal';
+
+        const runnersOnBase = [];
+        const game = gameManager.currentGame;
+
+        if (game.runnersOnBase.first) {
+            runnersOnBase.push({ base: 'first', name: game.runnersOnBase.first.name });
+        }
+        if (game.runnersOnBase.second) {
+            runnersOnBase.push({ base: 'second', name: game.runnersOnBase.second.name });
+        }
+        if (game.runnersOnBase.third) {
+            runnersOnBase.push({ base: 'third', name: game.runnersOnBase.third.name });
+        }
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('obstruction')}</h3>
+                <p>${i18n.t('select_obstructed_runner')}</p>
+                <div class="runner-selection-buttons">
+                    ${runnersOnBase.map(runner => `
+                        <button class="runner-btn" data-base="${runner.base}">
+                            ${i18n.t(runner.base + '_base')}: ${runner.name}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelObstruction">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 走者選択
+        modal.querySelectorAll('.runner-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const base = btn.dataset.base;
+                modal.remove();
+                this.showObstructingFielderModal(base);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelObstruction').addEventListener('click', () => {
+            modal.remove();
+            this.currentResultView = 'top';
+            this.showAtBatResult();
+        });
+    }
+
+    showObstructingFielderModal(obstructedRunnerBase) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'obstructingFielderModal';
+
+        const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('select_obstructing_fielder')}</h3>
+                <div class="position-buttons">
+                    ${positions.map(pos => `
+                        <button class="position-btn" data-position="${pos}">
+                            ${i18n.t('pos_' + pos)}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelFielder">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 野手選択
+        modal.querySelectorAll('.position-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const position = btn.dataset.position;
+                modal.remove();
+                this.showRunnerAdvancementModal(obstructedRunnerBase, position);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelFielder').addEventListener('click', () => {
+            modal.remove();
+            this.showObstructionModal();
+        });
+    }
+
+    showRunnerAdvancementModal(obstructedRunnerBase, obstructingFielder) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'runnerAdvancementModal';
+
+        const currentBaseNum = obstructedRunnerBase === 'first' ? 1 : obstructedRunnerBase === 'second' ? 2 : 3;
+        const minAdvancement = currentBaseNum + BASEBALL_CONFIG.OBSTRUCTION_CONFIG.minimumAdvancement;
+
+        const bases = [];
+        for (let i = minAdvancement; i <= 4; i++) {
+            bases.push(i);
+        }
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('runner_advancement_obstruction')}</h3>
+                <p>${i18n.t('minimum_one_base')}</p>
+                <p>妨害された走者: ${i18n.t(obstructedRunnerBase + '_base')}</p>
+                <div class="base-buttons">
+                    ${bases.map(base => `
+                        <button class="base-btn" data-base="${base}">
+                            ${base === 4 ? i18n.t('home') : i18n.t('base_' + base)}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelAdvancement">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 進塁先選択
+        modal.querySelectorAll('.base-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetBase = parseInt(btn.dataset.base);
+                modal.remove();
+                this.processObstruction(obstructedRunnerBase, obstructingFielder, targetBase);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelAdvancement').addEventListener('click', () => {
+            modal.remove();
+            this.showObstructingFielderModal(obstructedRunnerBase);
+        });
+    }
+
+    async processObstruction(obstructedRunnerBase, obstructingFielder, targetBase) {
+        const game = gameManager.currentGame;
+        const atBat = game.currentAtBat;
+
+        // 走塁妨害を記録
+        atBat.result = 'obstruction';
+        atBat.resultDetail = `${i18n.t('obstruction')} - ${i18n.t(obstructedRunnerBase + '_base')}走者が妨害`;
+
+        // エラーを記録
+        atBat.errorPosition = obstructingFielder;
+
+        // 打数にカウントしない
+        atBat.isAtBat = false;
+
+        // 妨害された走者の進塁を記録
+        const runner = game.runnersOnBase[obstructedRunnerBase];
+        if (runner) {
+            if (targetBase === 4) {
+                // ホームへ進塁（得点）
+                atBat.runs++;
+                atBat.rbis++; // 打点は記録員判断だが、ここでは仮に加算
+                game.runnersOnBase[obstructedRunnerBase] = null;
+
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+            } else {
+                // 塁間移動
+                game.runnersOnBase[obstructedRunnerBase] = null;
+                const newBase = targetBase === 1 ? 'first' : targetBase === 2 ? 'second' : 'third';
+                game.runnersOnBase[newBase] = runner;
+            }
+        }
+
+        // 打者は1塁へ進塁（押し出しの可能性）
+        // ここでは簡略化し、打者を1塁に配置
+        if (!game.runnersOnBase.first) {
+            game.runnersOnBase.first = {
+                name: game.currentBatter.name,
+                battingOrder: game.currentBatter.battingOrder,
+                playerId: game.currentBatter.playerId
+            };
+        }
+
+        atBat.runnersAfterPlay = {
+            first: game.runnersOnBase.first ? {...game.runnersOnBase.first} : null,
+            second: game.runnersOnBase.second ? {...game.runnersOnBase.second} : null,
+            third: game.runnersOnBase.third ? {...game.runnersOnBase.third} : null
+        };
+
+        // 打席を完了
+        atBat.endTime = new Date().toISOString();
+        gameManager.currentGame.completedAtBats.push(atBat);
+        gameManager.currentGame.currentAtBat = null;
+
+        // 統計更新
+        gameManager.updatePlayerStats(atBat);
+
+        // 次の打者へ
+        gameManager.advanceToNextBatter();
+
+        // 保存
+        await gameManager.saveGame();
+
+        // UI更新
+        this.updateGameDisplay();
+        this.clearBatterForm();
+
+        this.showSuccess(`${i18n.t('obstruction')}：${i18n.t(obstructedRunnerBase + '_base')}走者が進塁、野手${obstructingFielder}にエラー記録`);
+    }
+
+    // ===== エラータイプ選択処理 =====
+
+    showErrorTypeModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'errorTypeModal';
+
+        const errorTypes = BASEBALL_CONFIG.ERROR_TYPES;
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('error_type') || 'エラーの種類'}</h3>
+                <p>エラーの種類を選択してください</p>
+                <div class="error-type-buttons">
+                    ${Object.keys(errorTypes).map(key => `
+                        <button class="error-type-btn" data-type="${key}">
+                            ${i18n.t(errorTypes[key].label)}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelErrorType">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // エラータイプ選択
+        modal.querySelectorAll('.error-type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const errorType = btn.dataset.type;
+                modal.remove();
+
+                // キャッチャー打撃妨害の場合
+                if (errorType === 'catchers_interference') {
+                    this.processCatchersInterference();
+                }
+                // 牽制悪送球の場合
+                else if (errorType === 'pickoff_throwing_error') {
+                    this.showPickoffErrorModal();
+                }
+                // 通常のエラー（捕球・送球・落球）
+                else if (errorType === 'fielding_error' || errorType === 'throwing_error' || errorType === 'foul_fly_drop') {
+                    this.showRegularErrorModal(errorType);
+                }
+                // その他のエラー処理
+                else {
+                    this.showInfo('このエラータイプの処理は今後実装予定です');
+                    this.currentResultView = 'top';
+                    this.showAtBatResult();
+                }
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelErrorType').addEventListener('click', () => {
+            modal.remove();
+            this.currentResultView = 'top';
+            this.showAtBatResult();
+        });
+    }
+
+    // ===== キャッチャー打撃妨害処理 =====
+
+    async processCatchersInterference() {
+        const game = gameManager.currentGame;
+        const atBat = game.currentAtBat;
+
+        if (!atBat) {
+            this.showError('打席情報がありません');
+            return;
+        }
+
+        // 打席結果を記録
+        atBat.result = 'catchers_interference';
+        atBat.resultDetail = i18n.t('catchers_interference');
+        atBat.errorPosition = 'C'; // キャッチャー
+
+        // 先に走者状況を保存
+        atBat.runnersBeforePlay = {
+            first: game.runnersOnBase.first ? {...game.runnersOnBase.first} : null,
+            second: game.runnersOnBase.second ? {...game.runnersOnBase.second} : null,
+            third: game.runnersOnBase.third ? {...game.runnersOnBase.third} : null
+        };
+
+        // 走者を全員1塁進塁（3塁→ホーム、2塁→3塁、1塁→2塁）
+        const runs = this.advanceAllRunnersOneBase(game);
+        atBat.runs = runs;
+
+        // 打者は1塁へ（走者進塁後に空いた1塁に入る）
+        game.runnersOnBase.first = {
+            name: game.currentBatter.name,
+            battingOrder: game.currentBatter.battingOrder,
+            playerId: game.currentBatter.playerId
+        };
+
+        atBat.runnersAfterPlay = {
+            first: game.runnersOnBase.first ? {...game.runnersOnBase.first} : null,
+            second: game.runnersOnBase.second ? {...game.runnersOnBase.second} : null,
+            third: game.runnersOnBase.third ? {...game.runnersOnBase.third} : null
+        };
+
+        // 打席を完了
+        atBat.endTime = new Date().toISOString();
+        gameManager.currentGame.completedAtBats.push(atBat);
+        gameManager.currentGame.currentAtBat = null;
+
+        // 統計更新
+        gameManager.updatePlayerStats(atBat);
+
+        // 次の打者へ
+        gameManager.advanceToNextBatter();
+
+        // 保存
+        await gameManager.saveGame();
+
+        // UI更新
+        this.updateGameDisplay();
+        this.clearBatterForm();
+
+        this.showSuccess(`${i18n.t('catchers_interference')}：打者出塁、全走者1塁進塁${runs > 0 ? `、${runs}得点` : ''}`);
+    }
+
+    // ===== ボーク処理 =====
+
+    async processBalk() {
+        const game = gameManager.currentGame;
+
+        // 走者がいない場合はボークを記録できない
+        if (!game.runnersOnBase.first && !game.runnersOnBase.second && !game.runnersOnBase.third) {
+            this.showError('走者がいないためボークは記録できません');
+            return;
+        }
+
+        // 走者を全員1塁進塁
+        const runs = this.advanceAllRunnersOneBase(game);
+
+        // 保存
+        await gameManager.saveGame();
+
+        // UI更新
+        this.updateGameDisplay();
+
+        this.showSuccess(`ボーク：全走者1塁進塁${runs > 0 ? `、${runs}得点` : ''}。打者は打席継続。`);
+    }
+
+    // ===== 全走者1塁進塁処理（共通関数） =====
+
+    advanceAllRunnersOneBase(game) {
+        let runs = 0;
+
+        // 3塁走者 → ホーム
+        if (game.runnersOnBase.third) {
+            runs++;
+            if (game.isTopHalf) {
+                game.awayScore++;
+            } else {
+                game.homeScore++;
+            }
+            game.runnersOnBase.third = null;
+        }
+
+        // 2塁走者 → 3塁
+        if (game.runnersOnBase.second) {
+            game.runnersOnBase.third = game.runnersOnBase.second;
+            game.runnersOnBase.second = null;
+        }
+
+        // 1塁走者 → 2塁
+        if (game.runnersOnBase.first) {
+            game.runnersOnBase.second = game.runnersOnBase.first;
+            game.runnersOnBase.first = null;
+        }
+
+        return runs;
+    }
+
+    // ===== 盗塁処理 =====
+
+    showStealModal() {
+        const game = gameManager.currentGame;
+
+        // 走者がいない場合
+        if (!game.runnersOnBase.first && !game.runnersOnBase.second && !game.runnersOnBase.third) {
+            this.showError('走者がいないため盗塁は記録できません');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'stealModal';
+
+        const runners = [];
+        if (game.runnersOnBase.first) runners.push({ base: 'first', name: game.runnersOnBase.first.name });
+        if (game.runnersOnBase.second) runners.push({ base: 'second', name: game.runnersOnBase.second.name });
+        if (game.runnersOnBase.third) runners.push({ base: 'third', name: game.runnersOnBase.third.name });
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('steal_category')}</h3>
+                <p>盗塁した走者を選択してください</p>
+                <div class="runner-selection-buttons">
+                    ${runners.map(runner => `
+                        <button class="runner-btn" data-base="${runner.base}">
+                            ${i18n.t(runner.base + '_base')}: ${runner.name}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelSteal">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 走者選択
+        modal.querySelectorAll('.runner-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const base = btn.dataset.base;
+                modal.remove();
+                this.showStealResultModal(base);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelSteal').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    showStealResultModal(fromBase) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'stealResultModal';
+
+        // 盗塁先を決定
+        const toBase = fromBase === 'first' ? '2塁' : fromBase === 'second' ? '3塁' : 'ホーム';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>盗塁の結果</h3>
+                <p>${i18n.t(fromBase + '_base')}走者 → ${toBase}</p>
+                <div class="steal-result-buttons">
+                    <button class="steal-result-btn success-btn" data-result="success">
+                        ${i18n.t('steal_success')}
+                    </button>
+                    <button class="steal-result-btn failure-btn" data-result="failure">
+                        ${i18n.t('steal_failure')}（盗塁死）
+                    </button>
+                </div>
+                <button class="secondary-btn" id="cancelStealResult">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 結果選択
+        modal.querySelectorAll('.steal-result-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const result = btn.dataset.result;
+                modal.remove();
+                this.processSteal(fromBase, result === 'success');
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelStealResult').addEventListener('click', () => {
+            modal.remove();
+            this.showStealModal();
+        });
+    }
+
+    async processSteal(fromBase, success) {
+        const game = gameManager.currentGame;
+        const runner = game.runnersOnBase[fromBase];
+
+        if (!runner) {
+            this.showError('走者情報が見つかりません');
+            return;
+        }
+
+        if (success) {
+            // 盗塁成功 - エラーで追加進塁の可能性を確認
+            const normalBase = fromBase === 'first' ? 'second' : fromBase === 'second' ? 'third' : 'home';
+            this.showStealErrorModal(fromBase, runner, normalBase);
+
+        } else {
+            // 盗塁失敗（盗塁死）
+            game.runnersOnBase[fromBase] = null;
+            game.outs++;
+
+            await gameManager.saveGame();
+            this.updateGameDisplay();
+            this.showSuccess(`盗塁死：${i18n.t(fromBase + '_base')}走者アウト（${game.outs}アウト）`);
+
+            // 3アウトチェック
+            if (game.outs >= 3) {
+                await gameManager.endHalfInning();
+                this.updateCurrentInningDisplay();
+                this.loadInningHistory();
+            }
+        }
+    }
+
+    // ===== 牽制処理 =====
+
+    showStealErrorModal(fromBase, runner, normalBase) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'stealErrorModal';
+
+        const normalBaseName = normalBase === 'second' ? '2塁' : normalBase === 'third' ? '3塁' : 'ホーム';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>盗塁成功 - エラーで追加進塁？</h3>
+                <p>${i18n.t(fromBase + '_base')}走者 → ${normalBaseName}</p>
+                <div class="steal-error-buttons">
+                    <button class="btn btn-primary" id="noErrorBtn">
+                        エラーなし（${normalBaseName}で止まる）
+                    </button>
+                    <button class="btn btn-warning" id="withErrorBtn">
+                        エラーあり（さらに進塁）
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // エラーなしボタン
+        document.getElementById('noErrorBtn').addEventListener('click', () => {
+            modal.remove();
+            this.completeStealSuccess(fromBase, runner, normalBase, false, null, null);
+        });
+
+        // エラーありボタン
+        document.getElementById('withErrorBtn').addEventListener('click', () => {
+            modal.remove();
+            this.showStealErrorPositionModal(fromBase, runner, normalBase);
+        });
+    }
+
+    showStealErrorPositionModal(fromBase, runner, normalBase) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'stealErrorPositionModal';
+        const positions = BASEBALL_CONFIG.POSITIONS;
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>盗塁時のエラー - 守備位置選択</h3>
+                <p>エラーを記録する守備位置を選択してください</p>
+                <div class="position-buttons">
+                    ${Object.keys(positions).map(key => `
+                        <button class="position-btn" data-position="${key}">
+                            ${i18n.t(positions[key].label)}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelStealErrorPosition">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 守備位置選択
+        modal.querySelectorAll('.position-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const position = btn.dataset.position;
+                modal.remove();
+                this.showStealErrorFinalBaseModal(fromBase, runner, normalBase, position);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelStealErrorPosition').addEventListener('click', () => {
+            modal.remove();
+            this.showStealErrorModal(fromBase, runner, normalBase);
+        });
+    }
+
+    showStealErrorFinalBaseModal(fromBase, runner, normalBase, errorPosition) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'stealErrorFinalBaseModal';
+
+        // 可能な進塁先を決定
+        const possibleBases = [];
+        if (normalBase === 'second') {
+            possibleBases.push({ value: 'third', label: '3塁' });
+            possibleBases.push({ value: 'home', label: 'ホーム' });
+        } else if (normalBase === 'third') {
+            possibleBases.push({ value: 'home', label: 'ホーム' });
+        }
+
+        if (possibleBases.length === 0) {
+            // ホームスチール成功の場合はエラーでの追加進塁はない
+            this.completeStealSuccess(fromBase, runner, normalBase, false, null, null);
+            return;
+        }
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>盗塁 + エラー - 最終進塁先</h3>
+                <p>走者の最終的な進塁先を選択してください</p>
+                <div class="final-base-buttons">
+                    ${possibleBases.map(base => `
+                        <button class="btn btn-primary" data-base="${base.value}">
+                            ${base.label}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelStealErrorFinalBase">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 最終進塁先選択
+        modal.querySelectorAll('.final-base-buttons button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const finalBase = btn.dataset.base;
+                modal.remove();
+                this.completeStealSuccess(fromBase, runner, normalBase, true, errorPosition, finalBase);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelStealErrorFinalBase').addEventListener('click', () => {
+            modal.remove();
+            this.showStealErrorPositionModal(fromBase, runner, normalBase);
+        });
+    }
+
+    async completeStealSuccess(fromBase, runner, normalBase, hasError, errorPosition, finalBase) {
+        const game = gameManager.currentGame;
+        let runs = 0;
+
+        // 元の塁から走者を削除
+        game.runnersOnBase[fromBase] = null;
+
+        // エラーがない場合は通常の進塁
+        if (!hasError) {
+            if (normalBase === 'second') {
+                game.runnersOnBase.second = runner;
+            } else if (normalBase === 'third') {
+                game.runnersOnBase.third = runner;
+            } else if (normalBase === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+            }
+
+            await gameManager.saveGame();
+            this.updateGameDisplay();
+            this.showSuccess(`盗塁成功：${i18n.t(fromBase + '_base')}走者が進塁`);
+        }
+        // エラーがある場合
+        else {
+            if (finalBase === 'second') {
+                game.runnersOnBase.second = runner;
+            } else if (finalBase === 'third') {
+                game.runnersOnBase.third = runner;
+            } else if (finalBase === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+            }
+
+            // エラー記録を保存（チーム統計に反映）
+            if (game.isTopHalf) {
+                game.teamStats.home.errors++;
+            } else {
+                game.teamStats.away.errors++;
+            }
+
+            await gameManager.saveGame();
+            this.updateGameDisplay();
+
+            const positionName = i18n.t(BASEBALL_CONFIG.POSITIONS[errorPosition].label);
+            const normalBaseName = normalBase === 'second' ? '2塁' : normalBase === 'third' ? '3塁' : 'ホーム';
+            const finalBaseName = finalBase === 'second' ? '2塁' : finalBase === 'third' ? '3塁' : 'ホーム';
+            this.showSuccess(`盗塁成功 + エラー（${positionName}）：${i18n.t(fromBase + '_base')}走者 ${normalBaseName} → ${finalBaseName}${runs > 0 ? '、得点' : ''}`);
+        }
+    }
+
+    showPickoffModal() {
+        const game = gameManager.currentGame;
+
+        // 走者がいない場合
+        if (!game.runnersOnBase.first && !game.runnersOnBase.second && !game.runnersOnBase.third) {
+            this.showError('走者がいないため牽制は記録できません');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'pickoffModal';
+
+        const runners = [];
+        if (game.runnersOnBase.first) runners.push({ base: 'first', name: game.runnersOnBase.first.name });
+        if (game.runnersOnBase.second) runners.push({ base: 'second', name: game.runnersOnBase.second.name });
+        if (game.runnersOnBase.third) runners.push({ base: 'third', name: game.runnersOnBase.third.name });
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('pickoff_category')}</h3>
+                <p>牽制された走者を選択してください</p>
+                <div class="runner-selection-buttons">
+                    ${runners.map(runner => `
+                        <button class="runner-btn" data-base="${runner.base}">
+                            ${i18n.t(runner.base + '_base')}: ${runner.name}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelPickoff">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 走者選択
+        modal.querySelectorAll('.runner-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const base = btn.dataset.base;
+                modal.remove();
+                this.showPickoffResultModal(base);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelPickoff').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    showPickoffResultModal(base) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'pickoffResultModal';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>牽制の結果</h3>
+                <p>${i18n.t(base + '_base')}走者への牽制</p>
+                <div class="pickoff-result-buttons">
+                    <button class="pickoff-result-btn safe-btn" data-result="safe">
+                        ${i18n.t('pickoff_safe')}（セーフ）
+                    </button>
+                    <button class="pickoff-result-btn out-btn" data-result="out">
+                        ${i18n.t('pickoff_out')}（アウト）
+                    </button>
+                </div>
+                <button class="secondary-btn" id="cancelPickoffResult">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 結果選択
+        modal.querySelectorAll('.pickoff-result-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const result = btn.dataset.result;
+                modal.remove();
+                this.processPickoff(base, result === 'safe');
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelPickoffResult').addEventListener('click', () => {
+            modal.remove();
+            this.showPickoffModal();
+        });
+    }
+
+    async processPickoff(base, safe) {
+        const game = gameManager.currentGame;
+        const runner = game.runnersOnBase[base];
+
+        if (safe) {
+            // 牽制セーフ - エラーで追加進塁の可能性を確認
+            this.showPickoffSafeErrorModal(base, runner);
+
+        } else {
+            // 牽制死
+            game.runnersOnBase[base] = null;
+            game.outs++;
+
+            await gameManager.saveGame();
+            this.updateGameDisplay();
+            this.showSuccess(`牽制死：${i18n.t(base + '_base')}走者アウト（${game.outs}アウト）`);
+
+            // 3アウトチェック
+            if (game.outs >= 3) {
+                await gameManager.endHalfInning();
+                this.updateCurrentInningDisplay();
+                this.loadInningHistory();
+            }
+        }
+    }
+
+    showPickoffSafeErrorModal(base, runner) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'pickoffSafeErrorModal';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>牽制セーフ - エラーで追加進塁？</h3>
+                <p>${i18n.t(base + '_base')}走者</p>
+                <div class="pickoff-error-buttons">
+                    <button class="btn btn-primary" id="noPickoffErrorBtn">
+                        エラーなし（${i18n.t(base + '_base')}に留まる）
+                    </button>
+                    <button class="btn btn-warning" id="withPickoffErrorBtn">
+                        エラーあり（さらに進塁）
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // エラーなしボタン
+        document.getElementById('noPickoffErrorBtn').addEventListener('click', async () => {
+            modal.remove();
+            await gameManager.saveGame();
+            this.updateGameDisplay();
+            this.showSuccess(`牽制セーフ：${i18n.t(base + '_base')}走者`);
+        });
+
+        // エラーありボタン
+        document.getElementById('withPickoffErrorBtn').addEventListener('click', () => {
+            modal.remove();
+            this.showPickoffSafeErrorPositionModal(base, runner);
+        });
+    }
+
+    showPickoffSafeErrorPositionModal(base, runner) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'pickoffSafeErrorPositionModal';
+        const positions = BASEBALL_CONFIG.POSITIONS;
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>牽制セーフ時のエラー - 守備位置選択</h3>
+                <p>エラーを記録する守備位置を選択してください</p>
+                <div class="position-buttons">
+                    ${Object.keys(positions).map(key => `
+                        <button class="position-btn" data-position="${key}">
+                            ${i18n.t(positions[key].label)}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelPickoffSafeErrorPosition">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 守備位置選択
+        modal.querySelectorAll('.position-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const position = btn.dataset.position;
+                modal.remove();
+                this.showPickoffSafeErrorFinalBaseModal(base, runner, position);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelPickoffSafeErrorPosition').addEventListener('click', () => {
+            modal.remove();
+            this.showPickoffSafeErrorModal(base, runner);
+        });
+    }
+
+    showPickoffSafeErrorFinalBaseModal(base, runner, errorPosition) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'pickoffSafeErrorFinalBaseModal';
+
+        // 可能な進塁先を決定
+        const possibleBases = [];
+        if (base === 'first') {
+            possibleBases.push({ value: 'second', label: '2塁' });
+            possibleBases.push({ value: 'third', label: '3塁' });
+            possibleBases.push({ value: 'home', label: 'ホーム' });
+        } else if (base === 'second') {
+            possibleBases.push({ value: 'third', label: '3塁' });
+            possibleBases.push({ value: 'home', label: 'ホーム' });
+        } else if (base === 'third') {
+            possibleBases.push({ value: 'home', label: 'ホーム' });
+        }
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>牽制セーフ + エラー - 最終進塁先</h3>
+                <p>走者の最終的な進塁先を選択してください</p>
+                <div class="final-base-buttons">
+                    ${possibleBases.map(b => `
+                        <button class="btn btn-primary" data-base="${b.value}">
+                            ${b.label}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelPickoffSafeErrorFinalBase">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 最終進塁先選択
+        modal.querySelectorAll('.final-base-buttons button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const finalBase = btn.dataset.base;
+                modal.remove();
+                this.completePickoffSafeWithError(base, runner, errorPosition, finalBase);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelPickoffSafeErrorFinalBase').addEventListener('click', () => {
+            modal.remove();
+            this.showPickoffSafeErrorPositionModal(base, runner);
+        });
+    }
+
+    async completePickoffSafeWithError(fromBase, runner, errorPosition, finalBase) {
+        const game = gameManager.currentGame;
+        let runs = 0;
+
+        // 元の塁から走者を削除
+        game.runnersOnBase[fromBase] = null;
+
+        // 最終進塁先に配置
+        if (finalBase === 'second') {
+            game.runnersOnBase.second = runner;
+        } else if (finalBase === 'third') {
+            game.runnersOnBase.third = runner;
+        } else if (finalBase === 'home') {
+            runs++;
+            if (game.isTopHalf) {
+                game.awayScore++;
+            } else {
+                game.homeScore++;
+            }
+        }
+
+        // エラー記録を保存（チーム統計に反映）
+        if (game.isTopHalf) {
+            game.teamStats.home.errors++;
+        } else {
+            game.teamStats.away.errors++;
+        }
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+
+        const positionName = i18n.t(BASEBALL_CONFIG.POSITIONS[errorPosition].label);
+        const finalBaseName = finalBase === 'second' ? '2塁' : finalBase === 'third' ? '3塁' : 'ホーム';
+        this.showSuccess(`牽制セーフ + エラー（${positionName}）：${i18n.t(fromBase + '_base')}走者 → ${finalBaseName}${runs > 0 ? '、得点' : ''}`);
+    }
+
+    // ===== 暴投・捕逸・牽制悪送球の実装 =====
+
+    showWildPitchModal() {
+        const game = gameManager.currentGame;
+
+        // 走者がいない場合は記録できない
+        if (!game.runnersOnBase.first && !game.runnersOnBase.second && !game.runnersOnBase.third) {
+            this.showError('走者がいないため暴投は記録できません');
+            return;
+        }
+
+        const modal = document.getElementById('modal');
+        const modalContent = modal.querySelector('.modal-content');
+
+        // 走者リストを作成
+        const runnersHTML = [];
+        if (game.runnersOnBase.third) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('third_base')}走者:</span>
+                    <button class="advancement-btn" data-from="third" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="third" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+        if (game.runnersOnBase.second) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('second_base')}走者:</span>
+                    <button class="advancement-btn" data-from="second" data-to="third">
+                        ${i18n.t('third_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="second" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="second" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+        if (game.runnersOnBase.first) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('first_base')}走者:</span>
+                    <button class="advancement-btn" data-from="first" data-to="second">
+                        ${i18n.t('second_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="third">
+                        ${i18n.t('third_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+
+        modalContent.innerHTML = `
+            <h3>暴投</h3>
+            <p>各走者の進塁先を選択してください</p>
+            <div class="runner-advancement-container">
+                ${runnersHTML.join('')}
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelWildPitchBtn">キャンセル</button>
+                <button class="btn btn-primary" id="confirmWildPitchBtn">確定</button>
+            </div>
+        `;
+
+        modal.style.display = 'block';
+
+        // 走者の進塁先を記録するオブジェクト
+        const advancements = {};
+
+        // 進塁ボタンのイベント処理
+        modalContent.querySelectorAll('.advancement-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const from = btn.getAttribute('data-from');
+                const to = btn.getAttribute('data-to');
+
+                // 同じグループのボタンのアクティブ状態を解除
+                btn.closest('.runner-advancement-group')
+                    .querySelectorAll('.advancement-btn')
+                    .forEach(b => b.classList.remove('active'));
+
+                btn.classList.add('active');
+                advancements[from] = to;
+            });
+        });
+
+        // キャンセルボタン
+        document.getElementById('cancelWildPitchBtn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        // 確定ボタン
+        document.getElementById('confirmWildPitchBtn').addEventListener('click', async () => {
+            // 全走者の進塁先が選択されているかチェック
+            const expectedRunners = [];
+            if (game.runnersOnBase.first) expectedRunners.push('first');
+            if (game.runnersOnBase.second) expectedRunners.push('second');
+            if (game.runnersOnBase.third) expectedRunners.push('third');
+
+            const allSelected = expectedRunners.every(base => advancements[base]);
+            if (!allSelected) {
+                this.showError('全走者の進塁先を選択してください');
+                return;
+            }
+
+            modal.style.display = 'none';
+            await this.processWildPitch(advancements);
+        });
+    }
+
+    async processWildPitch(advancements) {
+        const game = gameManager.currentGame;
+        let runs = 0;
+        let earnedRuns = 0;
+        const messages = [];
+        const virtualOuts = (gameManager.currentInning && gameManager.currentInning.virtualOuts) || 0;
+
+        // 3塁走者から処理
+        if (advancements.third) {
+            if (advancements.third === 'home') {
+                runs++;
+                const wasEarned = gameManager.moveRunnerEarnedStatus('third', null);
+                gameManager.moveRunnerResponsiblePitcher('third', null);
+                if (wasEarned && virtualOuts < 3) earnedRuns++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                game.runnersOnBase.third = null;
+                messages.push('3塁走者ホーム');
+            }
+        }
+
+        // 2塁走者
+        if (advancements.second) {
+            if (advancements.second === 'third') {
+                game.runnersOnBase.third = game.runnersOnBase.second;
+                game.runnersOnBase.second = null;
+                gameManager.moveRunnerEarnedStatus('second', 'third');
+                gameManager.moveRunnerResponsiblePitcher('second', 'third');
+                messages.push('2塁走者3塁へ');
+            } else if (advancements.second === 'home') {
+                runs++;
+                const wasEarned = gameManager.moveRunnerEarnedStatus('second', null);
+                gameManager.moveRunnerResponsiblePitcher('second', null);
+                if (wasEarned && virtualOuts < 3) earnedRuns++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                game.runnersOnBase.second = null;
+                messages.push('2塁走者ホーム');
+            }
+        }
+
+        // 1塁走者
+        if (advancements.first) {
+            if (advancements.first === 'second') {
+                game.runnersOnBase.second = game.runnersOnBase.first;
+                game.runnersOnBase.first = null;
+                gameManager.moveRunnerEarnedStatus('first', 'second');
+                gameManager.moveRunnerResponsiblePitcher('first', 'second');
+                messages.push('1塁走者2塁へ');
+            } else if (advancements.first === 'third') {
+                game.runnersOnBase.third = game.runnersOnBase.first;
+                game.runnersOnBase.first = null;
+                gameManager.moveRunnerEarnedStatus('first', 'third');
+                gameManager.moveRunnerResponsiblePitcher('first', 'third');
+                messages.push('1塁走者3塁へ');
+            } else if (advancements.first === 'home') {
+                runs++;
+                const wasEarned = gameManager.moveRunnerEarnedStatus('first', null);
+                gameManager.moveRunnerResponsiblePitcher('first', null);
+                if (wasEarned && virtualOuts < 3) earnedRuns++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                game.runnersOnBase.first = null;
+                messages.push('1塁走者ホーム');
+            }
+        }
+
+        // 暴投による得点をイニング自責点に反映
+        if (runs > 0 && gameManager.currentInning) {
+            gameManager.currentInning.runs = (gameManager.currentInning.runs || 0) + runs;
+            gameManager.currentInning.earnedRuns = Math.min(
+                gameManager.currentInning.runs,
+                (gameManager.currentInning.earnedRuns || 0) + earnedRuns
+            );
+        }
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+
+        const message = `暴投：${messages.join('、')}${runs > 0 ? `、${runs}得点` : ''}。打者は打席継続。`;
+        this.showSuccess(message);
+    }
+
+    showPassedBallModal() {
+        const game = gameManager.currentGame;
+
+        // 走者がいない場合は記録できない
+        if (!game.runnersOnBase.first && !game.runnersOnBase.second && !game.runnersOnBase.third) {
+            this.showError('走者がいないため捕逸は記録できません');
+            return;
+        }
+
+        const modal = document.getElementById('modal');
+        const modalContent = modal.querySelector('.modal-content');
+
+        // 走者リストを作成
+        const runnersHTML = [];
+        if (game.runnersOnBase.third) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('third_base')}走者:</span>
+                    <button class="advancement-btn" data-from="third" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="third" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+        if (game.runnersOnBase.second) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('second_base')}走者:</span>
+                    <button class="advancement-btn" data-from="second" data-to="third">
+                        ${i18n.t('third_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="second" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="second" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+        if (game.runnersOnBase.first) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('first_base')}走者:</span>
+                    <button class="advancement-btn" data-from="first" data-to="second">
+                        ${i18n.t('second_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="third">
+                        ${i18n.t('third_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+
+        modalContent.innerHTML = `
+            <h3>捕逸</h3>
+            <p>各走者の進塁先を選択してください</p>
+            <div class="runner-advancement-container">
+                ${runnersHTML.join('')}
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelPassedBallBtn">キャンセル</button>
+                <button class="btn btn-primary" id="confirmPassedBallBtn">確定</button>
+            </div>
+        `;
+
+        modal.style.display = 'block';
+
+        // 走者の進塁先を記録するオブジェクト
+        const advancements = {};
+
+        // 進塁ボタンのイベント処理
+        modalContent.querySelectorAll('.advancement-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const from = btn.getAttribute('data-from');
+                const to = btn.getAttribute('data-to');
+
+                // 同じグループのボタンのアクティブ状態を解除
+                btn.closest('.runner-advancement-group')
+                    .querySelectorAll('.advancement-btn')
+                    .forEach(b => b.classList.remove('active'));
+
+                btn.classList.add('active');
+                advancements[from] = to;
+            });
+        });
+
+        // キャンセルボタン
+        document.getElementById('cancelPassedBallBtn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        // 確定ボタン
+        document.getElementById('confirmPassedBallBtn').addEventListener('click', async () => {
+            // 全走者の進塁先が選択されているかチェック
+            const expectedRunners = [];
+            if (game.runnersOnBase.first) expectedRunners.push('first');
+            if (game.runnersOnBase.second) expectedRunners.push('second');
+            if (game.runnersOnBase.third) expectedRunners.push('third');
+
+            const allSelected = expectedRunners.every(base => advancements[base]);
+            if (!allSelected) {
+                this.showError('全走者の進塁先を選択してください');
+                return;
+            }
+
+            modal.style.display = 'none';
+            await this.processPassedBall(advancements);
+        });
+    }
+
+    async processPassedBall(advancements) {
+        const game = gameManager.currentGame;
+        let runs = 0;
+        const messages = [];
+
+        // 3塁走者から処理
+        if (advancements.third) {
+            if (advancements.third === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                // 捕逸による得点は非自責点のため earned status を移動するだけ（earnedRuns加算なし）
+                gameManager.moveRunnerEarnedStatus('third', null);
+                gameManager.moveRunnerResponsiblePitcher('third', null);
+                game.runnersOnBase.third = null;
+                messages.push('3塁走者ホーム');
+            }
+        }
+
+        // 2塁走者
+        if (advancements.second) {
+            if (advancements.second === 'third') {
+                game.runnersOnBase.third = game.runnersOnBase.second;
+                game.runnersOnBase.second = null;
+                gameManager.moveRunnerEarnedStatus('second', 'third');
+                gameManager.moveRunnerResponsiblePitcher('second', 'third');
+                messages.push('2塁走者3塁へ');
+            } else if (advancements.second === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                gameManager.moveRunnerEarnedStatus('second', null);
+                gameManager.moveRunnerResponsiblePitcher('second', null);
+                game.runnersOnBase.second = null;
+                messages.push('2塁走者ホーム');
+            }
+        }
+
+        // 1塁走者
+        if (advancements.first) {
+            if (advancements.first === 'second') {
+                game.runnersOnBase.second = game.runnersOnBase.first;
+                game.runnersOnBase.first = null;
+                gameManager.moveRunnerEarnedStatus('first', 'second');
+                gameManager.moveRunnerResponsiblePitcher('first', 'second');
+                messages.push('1塁走者2塁へ');
+            } else if (advancements.first === 'third') {
+                game.runnersOnBase.third = game.runnersOnBase.first;
+                game.runnersOnBase.first = null;
+                gameManager.moveRunnerEarnedStatus('first', 'third');
+                gameManager.moveRunnerResponsiblePitcher('first', 'third');
+                messages.push('1塁走者3塁へ');
+            } else if (advancements.first === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                gameManager.moveRunnerEarnedStatus('first', null);
+                gameManager.moveRunnerResponsiblePitcher('first', null);
+                game.runnersOnBase.first = null;
+                messages.push('1塁走者ホーム');
+            }
+        }
+
+        // 捕逸による得点はイニング失点に計上するが自責点には加算しない
+        if (runs > 0 && gameManager.currentInning) {
+            gameManager.currentInning.runs = (gameManager.currentInning.runs || 0) + runs;
+            // earnedRuns は加算しない（捕逸は非自責点）
+        }
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+
+        const message = `捕逸：${messages.join('、')}${runs > 0 ? `、${runs}得点` : ''}。打者は打席継続。`;
+        this.showSuccess(message);
+    }
+
+    showPickoffErrorModal() {
+        const game = gameManager.currentGame;
+
+        // 走者がいない場合は記録できない
+        if (!game.runnersOnBase.first && !game.runnersOnBase.second && !game.runnersOnBase.third) {
+            this.showError('走者がいないため牽制悪送球は記録できません');
+            return;
+        }
+
+        // まずエラー野手を選択
+        this.showPickoffErrorPositionModal();
+    }
+
+    showPickoffErrorPositionModal() {
+        const modal = document.getElementById('modal');
+        const modalContent = modal.querySelector('.modal-content');
+        const positions = BASEBALL_CONFIG.POSITIONS;
+
+        modalContent.innerHTML = `
+            <h3>牽制悪送球 - 守備位置選択</h3>
+            <p>エラーを記録する守備位置を選択してください</p>
+            <div class="position-buttons">
+                ${Object.keys(positions).map(key => `
+                    <button class="position-btn" data-position="${key}">
+                        ${i18n.t(positions[key].label)}
+                    </button>
+                `).join('')}
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelPickoffErrorPositionBtn">キャンセル</button>
+            </div>
+        `;
+
+        modal.style.display = 'block';
+
+        // 守備位置選択
+        modalContent.querySelectorAll('.position-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const position = btn.getAttribute('data-position');
+                modal.style.display = 'none';
+
+                // 走者進塁先選択へ
+                this.showPickoffErrorAdvancementModal(position);
+            });
+        });
+
+        // キャンセルボタン
+        document.getElementById('cancelPickoffErrorPositionBtn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showPickoffErrorAdvancementModal(position) {
+        const game = gameManager.currentGame;
+        const modal = document.getElementById('modal');
+        const modalContent = modal.querySelector('.modal-content');
+
+        // 走者リストを作成
+        const runnersHTML = [];
+        if (game.runnersOnBase.third) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('third_base')}走者:</span>
+                    <button class="advancement-btn" data-from="third" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="third" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+        if (game.runnersOnBase.second) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('second_base')}走者:</span>
+                    <button class="advancement-btn" data-from="second" data-to="third">
+                        ${i18n.t('third_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="second" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="second" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+        if (game.runnersOnBase.first) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('first_base')}走者:</span>
+                    <button class="advancement-btn" data-from="first" data-to="second">
+                        ${i18n.t('second_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="third">
+                        ${i18n.t('third_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+
+        modalContent.innerHTML = `
+            <h3>牽制悪送球</h3>
+            <p>各走者の進塁先を選択してください</p>
+            <div class="runner-advancement-container">
+                ${runnersHTML.join('')}
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelPickoffErrorBtn">キャンセル</button>
+                <button class="btn btn-primary" id="confirmPickoffErrorBtn">確定</button>
+            </div>
+        `;
+
+        modal.style.display = 'block';
+
+        // 走者の進塁先を記録するオブジェクト
+        const advancements = {};
+
+        // 進塁ボタンのイベント処理
+        modalContent.querySelectorAll('.advancement-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const from = btn.getAttribute('data-from');
+                const to = btn.getAttribute('data-to');
+
+                // 同じグループのボタンのアクティブ状態を解除
+                btn.closest('.runner-advancement-group')
+                    .querySelectorAll('.advancement-btn')
+                    .forEach(b => b.classList.remove('active'));
+
+                btn.classList.add('active');
+                advancements[from] = to;
+            });
+        });
+
+        // キャンセルボタン
+        document.getElementById('cancelPickoffErrorBtn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        // 確定ボタン
+        document.getElementById('confirmPickoffErrorBtn').addEventListener('click', async () => {
+            // 全走者の進塁先が選択されているかチェック
+            const expectedRunners = [];
+            if (game.runnersOnBase.first) expectedRunners.push('first');
+            if (game.runnersOnBase.second) expectedRunners.push('second');
+            if (game.runnersOnBase.third) expectedRunners.push('third');
+
+            const allSelected = expectedRunners.every(base => advancements[base]);
+            if (!allSelected) {
+                this.showError('全走者の進塁先を選択してください');
+                return;
+            }
+
+            modal.style.display = 'none';
+            await this.processPickoffError(position, advancements);
+        });
+    }
+
+    async processPickoffError(position, advancements) {
+        const game = gameManager.currentGame;
+        let runs = 0;
+        const messages = [];
+
+        // 3塁走者から処理
+        if (advancements.third) {
+            if (advancements.third === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                game.runnersOnBase.third = null;
+                messages.push('3塁走者ホーム');
+            }
+        }
+
+        // 2塁走者
+        if (advancements.second) {
+            if (advancements.second === 'third') {
+                game.runnersOnBase.third = game.runnersOnBase.second;
+                game.runnersOnBase.second = null;
+                messages.push('2塁走者3塁へ');
+            } else if (advancements.second === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                game.runnersOnBase.second = null;
+                messages.push('2塁走者ホーム');
+            }
+        }
+
+        // 1塁走者
+        if (advancements.first) {
+            if (advancements.first === 'second') {
+                game.runnersOnBase.second = game.runnersOnBase.first;
+                game.runnersOnBase.first = null;
+                messages.push('1塁走者2塁へ');
+            } else if (advancements.first === 'third') {
+                game.runnersOnBase.third = game.runnersOnBase.first;
+                game.runnersOnBase.first = null;
+                messages.push('1塁走者3塁へ');
+            } else if (advancements.first === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                game.runnersOnBase.first = null;
+                messages.push('1塁走者ホーム');
+            }
+        }
+
+        // エラー記録を保存（チーム統計に反映）
+        if (game.isTopHalf) {
+            game.teamStats.home.errors++;
+        } else {
+            game.teamStats.away.errors++;
+        }
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+
+        const positionName = i18n.t(BASEBALL_CONFIG.POSITIONS[position].label);
+        const message = `牽制悪送球（${positionName}）：${messages.join('、')}${runs > 0 ? `、${runs}得点` : ''}。打者は打席継続。`;
+        this.showSuccess(message);
+    }
+
+    // ===== 通常エラー（捕球・送球・落球）の実装 =====
+
+    showRegularErrorModal(errorType) {
+        const game = gameManager.currentGame;
+        const errorConfig = BASEBALL_CONFIG.ERROR_TYPES[errorType];
+
+        // ファウルフライ落球の場合は走者進塁なし、打席継続のみ
+        if (errorType === 'foul_fly_drop') {
+            this.processFoulFlyDrop();
+            return;
+        }
+
+        const modal = document.getElementById('modal');
+        const modalContent = modal.querySelector('.modal-content');
+
+        // 守備位置選択
+        const positions = BASEBALL_CONFIG.POSITIONS;
+
+        modalContent.innerHTML = `
+            <h3>${i18n.t(errorConfig.label)}</h3>
+            <p>エラーを記録する守備位置を選択してください</p>
+            <div class="position-buttons">
+                ${Object.keys(positions).map(key => `
+                    <button class="position-btn" data-position="${key}">
+                        ${i18n.t(positions[key].label)}
+                    </button>
+                `).join('')}
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelRegularErrorBtn">キャンセル</button>
+            </div>
+        `;
+
+        modal.style.display = 'block';
+
+        // 守備位置選択
+        modalContent.querySelectorAll('.position-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const position = btn.getAttribute('data-position');
+                modal.style.display = 'none';
+
+                // 打者と走者の進塁先を選択するモーダルへ
+                this.showErrorAdvancementModal(errorType, position);
+            });
+        });
+
+        // キャンセルボタン
+        document.getElementById('cancelRegularErrorBtn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    showErrorAdvancementModal(errorType, position) {
+        const game = gameManager.currentGame;
+        const errorConfig = BASEBALL_CONFIG.ERROR_TYPES[errorType];
+        const modal = document.getElementById('modal');
+        const modalContent = modal.querySelector('.modal-content');
+
+        // 打者の進塁先選択
+        const batterAdvancementHTML = `
+            <div class="runner-advancement-group">
+                <span class="runner-label">打者の進塁先:</span>
+                <button class="advancement-btn" data-from="batter" data-to="first">
+                    ${i18n.t('first_base')}
+                </button>
+                <button class="advancement-btn" data-from="batter" data-to="second">
+                    ${i18n.t('second_base')}
+                </button>
+                <button class="advancement-btn" data-from="batter" data-to="third">
+                    ${i18n.t('third_base')}
+                </button>
+                <button class="advancement-btn" data-from="batter" data-to="out">
+                    アウト
+                </button>
+            </div>
+        `;
+
+        // 走者の進塁先選択
+        const runnersHTML = [];
+        if (game.runnersOnBase.third) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('third_base')}走者:</span>
+                    <button class="advancement-btn" data-from="third" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="third" data-to="out">
+                        アウト
+                    </button>
+                    <button class="advancement-btn" data-from="third" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+        if (game.runnersOnBase.second) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('second_base')}走者:</span>
+                    <button class="advancement-btn" data-from="second" data-to="third">
+                        ${i18n.t('third_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="second" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="second" data-to="out">
+                        アウト
+                    </button>
+                    <button class="advancement-btn" data-from="second" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+        if (game.runnersOnBase.first) {
+            runnersHTML.push(`
+                <div class="runner-advancement-group">
+                    <span class="runner-label">${i18n.t('first_base')}走者:</span>
+                    <button class="advancement-btn" data-from="first" data-to="second">
+                        ${i18n.t('second_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="third">
+                        ${i18n.t('third_base')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="home">
+                        ${i18n.t('home')}
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="out">
+                        アウト
+                    </button>
+                    <button class="advancement-btn" data-from="first" data-to="stay">
+                        進塁なし
+                    </button>
+                </div>
+            `);
+        }
+
+        modalContent.innerHTML = `
+            <h3>${i18n.t(errorConfig.label)} - 進塁先選択</h3>
+            <p>打者と走者の進塁先を選択してください</p>
+            <div class="runner-advancement-container">
+                ${batterAdvancementHTML}
+                ${runnersHTML.join('')}
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelErrorAdvancementBtn">キャンセル</button>
+                <button class="btn btn-primary" id="confirmErrorAdvancementBtn">確定</button>
+            </div>
+        `;
+
+        modal.style.display = 'block';
+
+        // 進塁先を記録するオブジェクト
+        const advancements = {};
+
+        // 進塁ボタンのイベント処理
+        modalContent.querySelectorAll('.advancement-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const from = btn.getAttribute('data-from');
+                const to = btn.getAttribute('data-to');
+
+                // 同じグループのボタンのアクティブ状態を解除
+                btn.closest('.runner-advancement-group')
+                    .querySelectorAll('.advancement-btn')
+                    .forEach(b => b.classList.remove('active'));
+
+                btn.classList.add('active');
+                advancements[from] = to;
+            });
+        });
+
+        // キャンセルボタン
+        document.getElementById('cancelErrorAdvancementBtn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        // 確定ボタン
+        document.getElementById('confirmErrorAdvancementBtn').addEventListener('click', async () => {
+            // 打者の進塁先が選択されているかチェック
+            if (!advancements.batter) {
+                this.showError('打者の進塁先を選択してください');
+                return;
+            }
+
+            // 全走者の進塁先が選択されているかチェック
+            const expectedRunners = [];
+            if (game.runnersOnBase.first) expectedRunners.push('first');
+            if (game.runnersOnBase.second) expectedRunners.push('second');
+            if (game.runnersOnBase.third) expectedRunners.push('third');
+
+            const allSelected = expectedRunners.every(base => advancements[base]);
+            if (!allSelected) {
+                this.showError('全走者の進塁先を選択してください');
+                return;
+            }
+
+            modal.style.display = 'none';
+            await this.processRegularError(errorType, position, advancements);
+        });
+    }
+
+    async processRegularError(errorType, position, advancements) {
+        const game = gameManager.currentGame;
+        const atBat = game.currentAtBat;
+
+        if (!atBat) {
+            this.showError('打席情報がありません');
+            return;
+        }
+
+        // 打席結果を記録
+        atBat.result = errorType;
+        atBat.resultDetail = i18n.t(BASEBALL_CONFIG.ERROR_TYPES[errorType].label);
+        atBat.errorPosition = position;
+
+        // 走者状況を保存
+        atBat.runnersBeforePlay = {
+            first: game.runnersOnBase.first ? {...game.runnersOnBase.first} : null,
+            second: game.runnersOnBase.second ? {...game.runnersOnBase.second} : null,
+            third: game.runnersOnBase.third ? {...game.runnersOnBase.third} : null
+        };
+
+        let runs = 0;
+        let outs = 0;
+        const messages = [];
+
+        // 3塁走者から処理
+        if (advancements.third) {
+            if (advancements.third === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                game.runnersOnBase.third = null;
+                messages.push('3塁走者ホーム');
+            } else if (advancements.third === 'out') {
+                game.runnersOnBase.third = null;
+                game.outs++;
+                outs++;
+                messages.push('3塁走者アウト');
+            }
+        }
+
+        // 2塁走者
+        if (advancements.second) {
+            if (advancements.second === 'third') {
+                game.runnersOnBase.third = game.runnersOnBase.second;
+                game.runnersOnBase.second = null;
+                messages.push('2塁走者3塁へ');
+            } else if (advancements.second === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                game.runnersOnBase.second = null;
+                messages.push('2塁走者ホーム');
+            } else if (advancements.second === 'out') {
+                game.runnersOnBase.second = null;
+                game.outs++;
+                outs++;
+                messages.push('2塁走者アウト');
+            }
+        }
+
+        // 1塁走者
+        if (advancements.first) {
+            if (advancements.first === 'second') {
+                game.runnersOnBase.second = game.runnersOnBase.first;
+                game.runnersOnBase.first = null;
+                messages.push('1塁走者2塁へ');
+            } else if (advancements.first === 'third') {
+                game.runnersOnBase.third = game.runnersOnBase.first;
+                game.runnersOnBase.first = null;
+                messages.push('1塁走者3塁へ');
+            } else if (advancements.first === 'home') {
+                runs++;
+                if (game.isTopHalf) {
+                    game.awayScore++;
+                } else {
+                    game.homeScore++;
+                }
+                game.runnersOnBase.first = null;
+                messages.push('1塁走者ホーム');
+            } else if (advancements.first === 'out') {
+                game.runnersOnBase.first = null;
+                game.outs++;
+                outs++;
+                messages.push('1塁走者アウト');
+            }
+        }
+
+        // 打者の処理
+        if (advancements.batter === 'out') {
+            game.outs++;
+            outs++;
+            messages.push('打者アウト');
+        } else if (advancements.batter === 'first') {
+            game.runnersOnBase.first = {
+                name: game.currentBatter.name,
+                battingOrder: game.currentBatter.battingOrder,
+                playerId: game.currentBatter.playerId
+            };
+            messages.push('打者1塁へ');
+        } else if (advancements.batter === 'second') {
+            game.runnersOnBase.second = {
+                name: game.currentBatter.name,
+                battingOrder: game.currentBatter.battingOrder,
+                playerId: game.currentBatter.playerId
+            };
+            messages.push('打者2塁へ');
+        } else if (advancements.batter === 'third') {
+            game.runnersOnBase.third = {
+                name: game.currentBatter.name,
+                battingOrder: game.currentBatter.battingOrder,
+                playerId: game.currentBatter.playerId
+            };
+            messages.push('打者3塁へ');
+        }
+
+        atBat.runs = runs;
+        atBat.runnersAfterPlay = {
+            first: game.runnersOnBase.first ? {...game.runnersOnBase.first} : null,
+            second: game.runnersOnBase.second ? {...game.runnersOnBase.second} : null,
+            third: game.runnersOnBase.third ? {...game.runnersOnBase.third} : null
+        };
+
+        // 打席を完了
+        atBat.endTime = new Date().toISOString();
+        gameManager.currentGame.completedAtBats.push(atBat);
+        gameManager.currentGame.currentAtBat = null;
+
+        // 統計更新
+        gameManager.updatePlayerStats(atBat);
+
+        // 次の打者へ
+        gameManager.advanceToNextBatter();
+
+        // 3アウトチェック
+        if (game.outs >= 3) {
+            await gameManager.endHalfInning();
+            this.showSuccess(`${atBat.resultDetail}：${messages.join('、')}${runs > 0 ? `、${runs}得点` : ''}。3アウトチェンジ`);
+        } else {
+            await gameManager.saveGame();
+            this.updateGameDisplay();
+            this.clearBatterForm();
+            this.showSuccess(`${atBat.resultDetail}：${messages.join('、')}${runs > 0 ? `、${runs}得点` : ''}（${game.outs}アウト）`);
+        }
+    }
+
+    async processFoulFlyDrop() {
+        const game = gameManager.currentGame;
+
+        // ファウルフライ落球は打席継続のみ
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+        this.showSuccess('ファウルフライ落球：打席継続');
+    }
+
+    // ===== 選手交代機能（代打・代走・リリーフ・守備交代） =====
+
+    showSubstitutionMenu() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'substitutionMenu';
+
+        const game = gameManager.currentGame;
+        const dhButtonHtml = game.dhRule && game.dhActive ? `
+            <button class="btn btn-warning substitution-menu-btn" id="cancelDHBtn">
+                DH制解除
+            </button>
+        ` : '';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>選手交代</h3>
+                <div class="substitution-menu-buttons">
+                    <button class="btn btn-primary substitution-menu-btn" id="pinchHitterBtn">
+                        代打
+                    </button>
+                    <button class="btn btn-primary substitution-menu-btn" id="pinchRunnerBtn">
+                        代走
+                    </button>
+                    <button class="btn btn-primary substitution-menu-btn" id="reliefPitcherBtn">
+                        リリーフ投手
+                    </button>
+                    <button class="btn btn-primary substitution-menu-btn" id="defensiveSubBtn">
+                        守備交代
+                    </button>
+                    ${dhButtonHtml}
+                </div>
+                <button class="btn btn-secondary" id="cancelSubstitutionMenu">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 代打ボタン
+        document.getElementById('pinchHitterBtn').addEventListener('click', () => {
+            modal.remove();
+            this.showPinchHitterModal();
+        });
+
+        // 代走ボタン
+        document.getElementById('pinchRunnerBtn').addEventListener('click', () => {
+            modal.remove();
+            this.showPinchRunnerModal();
+        });
+
+        // リリーフ投手ボタン
+        document.getElementById('reliefPitcherBtn').addEventListener('click', () => {
+            modal.remove();
+            this.showReliefPitcherModal();
+        });
+
+        // 守備交代ボタン
+        document.getElementById('defensiveSubBtn').addEventListener('click', () => {
+            modal.remove();
+            this.showDefensiveSubstitutionModal();
+        });
+
+        // DH制解除ボタン
+        if (game.dhRule && game.dhActive) {
+            document.getElementById('cancelDHBtn').addEventListener('click', () => {
+                modal.remove();
+                this.showCancelDHModal();
+            });
+        }
+
+        // キャンセルボタン
+        document.getElementById('cancelSubstitutionMenu').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    // ===== 代打機能 =====
+
+    showPinchHitterModal() {
+        const game = gameManager.currentGame;
+
+        if (!game.currentBatter) {
+            this.showError('現在打席に立っている打者がいません');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'pinchHitterModal';
+
+        const playerDetailLevel = game.playerDetailLevel;
+        const currentTeam = game.isTopHalf ? game.awayTeam : game.homeTeam;
+
+        // 詳細モード：控え選手から選択
+        if (playerDetailLevel === 'detailed') {
+            const benchPlayers = game.players[game.isTopHalf ? 'away' : 'home'].filter(p =>
+                p.isBench && p.isActive && !p.substitutedBy
+            );
+
+            if (benchPlayers.length === 0) {
+                this.showError('起用可能な控え選手がいません');
+                return;
+            }
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>代打選択</h3>
+                    <p>現在の打者: ${game.currentBatter.name}</p>
+                    <p>控え選手から代打を選択してください</p>
+                    <div class="player-selection-list">
+                        ${benchPlayers.map(player => `
+                            <button class="player-selection-btn" data-player-id="${player.id}">
+                                ${player.name}${player.playerInfo.number ? ` (#${player.playerInfo.number})` : ''}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-secondary" id="cancelPinchHitter">${i18n.t('cancel')}</button>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // 選手選択
+            modal.querySelectorAll('.player-selection-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const playerId = btn.dataset.playerId;
+                    const selectedPlayer = benchPlayers.find(p => p.id === playerId);
+                    modal.remove();
+                    this.processPinchHitter(selectedPlayer);
+                });
+            });
+
+        } else {
+            // 標準以下：選手名を直接入力
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>代打選択</h3>
+                    <p>現在の打者: ${game.currentBatter.name}</p>
+                    <div class="input-group">
+                        <label for="pinchHitterName">代打選手名:</label>
+                        <input type="text" id="pinchHitterName" placeholder="選手名を入力">
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelPinchHitter">${i18n.t('cancel')}</button>
+                        <button class="btn btn-primary" id="confirmPinchHitter">確定</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // 確定ボタン
+            document.getElementById('confirmPinchHitter').addEventListener('click', () => {
+                const playerName = document.getElementById('pinchHitterName').value.trim();
+                if (!playerName) {
+                    this.showError('選手名を入力してください');
+                    return;
+                }
+
+                modal.remove();
+
+                // 新しい選手オブジェクトを作成
+                const newPlayer = {
+                    id: `ph_${Date.now()}`,
+                    name: playerName,
+                    team: currentTeam,
+                    position: '打', // 代打は「打」
+                    battingOrder: game.currentBatter.battingOrder,
+                    isActive: true,
+                    isStarter: false,
+                    isBench: false,
+                    isPinchHitter: true,
+                    needsDefensiveSubstitution: true,
+                    enteredGameAt: new Date().toISOString(),
+                    stats: {
+                        atBats: 0, hits: 0, runs: 0, rbis: 0, walks: 0, strikeouts: 0,
+                        errors: 0, singles: 0, doubles: 0, triples: 0, homeruns: 0,
+                        sacrificeBunts: 0, sacrificeFlies: 0, hitByPitch: 0,
+                        stolenBases: 0, caughtStealing: 0, fieldingChances: 0,
+                        fieldingAssists: 0, fieldingPutouts: 0
+                    }
+                };
+
+                this.processPinchHitter(newPlayer);
+            });
+        }
+
+        // キャンセルボタン
+        document.getElementById('cancelPinchHitter').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    async processPinchHitter(pinchHitter) {
+        const game = gameManager.currentGame;
+        const originalBatter = game.currentBatter;
+
+        // 元の打者を退場させる
+        const teamKey = game.isTopHalf ? 'away' : 'home';
+        const originalPlayerIndex = game.players[teamKey].findIndex(p => p.id === originalBatter.playerId);
+
+        if (originalPlayerIndex !== -1) {
+            game.players[teamKey][originalPlayerIndex].isActive = false;
+            game.players[teamKey][originalPlayerIndex].substitutedBy = pinchHitter.id;
+            game.players[teamKey][originalPlayerIndex].substitutedAt = new Date().toISOString();
+        }
+
+        // 代打選手を追加（詳細モードの場合は既存選手を更新、標準以下は新規追加）
+        if (game.playerDetailLevel === 'detailed') {
+            const pinchHitterIndex = game.players[teamKey].findIndex(p => p.id === pinchHitter.id);
+            if (pinchHitterIndex !== -1) {
+                game.players[teamKey][pinchHitterIndex].isActive = true;
+                game.players[teamKey][pinchHitterIndex].isBench = false;
+                game.players[teamKey][pinchHitterIndex].isPinchHitter = true;
+                game.players[teamKey][pinchHitterIndex].position = '打';
+                game.players[teamKey][pinchHitterIndex].battingOrder = originalBatter.battingOrder;
+                game.players[teamKey][pinchHitterIndex].needsDefensiveSubstitution = true;
+                game.players[teamKey][pinchHitterIndex].enteredGameAt = new Date().toISOString();
+            }
+        } else {
+            // 新規追加
+            game.players[teamKey].push(pinchHitter);
+        }
+
+        // 現在の打者を更新
+        game.currentBatter = {
+            name: pinchHitter.name,
+            battingOrder: originalBatter.battingOrder,
+            playerId: pinchHitter.id,
+            position: '打'
+        };
+
+        // 交代履歴を記録
+        if (!game.substitutionHistory) {
+            game.substitutionHistory = [];
+        }
+        game.substitutionHistory.push({
+            type: 'pinchHitter',
+            inning: game.currentInning,
+            isTopHalf: game.isTopHalf,
+            out: originalBatter,
+            in: pinchHitter,
+            timestamp: new Date().toISOString()
+        });
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+        this.showSuccess(`代打：${pinchHitter.name} が ${originalBatter.name} に代わって打席に`);
+    }
+
+    // ===== 代走機能 =====
+
+    showPinchRunnerModal() {
+        const game = gameManager.currentGame;
+
+        // 走者がいない場合
+        if (!game.runnersOnBase.first && !game.runnersOnBase.second && !game.runnersOnBase.third) {
+            this.showError('代走を出せる走者がいません');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'pinchRunnerModal';
+
+        // 現在の走者リスト
+        const runners = [];
+        if (game.runnersOnBase.first) runners.push({ base: 'first', name: game.runnersOnBase.first.name });
+        if (game.runnersOnBase.second) runners.push({ base: 'second', name: game.runnersOnBase.second.name });
+        if (game.runnersOnBase.third) runners.push({ base: 'third', name: game.runnersOnBase.third.name });
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>代走選択</h3>
+                <p>代走を出す走者を選択してください</p>
+                <div class="runner-selection-buttons">
+                    ${runners.map(runner => `
+                        <button class="runner-btn" data-base="${runner.base}">
+                            ${i18n.t(runner.base + '_base')}: ${runner.name}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="btn btn-secondary" id="cancelPinchRunner">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 走者選択
+        modal.querySelectorAll('.runner-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const base = btn.dataset.base;
+                modal.remove();
+                this.showPinchRunnerSelectionModal(base);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelPinchRunner').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    showPinchRunnerSelectionModal(base) {
+        const game = gameManager.currentGame;
+        const originalRunner = game.runnersOnBase[base];
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'pinchRunnerSelectionModal';
+
+        const playerDetailLevel = game.playerDetailLevel;
+        const currentTeam = game.isTopHalf ? game.awayTeam : game.homeTeam;
+
+        // 詳細モード：控え選手から選択
+        if (playerDetailLevel === 'detailed') {
+            const benchPlayers = game.players[game.isTopHalf ? 'away' : 'home'].filter(p =>
+                p.isBench && p.isActive && !p.substitutedBy
+            );
+
+            if (benchPlayers.length === 0) {
+                this.showError('起用可能な控え選手がいません');
+                return;
+            }
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>代走選択 - ${i18n.t(base + '_base')}</h3>
+                    <p>現在の走者: ${originalRunner.name}</p>
+                    <p>控え選手から代走を選択してください</p>
+                    <div class="player-selection-list">
+                        ${benchPlayers.map(player => `
+                            <button class="player-selection-btn" data-player-id="${player.id}">
+                                ${player.name}${player.playerInfo.number ? ` (#${player.playerInfo.number})` : ''}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-secondary" id="cancelPinchRunnerSelection">${i18n.t('cancel')}</button>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // 選手選択
+            modal.querySelectorAll('.player-selection-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const playerId = btn.dataset.playerId;
+                    const selectedPlayer = benchPlayers.find(p => p.id === playerId);
+                    modal.remove();
+                    this.processPinchRunner(base, selectedPlayer);
+                });
+            });
+
+        } else {
+            // 標準以下：選手名を直接入力
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>代走選択 - ${i18n.t(base + '_base')}</h3>
+                    <p>現在の走者: ${originalRunner.name}</p>
+                    <div class="input-group">
+                        <label for="pinchRunnerName">代走選手名:</label>
+                        <input type="text" id="pinchRunnerName" placeholder="選手名を入力">
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelPinchRunnerSelection">${i18n.t('cancel')}</button>
+                        <button class="btn btn-primary" id="confirmPinchRunnerSelection">確定</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // 確定ボタン
+            document.getElementById('confirmPinchRunnerSelection').addEventListener('click', () => {
+                const playerName = document.getElementById('pinchRunnerName').value.trim();
+                if (!playerName) {
+                    this.showError('選手名を入力してください');
+                    return;
+                }
+
+                modal.remove();
+
+                // 新しい選手オブジェクトを作成
+                const newPlayer = {
+                    id: `pr_${Date.now()}`,
+                    name: playerName,
+                    team: currentTeam,
+                    position: '走', // 代走は「走」
+                    battingOrder: originalRunner.battingOrder,
+                    isActive: true,
+                    isStarter: false,
+                    isBench: false,
+                    isPinchRunner: true,
+                    needsDefensiveSubstitution: true,
+                    enteredGameAt: new Date().toISOString(),
+                    stats: {
+                        atBats: 0, hits: 0, runs: 0, rbis: 0, walks: 0, strikeouts: 0,
+                        errors: 0, singles: 0, doubles: 0, triples: 0, homeruns: 0,
+                        sacrificeBunts: 0, sacrificeFlies: 0, hitByPitch: 0,
+                        stolenBases: 0, caughtStealing: 0, fieldingChances: 0,
+                        fieldingAssists: 0, fieldingPutouts: 0
+                    }
+                };
+
+                this.processPinchRunner(base, newPlayer);
+            });
+        }
+
+        // キャンセルボタン
+        document.getElementById('cancelPinchRunnerSelection').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    async processPinchRunner(base, pinchRunner) {
+        const game = gameManager.currentGame;
+        const originalRunner = game.runnersOnBase[base];
+
+        // 元の走者を退場させる
+        const teamKey = game.isTopHalf ? 'away' : 'home';
+        const originalPlayerIndex = game.players[teamKey].findIndex(p => p.id === originalRunner.playerId);
+
+        if (originalPlayerIndex !== -1) {
+            game.players[teamKey][originalPlayerIndex].isActive = false;
+            game.players[teamKey][originalPlayerIndex].substitutedBy = pinchRunner.id;
+            game.players[teamKey][originalPlayerIndex].substitutedAt = new Date().toISOString();
+        }
+
+        // 代走選手を追加（詳細モードの場合は既存選手を更新、標準以下は新規追加）
+        if (game.playerDetailLevel === 'detailed') {
+            const pinchRunnerIndex = game.players[teamKey].findIndex(p => p.id === pinchRunner.id);
+            if (pinchRunnerIndex !== -1) {
+                game.players[teamKey][pinchRunnerIndex].isActive = true;
+                game.players[teamKey][pinchRunnerIndex].isBench = false;
+                game.players[teamKey][pinchRunnerIndex].isPinchRunner = true;
+                game.players[teamKey][pinchRunnerIndex].position = '走';
+                game.players[teamKey][pinchRunnerIndex].battingOrder = originalRunner.battingOrder;
+                game.players[teamKey][pinchRunnerIndex].needsDefensiveSubstitution = true;
+                game.players[teamKey][pinchRunnerIndex].enteredGameAt = new Date().toISOString();
+            }
+        } else {
+            // 新規追加
+            game.players[teamKey].push(pinchRunner);
+        }
+
+        // 走者を更新
+        game.runnersOnBase[base] = {
+            name: pinchRunner.name,
+            battingOrder: originalRunner.battingOrder,
+            playerId: pinchRunner.id
+        };
+
+        // 交代履歴を記録
+        if (!game.substitutionHistory) {
+            game.substitutionHistory = [];
+        }
+        game.substitutionHistory.push({
+            type: 'pinchRunner',
+            base: base,
+            inning: game.currentInning,
+            isTopHalf: game.isTopHalf,
+            out: originalRunner,
+            in: pinchRunner,
+            timestamp: new Date().toISOString()
+        });
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+        this.showSuccess(`代走：${pinchRunner.name} が ${originalRunner.name} に代わって${i18n.t(base + '_base')}に`);
+    }
+
+    // ===== リリーフ投手機能 =====
+
+    showReliefPitcherModal() {
+        const game = gameManager.currentGame;
+
+        if (!game.currentPitcher) {
+            this.showError('現在の投手がいません');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'reliefPitcherModal';
+
+        const playerDetailLevel = game.playerDetailLevel;
+        const currentTeam = game.isTopHalf ? game.homeTeam : game.awayTeam; // 守備側
+
+        // 詳細モード：控え選手から選択
+        if (playerDetailLevel === 'detailed') {
+            const benchPlayers = game.players[game.isTopHalf ? 'home' : 'away'].filter(p =>
+                p.isBench && p.isActive && !p.substitutedBy
+            );
+
+            if (benchPlayers.length === 0) {
+                this.showError('起用可能な控え選手がいません');
+                return;
+            }
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>リリーフ投手選択</h3>
+                    <p>現在の投手: ${game.currentPitcher.name}</p>
+                    <p>控え選手からリリーフ投手を選択してください</p>
+                    <div class="player-selection-list">
+                        ${benchPlayers.map(player => `
+                            <button class="player-selection-btn" data-player-id="${player.id}">
+                                ${player.name}${player.playerInfo.number ? ` (#${player.playerInfo.number})` : ''}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-secondary" id="cancelReliefPitcher">${i18n.t('cancel')}</button>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // 選手選択
+            modal.querySelectorAll('.player-selection-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const playerId = btn.dataset.playerId;
+                    const selectedPlayer = benchPlayers.find(p => p.id === playerId);
+                    modal.remove();
+                    this.processReliefPitcher(selectedPlayer);
+                });
+            });
+
+        } else {
+            // 標準以下：選手名を直接入力
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>リリーフ投手選択</h3>
+                    <p>現在の投手: ${game.currentPitcher.name}</p>
+                    <div class="input-group">
+                        <label for="reliefPitcherName">リリーフ投手名:</label>
+                        <input type="text" id="reliefPitcherName" placeholder="選手名を入力">
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelReliefPitcher">${i18n.t('cancel')}</button>
+                        <button class="btn btn-primary" id="confirmReliefPitcher">確定</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // 確定ボタン
+            document.getElementById('confirmReliefPitcher').addEventListener('click', () => {
+                const playerName = document.getElementById('reliefPitcherName').value.trim();
+                if (!playerName) {
+                    this.showError('選手名を入力してください');
+                    return;
+                }
+
+                modal.remove();
+
+                // 新しい選手オブジェクトを作成
+                const newPlayer = {
+                    id: `rp_${Date.now()}`,
+                    name: playerName,
+                    team: currentTeam,
+                    position: 'P',
+                    battingOrder: game.currentPitcher.battingOrder || null,
+                    isActive: true,
+                    isStarter: false,
+                    isBench: false,
+                    enteredGameAt: new Date().toISOString(),
+                    stats: {
+                        atBats: 0, hits: 0, runs: 0, rbis: 0, walks: 0, strikeouts: 0,
+                        errors: 0, singles: 0, doubles: 0, triples: 0, homeruns: 0,
+                        sacrificeBunts: 0, sacrificeFlies: 0, hitByPitch: 0,
+                        stolenBases: 0, caughtStealing: 0, fieldingChances: 0,
+                        fieldingAssists: 0, fieldingPutouts: 0
+                    }
+                };
+
+                this.processReliefPitcher(newPlayer);
+            });
+        }
+
+        // キャンセルボタン
+        document.getElementById('cancelReliefPitcher').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    async processReliefPitcher(reliefPitcher) {
+        const game = gameManager.currentGame;
+        const originalPitcher = game.currentPitcher;
+
+        // 元の投手を退場させる
+        const teamKey = game.isTopHalf ? 'home' : 'away'; // 守備側
+        const originalPitcherIndex = game.players[teamKey].findIndex(p => p.id === originalPitcher.playerId);
+
+        if (originalPitcherIndex !== -1) {
+            game.players[teamKey][originalPitcherIndex].isActive = false;
+            game.players[teamKey][originalPitcherIndex].substitutedBy = reliefPitcher.id;
+            game.players[teamKey][originalPitcherIndex].substitutedAt = new Date().toISOString();
+        }
+
+        // リリーフ投手を追加（詳細モードの場合は既存選手を更新、標準以下は新規追加）
+        if (game.playerDetailLevel === 'detailed') {
+            const reliefPitcherIndex = game.players[teamKey].findIndex(p => p.id === reliefPitcher.id);
+            if (reliefPitcherIndex !== -1) {
+                game.players[teamKey][reliefPitcherIndex].isActive = true;
+                game.players[teamKey][reliefPitcherIndex].isBench = false;
+                game.players[teamKey][reliefPitcherIndex].position = 'P';
+                game.players[teamKey][reliefPitcherIndex].enteredGameAt = new Date().toISOString();
+            }
+        } else {
+            // 新規追加
+            game.players[teamKey].push(reliefPitcher);
+        }
+
+        // 現在の投手を更新
+        game.currentPitcher = {
+            name: reliefPitcher.name,
+            playerId: reliefPitcher.id,
+            position: 'P'
+        };
+
+        // 交代履歴を記録
+        if (!game.substitutionHistory) {
+            game.substitutionHistory = [];
+        }
+        game.substitutionHistory.push({
+            type: 'reliefPitcher',
+            inning: game.currentInning,
+            isTopHalf: game.isTopHalf,
+            out: originalPitcher,
+            in: reliefPitcher,
+            timestamp: new Date().toISOString()
+        });
+
+        await gameManager.saveGame();
+        this.updateGameDisplay();
+        this.showSuccess(`リリーフ投手：${reliefPitcher.name} が ${originalPitcher.name} に代わって登板`);
+    }
+
+    // ===== 守備交代機能（複数選手同時対応） =====
+
+    showDefensiveSubstitutionModal() {
+        const fieldingTeam = gameManager.currentGame.isTopHalf ? 'home' : 'away';
+
+        const modal = document.createElement('div');
+        modal.className = 'modal modal-large';
+        modal.id = 'defensiveSubstitutionModal';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>守備交代・守備シフト</h3>
+                <p>複数選手の守備位置を同時に変更できます</p>
+                <div class="button-group">
+                    <button class="btn btn-primary" id="fullLineupChangeBtn">全守備位置を編集</button>
+                    <button class="btn btn-secondary" id="deferEditBtn">後で編集（仮状態で継続）</button>
+                    <button class="btn btn-secondary" id="cancelDefSubBtn">キャンセル</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('fullLineupChangeBtn').addEventListener('click', () => {
+            modal.remove();
+            this.showFullLineupEditor(fieldingTeam, false);
+        });
+
+        document.getElementById('deferEditBtn').addEventListener('click', () => {
+            modal.remove();
+            this.markLineupAsPending(fieldingTeam);
+        });
+
+        document.getElementById('cancelDefSubBtn').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    markLineupAsPending(team) {
+        const game = gameManager.currentGame;
+
+        if (!game.pendingLineupChanges) {
+            game.pendingLineupChanges = {};
+        }
+
+        game.pendingLineupChanges[team] = {
+            inning: game.currentInning,
+            isTopHalf: game.isTopHalf,
+            timestamp: new Date().toISOString()
+        };
+
+        gameManager.saveGame();
+        this.showSuccess('守備位置を後で編集します。半イニング終了前に編集してください。');
+        this.updateUI();
+    }
+
+    showFullLineupEditor(team, isPending = false) {
+        const game = gameManager.currentGame;
+        const activePlayers = game.players[team].filter(p => p.isActive);
+        const benchPlayers = game.players[team].filter(p => p.isBench && p.isActive && !p.substitutedBy);
+
+        const modal = document.createElement('div');
+        modal.className = 'modal modal-xlarge';
+        modal.id = 'fullLineupEditorModal';
+
+        let lineupHTML = '<div class="lineup-editor">';
+
+        // 現在の守備位置一覧
+        lineupHTML += '<h4>現在の守備陣</h4>';
+        lineupHTML += '<div class="lineup-grid">';
+
+        const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
+        if (game.dhRule && game.dhActive) {
+            positions.push('DH');
+        }
+
+        positions.forEach((pos, index) => {
+            const player = activePlayers.find(p => p.position === pos);
+            const playerName = player ? player.name : '(未配置)';
+            const playerId = player ? player.id : '';
+
+            lineupHTML += `
+                <div class="lineup-row" data-position="${pos}">
+                    <span class="position-label">${pos}</span>
+                    <select class="player-select" id="pos_${pos}" data-position="${pos}">
+                        <option value="">-- 選択 --</option>
+                        ${activePlayers.map(p => `
+                            <option value="${p.id}" ${p.id === playerId ? 'selected' : ''}>
+                                ${p.name} ${p.position !== pos ? `(現${p.position})` : ''}
+                            </option>
+                        `).join('')}
+                        ${benchPlayers.length > 0 ? '<optgroup label="控え選手">' : ''}
+                        ${benchPlayers.map(p => `
+                            <option value="${p.id}">${p.name}</option>
+                        `).join('')}
+                        ${benchPlayers.length > 0 ? '</optgroup>' : ''}
+                        ${game.playerDetailLevel !== 'detailed' ? '<option value="new">新規入力...</option>' : ''}
+                    </select>
+                    <button class="btn btn-sm btn-icon" data-action="swap" data-position="${pos}">⇄</button>
+                </div>
+            `;
+        });
+
+        lineupHTML += '</div>';
+        lineupHTML += '</div>';
+
+        modal.innerHTML = `
+            <div class="modal-content modal-content-wide">
+                <h3>守備位置編集</h3>
+                ${lineupHTML}
+                <div class="button-group">
+                    <button class="btn btn-primary" id="saveLineupBtn">確定</button>
+                    <button class="btn btn-secondary" id="cancelLineupBtn">キャンセル</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 選手選択の変更を監視して、新規入力が選ばれた場合の処理
+        document.querySelectorAll('.player-select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                if (e.target.value === 'new') {
+                    const position = e.target.dataset.position;
+                    this.showNewPlayerInputForPosition(team, position, (newPlayer) => {
+                        // 新規選手を追加
+                        game.players[team].push(newPlayer);
+                        // セレクトボックスを更新
+                        const option = document.createElement('option');
+                        option.value = newPlayer.id;
+                        option.textContent = newPlayer.name;
+                        option.selected = true;
+                        e.target.insertBefore(option, e.target.querySelector('option[value="new"]'));
+                    });
+                }
+            });
+        });
+
+        // 位置入れ替えボタンのイベント
+        document.querySelectorAll('[data-action="swap"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const position = e.target.dataset.position;
+                this.showSwapPositionModal(team, position);
+            });
+        });
+
+        document.getElementById('saveLineupBtn').addEventListener('click', () => {
+            this.processFullLineupChange(team, isPending);
+            modal.remove();
+        });
+
+        document.getElementById('cancelLineupBtn').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    showNewPlayerInputForPosition(team, position, callback) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'newPlayerInputModal';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${position} の新規選手</h3>
+                <div class="form-group">
+                    <label>選手名:</label>
+                    <input type="text" id="newPlayerName" class="form-control" placeholder="選手名を入力">
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-primary" id="addNewPlayerBtn">追加</button>
+                    <button class="btn btn-secondary" id="cancelNewPlayerBtn">キャンセル</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('addNewPlayerBtn').addEventListener('click', () => {
+            const name = document.getElementById('newPlayerName').value.trim();
+            if (!name) {
+                this.showError('選手名を入力してください');
+                return;
+            }
+
+            const newPlayer = {
+                id: Date.now(),
+                name: name,
+                team: team,
+                position: position,
+                battingOrder: null,
+                isActive: true,
+                isBench: false,
+                isStarter: false,
+                enteredGameAt: new Date().toISOString(),
+                stats: {
+                    atBats: 0,
+                    hits: 0,
+                    runs: 0,
+                    rbis: 0,
+                    walks: 0,
+                    strikeouts: 0,
+                    errors: 0
+                }
+            };
+
+            modal.remove();
+            callback(newPlayer);
+        });
+
+        document.getElementById('cancelNewPlayerBtn').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    showSwapPositionModal(team, currentPosition) {
+        const game = gameManager.currentGame;
+        const activePlayers = game.players[team].filter(p => p.isActive);
+        const currentPlayer = activePlayers.find(p => p.position === currentPosition);
+
+        if (!currentPlayer) {
+            this.showError('現在の位置に選手がいません');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'swapPositionModal';
+
+        const otherPlayers = activePlayers.filter(p => p.id !== currentPlayer.id);
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${currentPlayer.name} (${currentPosition}) と交換</h3>
+                <div class="player-list">
+                    ${otherPlayers.map(p => `
+                        <button class="btn btn-player" data-player-id="${p.id}">
+                            ${p.name} (${p.position})
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="btn btn-secondary" id="cancelSwapBtn">キャンセル</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.querySelectorAll('.btn-player').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetPlayerId = parseInt(btn.dataset.playerId);
+                const targetPlayer = activePlayers.find(p => p.id === targetPlayerId);
+
+                // 守備位置を入れ替え
+                const tempPos = currentPlayer.position;
+                currentPlayer.position = targetPlayer.position;
+                targetPlayer.position = tempPos;
+
+                // セレクトボックスを更新
+                document.getElementById(`pos_${currentPosition}`).value = targetPlayer.id;
+                document.getElementById(`pos_${targetPlayer.position}`).value = currentPlayer.id;
+
+                modal.remove();
+                this.showSuccess(`${currentPlayer.name} と ${targetPlayer.name} の守備位置を入れ替えました`);
+            });
+        });
+
+        document.getElementById('cancelSwapBtn').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    processFullLineupChange(team, isPending) {
+        const game = gameManager.currentGame;
+        const changes = [];
+
+        const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
+        if (game.dhRule && game.dhActive) {
+            positions.push('DH');
+        }
+
+        positions.forEach(pos => {
+            const select = document.getElementById(`pos_${pos}`);
+            if (!select) return;
+
+            const newPlayerId = parseInt(select.value);
+            if (!newPlayerId) return;
+
+            const currentPlayer = game.players[team].find(p => p.position === pos && p.isActive);
+            const newPlayer = game.players[team].find(p => p.id === newPlayerId);
+
+            if (newPlayer && (!currentPlayer || currentPlayer.id !== newPlayer.id)) {
+                // 守備位置が変更された
+                if (currentPlayer) {
+                    currentPlayer.isActive = false;
+                    currentPlayer.substitutedBy = newPlayer.id;
+                    currentPlayer.substitutedAt = new Date().toISOString();
+                }
+
+                newPlayer.position = pos;
+                newPlayer.isActive = true;
+                if (newPlayer.isBench) {
+                    newPlayer.enteredGameAt = new Date().toISOString();
+                    newPlayer.isBench = false;
+                }
+
+                changes.push({
+                    position: pos,
+                    out: currentPlayer ? currentPlayer.name : null,
+                    in: newPlayer.name
+                });
+            }
+        });
+
+        if (changes.length > 0) {
+            if (!game.substitutionHistory) {
+                game.substitutionHistory = [];
+            }
+
+            game.substitutionHistory.push({
+                type: 'defensive_shift',
+                inning: game.currentInning,
+                isTopHalf: game.isTopHalf,
+                changes: changes,
+                timestamp: new Date().toISOString()
+            });
+
+            // 仮状態を解除
+            if (isPending && game.pendingLineupChanges && game.pendingLineupChanges[team]) {
+                delete game.pendingLineupChanges[team];
+            }
+
+            gameManager.saveGame();
+            this.updateUI();
+            this.showSuccess(`守備位置を変更しました（${changes.length}件）`);
+        } else {
+            this.showInfo('変更はありませんでした');
+        }
+    }
+
+    // ===== 仮状態ラインナップの編集機能 =====
+
+    checkPendingLineupChanges() {
+        const game = gameManager.currentGame;
+        if (!game.pendingLineupChanges) return;
+
+        const teams = Object.keys(game.pendingLineupChanges);
+        if (teams.length > 0) {
+            // UIに警告表示を追加
+            this.showPendingLineupWarning(teams);
+        }
+    }
+
+    showPendingLineupWarning(teams) {
+        const warningDiv = document.getElementById('pending-lineup-warning');
+        if (!warningDiv) return;
+
+        const teamNames = teams.map(t => t === 'home' ? gameManager.currentGame.homeTeam : gameManager.currentGame.awayTeam);
+
+        warningDiv.innerHTML = `
+            <div class="warning-banner">
+                <span>⚠️ ${teamNames.join('、')} の守備位置が未確定です</span>
+                <button class="btn btn-sm btn-warning" id="editPendingLineupBtn">今すぐ編集</button>
+            </div>
+        `;
+
+        warningDiv.style.display = 'block';
+
+        document.getElementById('editPendingLineupBtn').addEventListener('click', () => {
+            this.showPendingLineupEditor(teams[0]);
+        });
+    }
+
+    showPendingLineupEditor(team) {
+        this.showFullLineupEditor(team, true);
+    }
+
+    // ===== 「打」「走」の強制守備交代処理 =====
+
+    async showSubstituteDefensivePositionScreen(battingTeam, substitutePlayers) {
+        if (!substitutePlayers || substitutePlayers.length === 0) {
+            return;
+        }
+
+        for (const player of substitutePlayers) {
+            await this.showMandatoryDefensiveSubstitutionModal(battingTeam, player);
+        }
+    }
+
+    async showMandatoryDefensiveSubstitutionModal(team, player) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.id = 'mandatoryDefSubModal';
+
+            const substituteType = player.position === '打' ? '代打' : '代走';
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>守備交代が必要です</h3>
+                    <p>${player.name} (${substituteType}) の守備位置を決定してください</p>
+                    <div class="button-group">
+                        <button class="btn btn-primary" id="keepPlayerNameBtn">このまま守備位置を割り当てる</button>
+                        <button class="btn btn-primary" id="changePlayerNameBtn">別の選手に交代する</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            document.getElementById('keepPlayerNameBtn').addEventListener('click', () => {
+                modal.remove();
+                this.showMandatoryPositionSelection(team, player, true, resolve);
+            });
+
+            document.getElementById('changePlayerNameBtn').addEventListener('click', () => {
+                modal.remove();
+                this.showMandatoryReplacementPlayer(team, player, resolve);
+            });
+        });
+    }
+
+    showMandatoryPositionSelection(team, player, keepName, resolve) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'mandatoryPosSelectModal';
+
+        const positions = ['P', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'C', 'DH'];
+        let positionOptions = '';
+        positions.forEach(pos => {
+            positionOptions += `<button class="btn btn-position" data-position="${pos}">${pos}</button>`;
+        });
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>守備位置を選択: ${player.name}</h3>
+                <div class="position-grid">
+                    ${positionOptions}
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.querySelectorAll('.btn-position').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const position = btn.dataset.position;
+                modal.remove();
+                this.processMandatoryDefensiveSubstitution(team, player, position, keepName);
+                resolve();
+            });
+        });
+    }
+
+    showMandatoryReplacementPlayer(team, playerToReplace, resolve) {
+        const detailLevel = gameManager.currentGame.playerDetailLevel;
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'mandatoryReplacementModal';
+
+        let content = `
+            <div class="modal-content">
+                <h3>${playerToReplace.name} に代わる選手</h3>
+        `;
+
+        if (detailLevel === 'detailed') {
+            const benchPlayers = gameManager.currentGame.players[team].filter(
+                p => p.isBench && p.isActive && !p.substitutedBy
+            );
+
+            if (benchPlayers.length === 0) {
+                content += `<p>利用可能な控え選手がいません</p>`;
+            } else {
+                content += `<div class="player-list">`;
+                benchPlayers.forEach(player => {
+                    content += `
+                        <button class="btn btn-player" data-player-id="${player.id}">
+                            ${player.name}
+                        </button>
+                    `;
+                });
+                content += `</div>`;
+            }
+        } else {
+            content += `
+                <div class="form-group">
+                    <label>選手名を入力:</label>
+                    <input type="text" id="mandatoryReplacementName" class="form-control" placeholder="選手名">
+                </div>
+                <button class="btn btn-primary" id="submitMandatoryReplaceBtn">次へ</button>
+            `;
+        }
+
+        content += `</div>`;
+
+        modal.innerHTML = content;
+        document.body.appendChild(modal);
+
+        if (detailLevel === 'detailed') {
+            document.querySelectorAll('.btn-player').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const playerId = parseInt(btn.dataset.playerId);
+                    const replacementPlayer = gameManager.currentGame.players[team].find(p => p.id === playerId);
+                    modal.remove();
+                    this.showMandatoryPositionForReplacement(team, playerToReplace, replacementPlayer, resolve);
+                });
+            });
+        } else {
+            document.getElementById('submitMandatoryReplaceBtn').addEventListener('click', () => {
+                const name = document.getElementById('mandatoryReplacementName').value.trim();
+                if (!name) {
+                    this.showError('選手名を入力してください');
+                    return;
+                }
+
+                const newPlayer = {
+                    name: name,
+                    team: team,
+                    position: null,
+                    battingOrder: playerToReplace.battingOrder,
+                    isActive: true,
+                    isBench: false,
+                    isStarter: false
+                };
+
+                modal.remove();
+                this.showMandatoryPositionForReplacement(team, playerToReplace, newPlayer, resolve);
+            });
+        }
+    }
+
+    showMandatoryPositionForReplacement(team, playerToReplace, replacementPlayer, resolve) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'mandatoryPosReplaceModal';
+
+        const positions = ['P', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'C', 'DH'];
+        let positionOptions = '';
+        positions.forEach(pos => {
+            positionOptions += `<button class="btn btn-position" data-position="${pos}">${pos}</button>`;
+        });
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>守備位置を選択: ${replacementPlayer.name}</h3>
+                <div class="position-grid">
+                    ${positionOptions}
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.querySelectorAll('.btn-position').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const position = btn.dataset.position;
+                modal.remove();
+                this.processMandatoryDefensiveSubstitutionWithReplacement(team, playerToReplace, replacementPlayer, position);
+                resolve();
+            });
+        });
+    }
+
+    processMandatoryDefensiveSubstitution(team, player, newPosition, keepName) {
+        player.position = newPosition;
+        player.needsDefensiveSubstitution = false;
+        player.isPinchHitter = false;
+        player.isPinchRunner = false;
+
+        if (!gameManager.currentGame.substitutionHistory) {
+            gameManager.currentGame.substitutionHistory = [];
+        }
+
+        gameManager.currentGame.substitutionHistory.push({
+            type: 'mandatory_defensive_change',
+            inning: gameManager.currentGame.currentInning,
+            isTopHalf: gameManager.currentGame.isTopHalf,
+            playerOut: null,
+            playerIn: player.name,
+            position: newPosition,
+            timestamp: new Date().toISOString()
+        });
+
+        gameManager.saveGame();
+        this.updateUI();
+        this.showSuccess(`${player.name} を ${newPosition} に配置しました`);
+    }
+
+    processMandatoryDefensiveSubstitutionWithReplacement(team, playerToReplace, replacementPlayer, newPosition) {
+        playerToReplace.isActive = false;
+        playerToReplace.substitutedBy = replacementPlayer.id || Date.now();
+        playerToReplace.substitutedAt = new Date().toISOString();
+        playerToReplace.needsDefensiveSubstitution = false;
+
+        if (!replacementPlayer.id) {
+            replacementPlayer.id = Date.now();
+            gameManager.currentGame.players[team].push(replacementPlayer);
+        }
+
+        replacementPlayer.position = newPosition;
+        replacementPlayer.battingOrder = playerToReplace.battingOrder;
+        replacementPlayer.isActive = true;
+        replacementPlayer.enteredGameAt = new Date().toISOString();
+
+        if (!gameManager.currentGame.substitutionHistory) {
+            gameManager.currentGame.substitutionHistory = [];
+        }
+
+        gameManager.currentGame.substitutionHistory.push({
+            type: 'mandatory_defensive_substitution',
+            inning: gameManager.currentGame.currentInning,
+            isTopHalf: gameManager.currentGame.isTopHalf,
+            playerOut: playerToReplace.name,
+            playerIn: replacementPlayer.name,
+            position: newPosition,
+            timestamp: new Date().toISOString()
+        });
+
+        gameManager.saveGame();
+        this.updateUI();
+        this.showSuccess(`守備交代: ${replacementPlayer.name} が ${playerToReplace.name} に代わって ${newPosition} に入りました`);
+    }
+
+    // ===== DH制解除機能 =====
+
+    showCancelDHModal() {
+        const game = gameManager.currentGame;
+
+        if (!game.dhRule || !game.dhActive) {
+            this.showError('DH制は既に解除されているか、使用されていません');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'cancelDHModal';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>DH制解除の確認</h3>
+                <p>DH制を解除すると、投手が打順に入ります。</p>
+                <p><strong>注意: 一度解除すると、この試合中は復活できません。</strong></p>
+                <div class="button-group">
+                    <button class="btn btn-warning" id="confirmCancelDHBtn">DH制を解除する</button>
+                    <button class="btn btn-secondary" id="cancelCancelDHBtn">キャンセル</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('confirmCancelDHBtn').addEventListener('click', () => {
+            modal.remove();
+            this.processCancelDH();
+        });
+
+        document.getElementById('cancelCancelDHBtn').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    processCancelDH() {
+        const game = gameManager.currentGame;
+        const battingTeam = game.isTopHalf ? 'away' : 'home';
+
+        // DHの選手を探す
+        const dhPlayer = game.players[battingTeam].find(p => p.position === 'DH' && p.isActive);
+
+        if (!dhPlayer) {
+            this.showError('DH選手が見つかりません');
+            return;
+        }
+
+        // 現在の投手を探す
+        const pitcher = game.players[battingTeam].find(p => p.position === 'P' && p.isActive);
+
+        if (!pitcher) {
+            this.showError('投手が見つかりません');
+            return;
+        }
+
+        // DH制を解除
+        game.dhActive = false;
+
+        // DHの選手を退場させる
+        dhPlayer.isActive = false;
+        dhPlayer.substitutedBy = pitcher.id;
+        dhPlayer.substitutedAt = new Date().toISOString();
+
+        // 投手がDHの打順を引き継ぐ
+        pitcher.battingOrder = dhPlayer.battingOrder;
+
+        // 交代履歴に記録
+        if (!game.substitutionHistory) {
+            game.substitutionHistory = [];
+        }
+
+        game.substitutionHistory.push({
+            type: 'dh_cancelled',
+            inning: game.currentInning,
+            isTopHalf: game.isTopHalf,
+            playerOut: dhPlayer.name,
+            playerIn: pitcher.name,
+            position: 'P',
+            battingOrder: pitcher.battingOrder,
+            timestamp: new Date().toISOString()
+        });
+
+        gameManager.saveGame();
+        this.updateUI();
+        this.showSuccess(`DH制を解除しました。${pitcher.name} が ${dhPlayer.battingOrder} 番打者として打順に入りました`);
+    }
+
     setupPitchLevelInterface(container) {
         container.innerHTML = `
             <div class="pitch-interface">
@@ -2671,58 +6926,32 @@ class BaseballApp {
                     </div>
                 </div>
 
-                <div class="pitch-input-section">
-                    <h4>投球詳細</h4>
-                    <div class="pitch-details">
-                        <div class="input-group">
-                            <label for="pitchType">球種:</label>
-                            <select id="pitchType">
-                                <option value="fastball">ストレート</option>
-                                <option value="curveball">カーブ</option>
-                                <option value="slider">スライダー</option>
-                                <option value="changeup">チェンジアップ</option>
-                                <option value="forkball">フォーク</option>
-                                <option value="sinker">シンカー</option>
-                                <option value="cutter">カッター</option>
-                                <option value="knuckle">ナックル</option>
-                            </select>
-                        </div>
-
-                        <div class="input-group">
-                            <label for="velocity">球速:</label>
-                            <input type="number" id="velocity" placeholder="km/h" min="50" max="180">
-                        </div>
-
-                        <div class="input-group">
-                            <label for="pitchLocation">コース:</label>
-                            <select id="pitchLocation">
-                                <option value="">選択してください</option>
-                                <option value="strike_zone_1">ストライクゾーン内角高め</option>
-                                <option value="strike_zone_2">ストライクゾーン真ん中高め</option>
-                                <option value="strike_zone_3">ストライクゾーン外角高め</option>
-                                <option value="strike_zone_4">ストライクゾーン内角</option>
-                                <option value="strike_zone_5">ストライクゾーン真ん中</option>
-                                <option value="strike_zone_6">ストライクゾーン外角</option>
-                                <option value="strike_zone_7">ストライクゾーン内角低め</option>
-                                <option value="strike_zone_8">ストライクゾーン真ん中低め</option>
-                                <option value="strike_zone_9">ストライクゾーン外角低め</option>
-                                <option value="outside">ボールゾーン</option>
-                            </select>
-                        </div>
+                <div class="pitch-type-section">
+                    <h4>球種<span class="optional-label">（任意）</span></h4>
+                    <div class="pitch-type-buttons">
+                        <button class="pitch-type-btn" data-type="直球">直球</button>
+                        <button class="pitch-type-btn" data-type="スライダー">スラ</button>
+                        <button class="pitch-type-btn" data-type="カーブ">カーブ</button>
+                        <button class="pitch-type-btn" data-type="フォーク">フォーク</button>
+                        <button class="pitch-type-btn" data-type="チェンジアップ">チェンジ</button>
+                        <button class="pitch-type-btn" data-type="カットボール">カット</button>
+                        <button class="pitch-type-btn" data-type="シュート">シュート</button>
+                        <button class="pitch-type-btn" data-type="ツーシーム">2シーム</button>
+                        <button class="pitch-type-btn" data-type="シンカー">シンカー</button>
                     </div>
                 </div>
 
                 <div class="pitch-result-section">
-                    <h4>投球結果</h4>
+                    <h4 data-i18n="pitchResult">投球結果</h4>
                     <div class="pitch-result-buttons">
-                        <button class="pitch-result-btn" data-result="ball">ボール</button>
-                        <button class="pitch-result-btn" data-result="strike_looking">見逃しストライク</button>
-                        <button class="pitch-result-btn" data-result="strike_swinging">空振りストライク</button>
-                        <button class="pitch-result-btn" data-result="foul">ファウル</button>
-                        <button class="pitch-result-btn" data-result="hit">打球</button>
-                        <button class="pitch-result-btn" data-result="bunt">バント</button>
-                        <button class="pitch-result-btn" data-result="wild_pitch">暴投</button>
-                        <button class="pitch-result-btn" data-result="passed_ball">捕逸</button>
+                        <button class="pitch-result-btn" data-result="ball" data-i18n="pitch_ball">見逃しボール</button>
+                        <button class="pitch-result-btn" data-result="strike_looking" data-i18n="pitch_strike_looking">見逃しストライク</button>
+                        <button class="pitch-result-btn" data-result="strike_swinging" data-i18n="pitch_strike_swinging">空振り（チップ捕球含む）</button>
+                        <button class="pitch-result-btn" data-result="foul" data-i18n="pitch_foul">ファウルボール（チップ落球含む）</button>
+                        <button class="pitch-result-btn" data-result="foul_bunt" data-i18n="pitch_foul_bunt">バントファウル</button>
+                        <button class="pitch-result-btn" data-result="foul_fly_dropped" data-i18n="pitch_foul_fly_dropped">ファウルフライ落球</button>
+                        <button class="pitch-result-btn" data-result="hit" data-i18n="pitch_hit">フェア（打球）</button>
+                        <button class="pitch-result-btn" data-result="hit_by_pitch" data-i18n="pitch_hit_by_pitch">死球</button>
                     </div>
                 </div>
 
@@ -2748,7 +6977,7 @@ class BaseballApp {
 
                 <div class="pitch-controls">
                     <button id="recordPitch" class="primary-btn">投球記録</button>
-                    <button id="undoLastPitch" class="secondary-btn">前球取消</button>
+                    <button id="undoLastPitch" class="undo-btn" disabled>前プレー取消</button>
                 </div>
 
                 <div class="pitch-history">
@@ -2772,6 +7001,13 @@ class BaseballApp {
                         </div>
                     </div>
                     <button id="completeAtBat" class="primary-btn">打席完了</button>
+                    <button id="undoLastAtBatBtn" class="undo-btn" data-i18n="undoLastAtBat">前打席に戻す</button>
+                </div>
+
+                <div class="earned-runs-adjust">
+                    <span data-i18n="earnedRunsLabel">自責点</span>: <span id="currentInningEarnedRuns">0</span>
+                    <button id="markUnearnedBtn" class="stat-btn" disabled data-i18n="markUnearned">−自責点</button>
+                    <button id="undoMarkUnearnedBtn" class="stat-btn" disabled data-i18n="undoMarkUnearned">+自責点</button>
                 </div>
             </div>
         `;
@@ -2781,6 +7017,18 @@ class BaseballApp {
     }
 
     setupPitchEventListeners() {
+        const pitchTypeButtons = document.querySelectorAll('.pitch-type-btn');
+        pitchTypeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.classList.contains('selected')) {
+                    btn.classList.remove('selected'); // toggle off
+                } else {
+                    pitchTypeButtons.forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                }
+            });
+        });
+
         const pitchResultButtons = document.querySelectorAll('.pitch-result-btn');
         pitchResultButtons.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -2794,7 +7042,11 @@ class BaseballApp {
         });
 
         document.getElementById('undoLastPitch').addEventListener('click', () => {
-            this.undoLastPitch();
+            this.undoLastPitchAction();
+        });
+
+        document.getElementById('undoLastAtBatBtn').addEventListener('click', () => {
+            this.undoLastAtBat();
         });
 
         document.getElementById('completeAtBat').addEventListener('click', () => {
@@ -2813,6 +7065,11 @@ class BaseballApp {
         document.getElementById('recordBaserunningPlay').addEventListener('click', () => {
             this.recordBaserunningPlay();
         });
+
+        const pMarkBtn = document.getElementById('markUnearnedBtn');
+        if (pMarkBtn) pMarkBtn.addEventListener('click', () => this.addMarkUnearned());
+        const pUndoMarkBtn = document.getElementById('undoMarkUnearnedBtn');
+        if (pUndoMarkBtn) pUndoMarkBtn.addEventListener('click', () => this.addUndoMarkUnearned());
 
         // 走者がいる場合のみ走者プレーセクションを表示
         this.updateBaserunningSection();
@@ -2897,7 +7154,23 @@ class BaseballApp {
             const playType = selectedPlay.dataset.play;
             const runnerBase = runnerSelect.value;
 
+            // プレー実行前に状態を記録（undo用）
+            if (!this.pitchActionHistory) this.pitchActionHistory = [];
+            const g = gameManager.currentGame;
+            this.pitchActionHistory.push({
+                type: 'baserunning',
+                playType,
+                snapshot: {
+                    runnersOnBase: JSON.parse(JSON.stringify(g.runnersOnBase)),
+                    outs: g.outs,
+                    homeScore: g.homeScore,
+                    awayScore: g.awayScore,
+                    inningRuns: gameManager.currentInning?.runs ?? 0
+                }
+            });
+
             await this.processBaserunningPlay(playType, runnerBase);
+            this._updatePitchUndoBtn();
 
             // 表示更新
             this.updateGameDisplay();
@@ -2957,16 +7230,23 @@ class BaseballApp {
         const runners = gameManager.currentGame.runnersOnBase;
         const runnerId = runners[runnerBase];
 
-        // 走者を次の塁に進める
+        // 走者を次の塁に進める（自責点ステータスも引き継ぐ）
         runners[runnerBase] = null;
 
         if (runnerBase === 'first') {
             runners.second = runnerId;
+            gameManager.moveRunnerEarnedStatus('first', 'second');
+            gameManager.moveRunnerResponsiblePitcher('first', 'second');
         } else if (runnerBase === 'second') {
             runners.third = runnerId;
+            gameManager.moveRunnerEarnedStatus('second', 'third');
+            gameManager.moveRunnerResponsiblePitcher('second', 'third');
         } else if (runnerBase === 'third') {
-            // ホームスチール（得点）
-            gameManager.addRuns(1);
+            // ホームスチール（得点）：盗塁は自責点
+            const wasEarned = gameManager.moveRunnerEarnedStatus('third', null);
+            gameManager.moveRunnerResponsiblePitcher('third', null);
+            const virtualOuts = (gameManager.currentInning && gameManager.currentInning.virtualOuts) || 0;
+            gameManager.addRuns(1, (wasEarned && virtualOuts < 3) ? 1 : 0);
         }
 
         this.showSuccess(`${runnerBase === 'first' ? '1' : runnerBase === 'second' ? '2' : '3'}塁走者が盗塁成功しました`);
@@ -3005,21 +7285,28 @@ class BaseballApp {
     processBalk() {
         const runners = gameManager.currentGame.runnersOnBase;
 
-        // 全走者1塁進塁
+        // 全走者1塁進塁（ボークは自責点：自責点ステータスを引き継ぐ）
         if (runners.third) {
             // 3塁走者は得点
-            gameManager.addRuns(1);
+            const wasEarned = gameManager.moveRunnerEarnedStatus('third', null);
+            gameManager.moveRunnerResponsiblePitcher('third', null);
+            const virtualOuts = (gameManager.currentInning && gameManager.currentInning.virtualOuts) || 0;
+            gameManager.addRuns(1, (wasEarned && virtualOuts < 3) ? 1 : 0);
             runners.third = null;
         }
 
         if (runners.second) {
             runners.third = runners.second;
             runners.second = null;
+            gameManager.moveRunnerEarnedStatus('second', 'third');
+            gameManager.moveRunnerResponsiblePitcher('second', 'third');
         }
 
         if (runners.first) {
             runners.second = runners.first;
             runners.first = null;
+            gameManager.moveRunnerEarnedStatus('first', 'second');
+            gameManager.moveRunnerResponsiblePitcher('first', 'second');
         }
 
         this.showSuccess('ボークにより全走者が1塁進塁しました');
@@ -3080,19 +7367,31 @@ class BaseballApp {
         const pitches = gameManager.currentAtBat.pitches || [];
 
         if (pitches.length === 0) {
-            historyEl.innerHTML = `<p class="no-pitches">${i18n.t('noPitchesYet')}</p>`;
+            historyEl.innerHTML = `<p class="no-pitches">まだ投球がありません</p>`;
             return;
         }
 
-        historyEl.innerHTML = pitches.map((pitch, index) => `
-            <div class="pitch-item">
+        const resultLabels = {
+            'ball': i18n.t('pitch_ball'),
+            'strike_looking': i18n.t('pitch_strike_looking'),
+            'strike_swinging': i18n.t('pitch_strike_swinging'),
+            'foul': i18n.t('pitch_foul'),
+            'foul_bunt': i18n.t('pitch_foul_bunt'),
+            'foul_fly_dropped': i18n.t('pitch_foul_fly_dropped'),
+            'hit': i18n.t('pitch_hit'),
+            'hit_by_pitch': i18n.t('pitch_hit_by_pitch')
+        };
+
+        historyEl.innerHTML = pitches.map((pitch, index) => {
+            const typeTag = pitch.pitchType
+                ? `<span class="pitch-type-tag">${pitch.pitchType}</span>` : '';
+            return `<div class="pitch-item">
                 <span class="pitch-number">${index + 1}球目</span>
-                <span class="pitch-type">${BASEBALL_CONFIG.PITCH_TYPES[pitch.pitchType] || pitch.pitchType}</span>
-                <span class="pitch-velocity">${pitch.velocity ? pitch.velocity + 'km/h' : '-'}</span>
-                <span class="pitch-result">${BASEBALL_CONFIG.PITCH_RESULTS[pitch.result] || pitch.result}</span>
-                <span class="pitch-count">${pitch.count.balls}-${pitch.count.strikes}</span>
-            </div>
-        `).join('');
+                ${typeTag}
+                <span class="pitch-result">${resultLabels[pitch.result] || pitch.result}</span>
+                <span class="pitch-count">${pitch.count.balls}B-${pitch.count.strikes}S</span>
+            </div>`;
+        }).join('');
     }
 
     setupInningEventListeners() {
@@ -3109,31 +7408,24 @@ class BaseballApp {
         });
 
         // 他のボタンのイベントリスナーも重複登録を防ぐため削除してから追加
-        ['addHit', 'undoHit', 'addError', 'undoError', 'endHalfInning', 'correctInning', 'saveInning'].forEach(id => {
+        ['addHit', 'addError', 'undoInningAction', 'endHalfInning', 'saveInning'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
                 const newBtn = btn.cloneNode(true);
                 btn.parentNode.replaceChild(newBtn, btn);
 
-                // イベントリスナーを追加
                 switch(id) {
                     case 'addHit':
                         newBtn.addEventListener('click', () => this.addHit());
                         break;
-                    case 'undoHit':
-                        newBtn.addEventListener('click', () => this.undoHit());
-                        break;
                     case 'addError':
                         newBtn.addEventListener('click', () => this.addError());
                         break;
-                    case 'undoError':
-                        newBtn.addEventListener('click', () => this.undoError());
+                    case 'undoInningAction':
+                        newBtn.addEventListener('click', () => this.undoLastInningAction());
                         break;
                     case 'endHalfInning':
                         newBtn.addEventListener('click', () => this.endHalfInning());
-                        break;
-                    case 'correctInning':
-                        newBtn.addEventListener('click', () => this.showInningCorrectionModal());
                         break;
                     case 'saveInning':
                         newBtn.addEventListener('click', () => this.saveCurrentInning());
@@ -3145,54 +7437,134 @@ class BaseballApp {
 
     addRuns(runs) {
         if (!gameManager.currentInning) return;
-
-        console.log('addRuns called with:', runs);
-        console.log('Before - Inning hits:', gameManager.currentInning.hits);
-        console.log('Before - Inning runs:', gameManager.currentInning.runs);
-
         gameManager.addRuns(runs);
-
-        console.log('After - Inning hits:', gameManager.currentInning.hits);
-        console.log('After - Inning runs:', gameManager.currentInning.runs);
-
+        if (!this.inningActionHistory) this.inningActionHistory = [];
+        this.inningActionHistory.push({ type: 'runs', amount: runs });
         this.updateCurrentInningDisplay();
         this.updateGameDisplay();
+        this._updateInningUndoBtn();
     }
 
     addHit() {
         if (!gameManager.currentInning) return;
-
-        // GameManagerのメソッドを使ってヒット数を更新
         gameManager.addHit();
+        if (!this.inningActionHistory) this.inningActionHistory = [];
+        this.inningActionHistory.push({ type: 'hit' });
         this.updateCurrentInningDisplay();
         this.updateGameDisplay();
-    }
-
-    undoHit() {
-        if (!gameManager.currentInning) return;
-
-        // GameManagerのメソッドを使ってヒット数を取り消し
-        gameManager.undoHit();
-        this.updateCurrentInningDisplay();
-        this.updateGameDisplay();
+        this._updateInningUndoBtn();
     }
 
     addError() {
         if (!gameManager.currentInning) return;
-
-        // GameManagerのメソッドを使ってエラー数を更新
         gameManager.addError();
+        if (!this.inningActionHistory) this.inningActionHistory = [];
+        this.inningActionHistory.push({ type: 'error' });
         this.updateCurrentInningDisplay();
         this.updateGameDisplay();
+        this._updateInningUndoBtn();
     }
 
-    undoError() {
-        if (!gameManager.currentInning) return;
-
-        // GameManagerのメソッドを使ってエラー数を取り消し
-        gameManager.undoError();
+    undoLastInningAction() {
+        if (!gameManager.currentInning || !this.inningActionHistory?.length) return;
+        const last = this.inningActionHistory.pop();
+        if (last.type === 'runs') {
+            gameManager.undoRuns(last.amount);
+        } else if (last.type === 'hit') {
+            gameManager.undoHit();
+        } else if (last.type === 'error') {
+            gameManager.undoError();
+        } else if (last.type === 'unearned') {
+            gameManager.undoMarkUnearned(); // 非自責点化を取り消す（+1自責点）
+        } else if (last.type === 'undoUnearned') {
+            gameManager.markUnearned();     // undoMarkUnearned を取り消す（-1自責点）
+        }
         this.updateCurrentInningDisplay();
         this.updateGameDisplay();
+        this._updateInningUndoBtn();
+    }
+
+    markUnearned() {
+        if (!gameManager.currentInning) return;
+        if (!gameManager.markUnearned()) return; // 自責点が0なら何もしない
+        if (!this.inningActionHistory) this.inningActionHistory = [];
+        this.inningActionHistory.push({ type: 'unearned' });
+        this.updateCurrentInningDisplay();
+        this._updateInningUndoBtn();
+    }
+
+    addMarkUnearned() {
+        // batter/pitch モード用（履歴なし、直接調整）
+        if (!gameManager.currentInning) return;
+        gameManager.markUnearned();
+        this.updateCurrentInningDisplay();
+    }
+
+    addUndoMarkUnearned() {
+        // batter/pitch モード用（履歴なし、直接調整）
+        if (!gameManager.currentInning) return;
+        gameManager.undoMarkUnearned();
+        this.updateCurrentInningDisplay();
+    }
+
+    _updateInningUndoBtn() {
+        const btn = document.getElementById('undoInningAction');
+        if (!btn) return;
+        const history = this.inningActionHistory || [];
+        if (!history.length) {
+            btn.disabled = true;
+            btn.textContent = i18n.t('undo') || '取消';
+            return;
+        }
+        btn.disabled = false;
+        const last = history[history.length - 1];
+        const base = i18n.t('undo') || '取消';
+        if (last.type === 'runs') {
+            btn.textContent = `${base}: +${last.amount}${i18n.t('points') || '点'}`;
+        } else if (last.type === 'hit') {
+            btn.textContent = `${base}: H`;
+        } else if (last.type === 'error') {
+            btn.textContent = `${base}: E`;
+        } else if (last.type === 'unearned') {
+            btn.textContent = `${base}: ${i18n.t('markUnearned') || '−自責点'}`;
+        } else if (last.type === 'undoUnearned') {
+            btn.textContent = `${base}: ${i18n.t('undoMarkUnearned') || '+自責点'}`;
+        }
+    }
+
+    async undoLastAtBat() {
+        // 確認ダイアログ
+        const msg = i18n.t('undoLastAtBatConfirm') ||
+            '最後の打席を取り消してゲームの状態をその打席の直前に戻します。\nよろしいですか？';
+        if (!confirm(msg)) return;
+
+        try {
+            const snap = await gameManager.undoLastAtBat();
+
+            // イニングが変わっている可能性があるため画面全体を更新
+            this.updateGameDisplay();
+            this.updateCurrentInningDisplay();
+
+            // 記録レベル別の追加更新
+            const level = gameManager.currentGame?.recordingLevel;
+            if (level === 'pitch') {
+                this.pitchActionHistory = [];
+                this._updatePitchUndoBtn();
+                this.updatePitchDisplay();
+            } else if (level === 'batter') {
+                await this.loadAtBatHistory();
+                this.updateBatterDisplay();
+            }
+
+            const inningStr = `${snap.inningNumber ?? '?'}回${snap.isTopHalf ? '表' : '裏'}`;
+            this.showSuccess(
+                (i18n.t('undoLastAtBatDone') || '前打席を取り消しました。現在：{inning}')
+                    .replace('{inning}', inningStr)
+            );
+        } catch (err) {
+            console.error('前打席取り消しエラー:', err);
+            this.showError(err.message || '取り消しに失敗しました');
+        }
     }
 
     updateCurrentInningDisplay() {
@@ -3201,20 +7573,43 @@ class BaseballApp {
         const runsEl = document.getElementById('currentInningRuns');
         const hitsEl = document.getElementById('currentInningHits');
         const errorsEl = document.getElementById('currentInningErrors');
+        const earnedRunsEl = document.getElementById('currentInningEarnedRuns');
 
         if (runsEl) runsEl.textContent = gameManager.currentInning.runs;
         if (hitsEl) hitsEl.textContent = gameManager.currentInning.hits;
         if (errorsEl) errorsEl.textContent = gameManager.currentInning.errors;
+
+        const earned = gameManager.currentInning.earnedRuns ?? 0;
+        const totalRuns = gameManager.currentInning.runs ?? 0;
+        if (earnedRunsEl) earnedRunsEl.textContent = earned;
+
+        const markBtn = document.getElementById('markUnearnedBtn');
+        const undoMarkBtn = document.getElementById('undoMarkUnearnedBtn');
+        if (markBtn) markBtn.disabled = earned <= 0;
+        if (undoMarkBtn) undoMarkBtn.disabled = earned >= totalRuns;
     }
 
     async endHalfInning() {
         if (!gameManager.currentInning) return;
+
+        // スナップショットを保存（pending_confirm 時の「戻す」ボタン用）
+        this._endHalfInningSnap = {
+            runs: gameManager.currentInning.runs,
+            earnedRuns: gameManager.currentInning.earnedRuns ?? 0,
+            hits: gameManager.currentInning.hits,
+            errors: gameManager.currentInning.errors,
+            homeScore: gameManager.currentGame.homeScore,
+            awayScore: gameManager.currentGame.awayScore,
+            inningActionHistory: [...(this.inningActionHistory || [])]
+        };
 
         const notes = document.getElementById('inningNotes').value;
         gameManager.currentInning.notes = notes;
 
         try {
             await gameManager.endHalfInning();
+            this.inningActionHistory = [];
+            this._updateInningUndoBtn();
             this.updateGameDisplay();
             this.updateCurrentInningDisplay();
             this.loadInningHistory();
@@ -3222,7 +7617,13 @@ class BaseballApp {
             if (document.getElementById('inningNotes')) {
                 document.getElementById('inningNotes').value = '';
             }
+
+            // 試合が終了しなかった（次イニングへ進んだ）場合はスナップショット不要
+            if (gameManager.currentGame?.status === 'active') {
+                this._endHalfInningSnap = null;
+            }
         } catch (error) {
+            this._endHalfInningSnap = null;
             console.error('イニング終了エラー:', error);
             this.showError('イニングの終了に失敗しました');
         }
@@ -3250,9 +7651,6 @@ class BaseballApp {
         const game = gameManager.currentGame;
         const currentInning = game.currentInning;
         const isTopHalf = game.isTopHalf;
-
-        console.log('loadInningHistory - game.innings:', game.innings);
-        console.log('loadInningHistory - current inning:', currentInning, 'isTopHalf:', isTopHalf);
 
         let historyHTML = '';
 
@@ -3291,9 +7689,6 @@ class BaseballApp {
     getInningStats(inningNumber, isTopHalf) {
         const innings = gameManager.currentGame.innings || [];
         const inning = innings.find(i => i.inning === inningNumber && i.isTopHalf === isTopHalf);
-
-        console.log(`getInningStats(${inningNumber}, ${isTopHalf}) - found inning:`, inning);
-
         return inning ? { runs: inning.runs, hits: inning.hits, errors: inning.errors } : { runs: 0, hits: 0, errors: 0 };
     }
 
@@ -3334,8 +7729,32 @@ class BaseballApp {
             if (batterContinues) {
                 // 打席継続の場合（牽制悪送球、ファウルフライ落球）
                 // エラー情報のみを処理して、打者はそのまま
+                const previousOuts = gameManager.currentGame.outs;
+
                 if (this.currentErrors && this.currentErrors.length > 0) {
                     await this.processErrors();
+                }
+
+                // 3アウトチェンジ判定（牽制悪送球で走者がアウトになった場合のみ）
+                // ※ファウルフライ落球はボールデッドで走者アウトは発生しない
+                if (gameManager.currentGame.outs >= 3 && previousOuts < 3) {
+                    // 打席継続フラグを立てる（次イニングは同じ打者）
+                    gameManager.currentGame.batterContinuesNextInning = true;
+
+                    await gameManager.saveGame();
+                    this.updateGameDisplay();
+
+                    // エラーリストをクリア
+                    this.currentErrors = [];
+                    this.updateErrorsList();
+
+                    this.showSuccess('エラー処理完了（3アウトチェンジ、打席継続）');
+
+                    // イニング終了処理
+                    await gameManager.endHalfInning();
+                    this.updateCurrentInningDisplay();
+                    this.loadInningHistory();
+                    return;
                 }
 
                 // 表示を更新
@@ -3359,6 +7778,65 @@ class BaseballApp {
                 await this.processErrors();
             }
 
+            // 走者の守備妨害処理
+            if (this.selectedInterferingRunner) {
+                // 現在の走者状態を保存（妨害処理前）
+                const currentRunners = { ...gameManager.currentGame.runnersOnBase };
+
+                // 妨害処理（妨害走者を削除してアウトカウント増加）
+                this.processRunnerInterference(this.selectedInterferingRunner);
+
+                // フォースプレイによる走者進塁を処理
+                const newRunners = { first: null, second: null, third: null };
+
+                // 妨害していない走者を適切に配置
+                // 1塁走者がいる場合は2塁に進塁（打者が1塁に行くため押し出される）
+                if (currentRunners.first && this.selectedInterferingRunner !== 'first') {
+                    newRunners.second = currentRunners.first;
+                }
+
+                // 2塁走者の処理
+                if (currentRunners.second && this.selectedInterferingRunner !== 'second') {
+                    // 1塁走者がいて3塁走者が妨害した場合は3塁へ進塁（押し出される）
+                    if (currentRunners.first && this.selectedInterferingRunner === 'third') {
+                        newRunners.third = currentRunners.second;
+                    } else {
+                        // それ以外は2塁に留まる
+                        newRunners.second = currentRunners.second;
+                    }
+                }
+
+                // 3塁走者の処理（妨害していない場合はそのまま）
+                if (currentRunners.third && this.selectedInterferingRunner !== 'third') {
+                    newRunners.third = currentRunners.third;
+                }
+
+                // 打者を一塁に配置
+                newRunners.first = 'batter';
+
+                const interferenceAdvancement = {
+                    newRunners: newRunners,
+                    runsScored: 0,
+                    batterResult: 1,
+                    needsAdjustment: false,
+                    outsAdded: 0 // アウトは既にprocessRunnerInterferenceで加算済み
+                };
+
+                // 打球方向の情報を追加
+                const directionDetail = `${i18n.t('runner_interference')} (${i18n.t(this.selectedInterferingRunner + '_base_runner')})`;
+                const finalDetail = resultDetail ? `${resultDetail} - ${directionDetail}` : directionDetail;
+
+                await this.finalizeAtBat(result, finalDetail, interferenceAdvancement, batter);
+                return;
+            }
+
+            // ホームランの場合は柵越えか確認してからフロー分岐
+            if (result === 'homerun') {
+                const advancement = gameManager.calculateRunnerAdvancement(result);
+                this.showHomerunTypeModal(result, resultDetail, advancement, batter);
+                return;
+            }
+
             // 走者進塁・得点を自動計算
             const advancement = gameManager.calculateRunnerAdvancement(result);
 
@@ -3366,8 +7844,20 @@ class BaseballApp {
             if (advancement.needsAdjustment) {
                 this.showRunnerAdvancementModal(result, resultDetail, advancement, batter);
             } else {
-                // 自動計算結果でそのまま記録
-                await this.finalizeAtBat(result, resultDetail, advancement, batter);
+                // プレー開始前のアウト数を記録
+                const previousOuts = gameManager.currentGame.outs - (advancement.outsAdded || 0);
+
+                // ボールインプレー/デッド判定
+                const isPlayContinuing = gameManager.isPlayContinuing(result, previousOuts);
+
+                if (isPlayContinuing) {
+                    // ボールインプレー：追加プレー確認モーダルを表示
+                    this.showAdditionalPlayModal(result, resultDetail, advancement, batter);
+                } else {
+                    // ボールデッド：即座に完了してバナーを表示
+                    await this.finalizeAtBat(result, resultDetail, advancement, batter);
+                    this.showBallDeadBanner();
+                }
             }
 
         } catch (error) {
@@ -3383,6 +7873,22 @@ class BaseballApp {
         }
 
         return this.currentErrors.some(error => error.config.batterContinues);
+    }
+
+    processRunnerInterference(interferingRunner) {
+        // 妨害した走者を塁から削除
+        if (interferingRunner === 'first') {
+            gameManager.currentGame.runnersOnBase.first = null;
+        } else if (interferingRunner === 'second') {
+            gameManager.currentGame.runnersOnBase.second = null;
+        } else if (interferingRunner === 'third') {
+            gameManager.currentGame.runnersOnBase.third = null;
+        }
+
+        // アウトカウントを増やす
+        gameManager.currentGame.outs += 1;
+
+        console.log(`Runner interference: ${interferingRunner} runner is out. Outs: ${gameManager.currentGame.outs}`);
     }
 
     async processErrors() {
@@ -3514,13 +8020,40 @@ class BaseballApp {
         gameManager.currentGame.outs += outsAdded;
 
         if (runsScored > 0) {
-            gameManager.addRuns(runsScored);
+            // エラーによる進塁で得点した走者は非自責点（エラーがなければ起きなかった得点）
+            gameManager.addRuns(runsScored, 0);
         }
     }
 
     async finalizeAtBat(result, resultDetail, advancement, batter) {
-        // 走者進塁を適用
+        // 自責点・責任走者計算のために進塁前の走者状態を保存
+        const oldRunners = { ...gameManager.currentGame.runnersOnBase };
+        const oldEarnedStatus = { ...(gameManager.currentGame.runnersEarnedStatus || { first: true, second: true, third: true }) };
+        const oldResponsiblePitcher = { ...(gameManager.currentGame.runnersResponsiblePitcher || { first: null, second: null, third: null }) };
+
+        // 打者が自責点対象かを判定
+        const batterIsEarned = gameManager.isBatterEarned(result);
+
+        // 自責点計算
+        const { earnedRunsScored, newEarnedStatus } = gameManager.calculateEarnedAdvancement(
+            oldRunners, oldEarnedStatus, advancement.newRunners, advancement.runsScored, batterIsEarned
+        );
+
+        // 責任走者担当投手を計算
+        const midAtBatChange = gameManager.currentAtBat?.midAtBatPitchChange || null;
+        const newResponsiblePitcher = gameManager.calculateResponsiblePitcherAdvancement(
+            oldRunners, oldResponsiblePitcher, advancement.newRunners, advancement.runsScored, result, midAtBatChange
+        );
+
+        // 走者進塁を適用（自責点ステータス・責任投手も同時に更新）
         gameManager.currentGame.runnersOnBase = advancement.newRunners;
+        gameManager.currentGame.runnersEarnedStatus = newEarnedStatus;
+        gameManager.currentGame.runnersResponsiblePitcher = newResponsiblePitcher;
+
+        // エラーで出塁した場合は仮想アウトをインクリメント（打者が本来アウトになるべきだった）
+        if (!batterIsEarned && advancement.batterResult !== 'out') {
+            gameManager.incrementVirtualOuts();
+        }
 
         // カスタムアウトカウントがある場合は適用
         if (advancement.outsAdded) {
@@ -3535,13 +8068,8 @@ class BaseballApp {
                 advancement.playDescription;
         }
 
-        // 打席結果記録（カスタムアウトカウントがある場合は通常のアウト処理をスキップ）
-        if (advancement.outsAdded) {
-            // カスタムアウト処理の場合、recordAtBatResultでのアウト増加をスキップ
-            await gameManager.recordAtBatResult(result, finalResultDetail, advancement.runsScored, advancement.runsScored, true);
-        } else {
-            await gameManager.recordAtBatResult(result, finalResultDetail, advancement.runsScored, advancement.runsScored);
-        }
+        // 打席結果記録（自責点数を含む）
+        await gameManager.recordAtBatResult(result, finalResultDetail, advancement.runsScored, advancement.runsScored, earnedRunsScored);
 
         // リアルタイムUI: プレー履歴に追加
         if (window.realtimeUI && batter) {
@@ -3574,8 +8102,755 @@ class BaseballApp {
         this.updateGameDisplay();
         this.updateBatterDisplay();
         this.updateResultButtons();
+        this.updateCurrentInningDisplay(); // 自責点・仮想アウト表示を更新
         this.loadAtBatHistory();
         this.clearBatterForm();
+    }
+
+    showAdditionalPlayModal(result, resultDetail, advancement, batter) {
+        // 追加プレー確認用のデータを保存
+        this.pendingAtBat = {
+            result: result,
+            resultDetail: resultDetail,
+            advancement: advancement,
+            batter: batter
+        };
+
+        // モーダルを表示
+        const modal = document.getElementById('additionalPlayModal');
+        modal.classList.remove('modal--hidden');
+        i18n.updatePageContent(); // 翻訳を適用
+    }
+
+    hideAdditionalPlayModal() {
+        const modal = document.getElementById('additionalPlayModal');
+        modal.classList.add('modal--hidden');
+    }
+
+    showHomerunTypeModal(result, resultDetail, advancement, batter) {
+        this.pendingAtBat = { result, resultDetail, advancement, batter };
+        const modal = document.getElementById('homerunTypeModal');
+        modal.classList.remove('modal--hidden');
+        i18n.updatePageContent();
+    }
+
+    hideHomerunTypeModal() {
+        const modal = document.getElementById('homerunTypeModal');
+        modal.classList.add('modal--hidden');
+    }
+
+    async onHomerunFenceOver(isFenceOver) {
+        this.hideHomerunTypeModal();
+
+        if (!this.pendingAtBat) return;
+        const { result, resultDetail, advancement, batter } = this.pendingAtBat;
+        const fromPitch = this.fromPitchInterface;
+        this.fromPitchInterface = false;
+        this.pendingAtBat = null;
+
+        if (isFenceOver) {
+            // 柵越え = ボールデッド：即座に完了してバナーを表示
+            await this.finalizeAtBat(result, resultDetail, advancement, batter);
+            this.showBallDeadBanner();
+        } else {
+            // ランニングホームラン = ボールインプレーだが追加プレーは不要
+            // 走者は全員生還しており塁上に誰もいないので即完了
+            await this.finalizeAtBat(result, resultDetail, advancement, batter);
+        }
+        if (fromPitch) this.prepareNextBatter();
+    }
+
+    // ===== コールドゲームルール =====
+
+    // context: 'setup'（セットアップ画面）or 'modal'（試合中モーダル）
+    _mercyIds(context) {
+        return context === 'modal'
+            ? { presets: '#gameRulesMercyPresets .mercy-preset-btn', display: 'gameRulesMercyDisplay', custom: 'gameRulesMercyCustomEditor', list: 'gameRulesMercyCustomList' }
+            : { presets: '#gameSetupForm .mercy-preset-btn', display: 'mercyRuleDisplay', custom: 'mercyRuleCustomEditor', list: 'mercyRuleCustomList' };
+    }
+
+    onMercyPresetSelect(btn, context = 'setup') {
+        const ids = this._mercyIds(context);
+        // 同じコンテキスト内のボタンだけアクティブ切り替え
+        document.querySelectorAll(ids.presets).forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const preset = btn.dataset.preset;
+        const displayEl = document.getElementById(ids.display);
+        const customEl  = document.getElementById(ids.custom);
+
+        if (preset === 'none') {
+            displayEl.classList.add('modal--hidden');
+            customEl.classList.add('modal--hidden');
+        } else if (preset === 'custom') {
+            displayEl.classList.add('modal--hidden');
+            customEl.classList.remove('modal--hidden');
+            if (document.getElementById(ids.list).children.length === 0) {
+                this.addMercyCustomRow(context);
+            }
+        } else {
+            customEl.classList.add('modal--hidden');
+            const rules = MERCY_RULE_PRESETS[preset];
+            if (rules && rules.length > 0) {
+                displayEl.innerHTML = '<ul>' + rules.map(r =>
+                    `<li>${i18n.t('mercyRuleInningsLabel').replace('{inning}', r.inning).replace('{points}', r.points)}</li>`
+                ).join('') + '</ul>';
+                displayEl.classList.remove('modal--hidden');
+            }
+        }
+    }
+
+    addMercyCustomRow(context = 'setup') {
+        const ids = this._mercyIds(context);
+        const list = document.getElementById(ids.list);
+        const row = document.createElement('div');
+        row.className = 'mercy-custom-row';
+        row.innerHTML = `
+            <input type="number" class="mercy-inning-input" min="1" max="20" value="5" title="${i18n.t('mercyRuleInningInput')}">
+            <span>${i18n.t('mercyRuleInningInput')}</span>
+            <input type="number" class="mercy-points-input" min="1" max="30" value="10" title="${i18n.t('mercyRulePointsInput')}">
+            <span>${i18n.t('mercyRulePointsInput')}</span>
+            <button type="button" class="mercy-remove-btn">${i18n.t('mercyRuleRemove')}</button>
+        `;
+        row.querySelector('.mercy-remove-btn').addEventListener('click', () => row.remove());
+        list.appendChild(row);
+    }
+
+    _getMercyRuleFrom(context) {
+        const ids = this._mercyIds(context);
+        const activeBtn = document.querySelector(`${ids.presets}.active`);
+        if (!activeBtn) return null;
+        const preset = activeBtn.dataset.preset;
+
+        if (preset === 'none') return null;
+        if (preset === 'custom') {
+            const rows = document.querySelectorAll(`#${ids.list} .mercy-custom-row`);
+            const rules = [];
+            rows.forEach(row => {
+                const inning = parseInt(row.querySelector('.mercy-inning-input').value, 10);
+                const points = parseInt(row.querySelector('.mercy-points-input').value, 10);
+                if (!isNaN(inning) && !isNaN(points) && inning > 0 && points > 0) {
+                    rules.push({ inning, points });
+                }
+            });
+            rules.sort((a, b) => a.inning - b.inning);
+            return rules.length > 0 ? rules : null;
+        }
+        return MERCY_RULE_PRESETS[preset] || null;
+    }
+
+    getMercyRuleFromSetup() {
+        return this._getMercyRuleFrom('setup');
+    }
+
+    // ゲームルール設定モーダル（試合中）
+    showGameRulesModal() {
+        const modal = document.getElementById('gameRulesModal');
+        const ids = this._mercyIds('modal');
+        const rules = gameManager.currentGame ? gameManager.currentGame.gameRules : {};
+
+        // 規定回数・試合成立回数を反映
+        document.getElementById('regulationInningsInput').value = rules.regulationInnings || 9;
+        const minVal = rules.minInningsForOfficial || 5;
+        document.getElementById('minInningsForOfficialInput').value = minVal;
+        document.querySelectorAll('#gameRulesModal .official-preset-btn').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.min) === minVal);
+        });
+
+        // コールドゲームルールUIを初期化
+        const currentMercyRule = rules.mercyRule || null;
+        this._initModalMercyUI(currentMercyRule, ids);
+
+        modal.classList.remove('modal--hidden');
+        i18n.updatePageContent();
+    }
+
+    hideGameRulesModal() {
+        document.getElementById('gameRulesModal').classList.add('modal--hidden');
+    }
+
+    _initModalMercyUI(currentRules, ids) {
+        // まずすべてのボタンをリセット
+        document.querySelectorAll(ids.presets).forEach(b => b.classList.remove('active'));
+        document.getElementById(ids.display).classList.add('modal--hidden');
+        document.getElementById(ids.custom).classList.add('modal--hidden');
+        document.getElementById(ids.list).innerHTML = '';
+
+        // 現在のルールに一致するプリセットを探す
+        let matched = 'none';
+        if (currentRules && Array.isArray(currentRules) && currentRules.length > 0) {
+            for (const [key, preset] of Object.entries(MERCY_RULE_PRESETS)) {
+                if (!preset) continue;
+                if (JSON.stringify(preset) === JSON.stringify(currentRules)) {
+                    matched = key;
+                    break;
+                }
+            }
+            if (matched === 'none') matched = 'custom'; // いずれのプリセットにも一致しない
+        }
+
+        const matchedBtn = document.querySelector(`${ids.presets}[data-preset="${matched}"]`);
+        if (matchedBtn) {
+            matchedBtn.classList.add('active');
+            if (matched === 'custom') {
+                document.getElementById(ids.custom).classList.remove('modal--hidden');
+                // 現在のカスタムルールを行として展開
+                if (currentRules) {
+                    currentRules.forEach(r => {
+                        this._addMercyCustomRowWithValues('modal', r.inning, r.points);
+                    });
+                }
+            } else if (matched !== 'none' && MERCY_RULE_PRESETS[matched]) {
+                const rules = MERCY_RULE_PRESETS[matched];
+                const displayEl = document.getElementById(ids.display);
+                displayEl.innerHTML = '<ul>' + rules.map(r =>
+                    `<li>${i18n.t('mercyRuleInningsLabel').replace('{inning}', r.inning).replace('{points}', r.points)}</li>`
+                ).join('') + '</ul>';
+                displayEl.classList.remove('modal--hidden');
+            }
+        }
+    }
+
+    _addMercyCustomRowWithValues(context, inning, points) {
+        const ids = this._mercyIds(context);
+        const list = document.getElementById(ids.list);
+        const row = document.createElement('div');
+        row.className = 'mercy-custom-row';
+        row.innerHTML = `
+            <input type="number" class="mercy-inning-input" min="1" max="20" value="${inning}" title="${i18n.t('mercyRuleInningInput')}">
+            <span>${i18n.t('mercyRuleInningInput')}</span>
+            <input type="number" class="mercy-points-input" min="1" max="30" value="${points}" title="${i18n.t('mercyRulePointsInput')}">
+            <span>${i18n.t('mercyRulePointsInput')}</span>
+            <button type="button" class="mercy-remove-btn">${i18n.t('mercyRuleRemove')}</button>
+        `;
+        row.querySelector('.mercy-remove-btn').addEventListener('click', () => row.remove());
+        list.appendChild(row);
+    }
+
+    async saveGameRules() {
+        const newRule = this._getMercyRuleFrom('modal');
+        const regVal = parseInt(document.getElementById('regulationInningsInput').value);
+        const minVal = parseInt(document.getElementById('minInningsForOfficialInput').value);
+        const gr = gameManager.currentGame.gameRules;
+        gr.mercyRule = newRule;
+        if (!isNaN(regVal) && regVal >= 1) gr.regulationInnings = regVal;
+        if (!isNaN(minVal) && minVal >= 1) gr.minInningsForOfficial = minVal;
+        await gameManager.saveGame();
+        this.hideGameRulesModal();
+    }
+
+    // ===== 雨天等コールドモーダル =====
+
+    showWeatherCallModal() {
+        const info = gameManager.getWeatherCallInfo('weather');
+        const { official, homeScore, awayScore, incompleteRuns } = info;
+        const { completedFullInnings } = gameManager.getOfficialGameStatus();
+        const game = gameManager.currentGame;
+        const min = game.gameRules.minInningsForOfficial || 5;
+        const isTopHalf = game.isTopHalf;
+        const currentInningNumber = game.currentInning;
+        const halfStr = isTopHalf ? i18n.t('top') : i18n.t('bottom');
+
+        // 現在の試合状況表示
+        document.getElementById('weatherCallStatus').textContent =
+            i18n.t('weatherCallInProgress')
+                .replace('{inning}', currentInningNumber)
+                .replace('{half}', halfStr);
+
+        // 試合成立バッジ
+        const badge = document.getElementById('weatherCallOfficialBadge');
+        if (official) {
+            badge.textContent = i18n.t('weatherCallOfficialMsg')
+                .replace('{completed}', completedFullInnings)
+                .replace('{min}', min);
+            badge.className = 'official-badge official';
+        } else {
+            badge.textContent = i18n.t('weatherCallNoGameMsg')
+                .replace('{completed}', completedFullInnings)
+                .replace('{min}', min);
+            badge.className = 'official-badge no-game';
+        }
+
+        // スコア情報
+        const scoreInfo = document.getElementById('weatherCallScoreInfo');
+        const awayName = game.awayTeam || i18n.t('awayTeam');
+        const homeName = game.homeTeam || i18n.t('homeTeam');
+        let html = `<p>${i18n.t('weatherCallCurrentScore')}: ${awayName} ${game.awayScore} - ${game.homeScore} ${homeName}</p>`;
+        if (incompleteRuns > 0) {
+            html += `<p class="weather-incomplete-note">${i18n.t('weatherCallIncompleteRuns').replace('{runs}', incompleteRuns)}</p>`;
+            html += `<p>${i18n.t('weatherCallRevertedScore')}: ${awayName} ${awayScore} - ${homeScore} ${homeName}</p>`;
+        }
+        scoreInfo.innerHTML = html;
+
+        document.getElementById('weatherCallModal').classList.remove('modal--hidden');
+    }
+
+    async confirmWeatherCall() {
+        document.getElementById('weatherCallModal').classList.add('modal--hidden');
+        await gameManager.applyWeatherCall('weather');
+    }
+
+    // ===== タイブレーク設定モーダル =====
+
+    showTiebreakerSetupModal(callback) {
+        this._tiebreakerCallback = callback;
+        this._tiebreakerRunnerSelection = null;
+
+        // ステップをリセット
+        document.getElementById('tiebreakerStep1').classList.remove('modal--hidden');
+        document.getElementById('tiebreakerStep2a').classList.add('modal--hidden');
+        document.getElementById('tiebreakerStep2b').classList.add('modal--hidden');
+
+        // ランナー選択ボタンをリセット
+        document.querySelectorAll('.runner-option-btn').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        document.getElementById('tiebreakerRunnerConfirmBtn').classList.add('modal--hidden');
+
+        // エラー非表示
+        document.getElementById('tiebreakerMaxInningsError').classList.add('modal--hidden');
+
+        document.getElementById('tiebreakerSetupModal').classList.remove('modal--hidden');
+        i18n.updatePageContent();
+    }
+
+    hideTiebreakerSetupModal() {
+        document.getElementById('tiebreakerSetupModal').classList.add('modal--hidden');
+    }
+
+    onTiebreakerYes() {
+        document.getElementById('tiebreakerStep1').classList.add('modal--hidden');
+        document.getElementById('tiebreakerStep2a').classList.remove('modal--hidden');
+    }
+
+    onTiebreakerNo() {
+        const reg = gameManager.currentGame.gameRules.regulationInnings || 9;
+        const minInnings = reg + 1;
+        const defaultInnings = reg + 3;
+
+        document.getElementById('tiebreakerStep1').classList.add('modal--hidden');
+
+        const label = document.getElementById('tiebreakerMaxInningsLabel');
+        label.textContent = i18n.t('tiebreakerMaxInningsLabel').replace('{min}', minInnings);
+
+        const input = document.getElementById('tiebreakerMaxInningsInput');
+        input.min = minInnings;
+        input.value = defaultInnings;
+
+        document.getElementById('tiebreakerStep2b').classList.remove('modal--hidden');
+    }
+
+    async onTiebreakerNone() {
+        // 延長なし → 即引き分け終了
+        gameManager.currentGame.gameRules.extraInnings = false;
+        gameManager.currentGame.gameRules.tiebreaker = 'none';
+        await gameManager.saveGame();
+
+        this.hideTiebreakerSetupModal();
+        await gameManager.endGame('draw');
+        // コールバックは呼ばない（試合終了）
+        this._tiebreakerCallback = null;
+        if (typeof this.updateDisplay === 'function') this.updateDisplay();
+    }
+
+    onTiebreakerRunnerOptionSelect(btn) {
+        // 選択を切り替え（1つだけ選択可）
+        document.querySelectorAll('.runner-option-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+
+        const placement = btn.dataset.placement;
+        this._tiebreakerRunnerSelection = placement;
+
+        document.getElementById('tiebreakerRunnerConfirmBtn').classList.remove('modal--hidden');
+    }
+
+    async onTiebreakerRunnerConfirm() {
+        if (!this._tiebreakerRunnerSelection) return;
+
+        const placement = this._tiebreakerRunnerSelection;
+        const runners = {
+            first:  ['first', 'first_second', 'first_third', 'bases_loaded'].includes(placement),
+            second: ['second', 'first_second', 'second_third', 'bases_loaded'].includes(placement),
+            third:  ['third', 'first_third', 'second_third', 'bases_loaded'].includes(placement)
+        };
+
+        gameManager.currentGame.gameRules.tiebreaker = true;
+        gameManager.currentGame.gameRules.tiebreakerRunners = runners;
+        await gameManager.saveGame();
+
+        this.hideTiebreakerSetupModal();
+        if (this._tiebreakerCallback) {
+            await this._tiebreakerCallback();
+            this._tiebreakerCallback = null;
+        }
+    }
+
+    async onTiebreakerMaxInningsConfirm() {
+        const reg = gameManager.currentGame.gameRules.regulationInnings || 9;
+        const minInnings = reg + 1;
+        const input = document.getElementById('tiebreakerMaxInningsInput');
+        const val = parseInt(input.value, 10);
+
+        const errorEl = document.getElementById('tiebreakerMaxInningsError');
+        if (isNaN(val) || val < minInnings) {
+            errorEl.textContent = i18n.t('tiebreakerMaxInningsError').replace('{min}', minInnings);
+            errorEl.classList.remove('modal--hidden');
+            return;
+        }
+
+        errorEl.classList.add('modal--hidden');
+
+        gameManager.currentGame.gameRules.tiebreaker = false;
+        gameManager.currentGame.gameRules.maxInnings = val;
+        await gameManager.saveGame();
+
+        this.hideTiebreakerSetupModal();
+        if (this._tiebreakerCallback) {
+            await this._tiebreakerCallback();
+            this._tiebreakerCallback = null;
+        }
+    }
+
+    showBallDeadBanner() {
+        const banner = document.getElementById('ballDeadBanner');
+        if (banner) {
+            banner.classList.remove('ball-dead-banner--hidden');
+        }
+    }
+
+    hideBallDeadBanner() {
+        const banner = document.getElementById('ballDeadBanner');
+        if (banner) {
+            banner.classList.add('ball-dead-banner--hidden');
+        }
+    }
+
+    async onAdditionalPlayYes() {
+        // 「はい」が選択された場合、追加プレー記録モードに移行
+        this.hideAdditionalPlayModal();
+        this.showAdditionalPlayRecordingModal();
+    }
+
+    showAdditionalPlayRecordingModal() {
+        if (!this.pendingAtBat) return;
+
+        // 追加プレーログを初期化
+        this.additionalPlays = [];
+
+        // 現在の状況表示を更新
+        this.updateAdditionalPlaySituation();
+
+        // 追加プレー選択肢を生成
+        this.renderAdditionalPlayOptions();
+
+        const modal = document.getElementById('additionalPlayRecordingModal');
+        modal.classList.remove('modal--hidden');
+        i18n.updatePageContent();
+    }
+
+    hideAdditionalPlayRecordingModal() {
+        const modal = document.getElementById('additionalPlayRecordingModal');
+        modal.classList.add('modal--hidden');
+    }
+
+    updateAdditionalPlaySituation() {
+        const situationEl = document.getElementById('additionalPlaySituation');
+        if (!situationEl) return;
+
+        const game = gameManager.currentGame;
+        const runners = game.runnersOnBase;
+        const outs = game.outs;
+
+        const runnerTexts = [];
+        if (runners.first) runnerTexts.push(i18n.t('first_base') || '1塁');
+        if (runners.second) runnerTexts.push(i18n.t('second_base') || '2塁');
+        if (runners.third) runnerTexts.push(i18n.t('third_base') || '3塁');
+
+        const runnersDisplay = runnerTexts.length > 0
+            ? runnerTexts.join(', ')
+            : (i18n.t('no_runners') || '走者なし');
+
+        const logHtml = this.additionalPlays && this.additionalPlays.length > 0
+            ? `<div class="additional-play-log">${this.additionalPlays.map((play, idx) => `
+                <div class="additional-play-log-item">
+                    <span>${play.description}</span>
+                    <button class="delete-log-btn" data-idx="${idx}" title="削除">×</button>
+                </div>
+            `).join('')}</div>`
+            : '';
+
+        situationEl.innerHTML = `
+            <div>${outs}${i18n.t('outs')} / ${runnersDisplay}</div>
+            ${logHtml}
+        `;
+
+        // ログ削除ボタンのイベント設定
+        situationEl.querySelectorAll('.delete-log-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.idx);
+                this.removeAdditionalPlay(idx);
+            });
+        });
+    }
+
+    removeAdditionalPlay(idx) {
+        const play = this.additionalPlays[idx];
+        if (play && play.revert) play.revert();
+        this.additionalPlays.splice(idx, 1);
+        this.updateAdditionalPlaySituation();
+        this.renderAdditionalPlayOptions();
+        this.updateGameDisplay();
+    }
+
+    renderAdditionalPlayOptions() {
+        const optionsEl = document.getElementById('additionalPlayOptions');
+        if (!optionsEl) return;
+
+        const game = gameManager.currentGame;
+        const runners = game.runnersOnBase;
+        const hasRunners = runners.first || runners.second || runners.third;
+
+        optionsEl.innerHTML = `
+            <div class="additional-play-type-btns">
+                <button class="additional-play-type-btn" data-type="runner_advance" ${!hasRunners ? 'disabled' : ''}>
+                    ${i18n.t('runner_advance') || '走者進塁'}
+                </button>
+                <button class="additional-play-type-btn" data-type="runner_out" ${!hasRunners ? 'disabled' : ''}>
+                    ${i18n.t('runner_out') || '走者アウト'}
+                </button>
+                <button class="additional-play-type-btn" data-type="error_play">
+                    ${i18n.t('error_play') || '送球エラー'}
+                </button>
+            </div>
+            <div id="additionalPlayDetailArea"></div>
+        `;
+
+        optionsEl.querySelectorAll('.additional-play-type-btn:not([disabled])').forEach(btn => {
+            btn.addEventListener('click', () => {
+                optionsEl.querySelectorAll('.additional-play-type-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                this.showAdditionalPlayDetail(btn.dataset.type);
+            });
+        });
+    }
+
+    showAdditionalPlayDetail(type) {
+        const detailArea = document.getElementById('additionalPlayDetailArea');
+        if (!detailArea) return;
+
+        const game = gameManager.currentGame;
+        const runners = game.runnersOnBase;
+
+        const runnerOptions = [
+            runners.first ? `<option value="first">${i18n.t('first_base') || '1塁走者'}</option>` : '',
+            runners.second ? `<option value="second">${i18n.t('second_base') || '2塁走者'}</option>` : '',
+            runners.third ? `<option value="third">${i18n.t('third_base') || '3塁走者'}</option>` : '',
+        ].filter(Boolean).join('');
+
+        if (type === 'runner_advance') {
+            detailArea.innerHTML = `
+                <div class="additional-play-detail">
+                    <div class="input-group">
+                        <label>${i18n.t('which_runner') || 'どの走者'}:</label>
+                        <select id="advanceRunnerBase">${runnerOptions}</select>
+                    </div>
+                    <div class="input-group">
+                        <label>${i18n.t('advance_to') || '進塁先'}:</label>
+                        <select id="advanceToBase">
+                            <option value="next">次の塁</option>
+                            <option value="home">本塁（得点）</option>
+                        </select>
+                    </div>
+                    <button class="primary-btn apply-additional-play-btn" style="margin-top:0.5rem">追加</button>
+                </div>
+            `;
+            detailArea.querySelector('.apply-additional-play-btn').addEventListener('click', () => {
+                this.applyRunnerAdvance();
+            });
+        } else if (type === 'runner_out') {
+            detailArea.innerHTML = `
+                <div class="additional-play-detail">
+                    <div class="input-group">
+                        <label>${i18n.t('which_runner') || 'どの走者'}:</label>
+                        <select id="outRunnerBase">${runnerOptions}</select>
+                    </div>
+                    <button class="primary-btn apply-additional-play-btn" style="margin-top:0.5rem">追加</button>
+                </div>
+            `;
+            detailArea.querySelector('.apply-additional-play-btn').addEventListener('click', () => {
+                this.applyRunnerOut();
+            });
+        } else if (type === 'error_play') {
+            detailArea.innerHTML = `
+                <div class="additional-play-detail">
+                    <div class="input-group">
+                        <label>${i18n.t('error_fielder') || 'エラーした野手'}:</label>
+                        <select id="errorFielder">
+                            <option value="1">1 ${i18n.t('pitcher') || '投手'}</option>
+                            <option value="2">2 ${i18n.t('catcher') || '捕手'}</option>
+                            <option value="3">3 ${i18n.t('firstBaseman') || '一塁手'}</option>
+                            <option value="4">4 ${i18n.t('secondBaseman') || '二塁手'}</option>
+                            <option value="5">5 ${i18n.t('thirdBaseman') || '三塁手'}</option>
+                            <option value="6">6 ${i18n.t('shortstop') || '遊撃手'}</option>
+                            <option value="7">7 ${i18n.t('leftField') || '左翼手'}</option>
+                            <option value="8">8 ${i18n.t('centerField') || '中堅手'}</option>
+                            <option value="9">9 ${i18n.t('rightField') || '右翼手'}</option>
+                        </select>
+                    </div>
+                    <button class="primary-btn apply-additional-play-btn" style="margin-top:0.5rem">追加</button>
+                </div>
+            `;
+            detailArea.querySelector('.apply-additional-play-btn').addEventListener('click', () => {
+                this.applyErrorPlay();
+            });
+        }
+    }
+
+    applyRunnerAdvance() {
+        const fromBase = document.getElementById('advanceRunnerBase')?.value;
+        const toBase = document.getElementById('advanceToBase')?.value;
+        if (!fromBase) return;
+
+        const game = gameManager.currentGame;
+        const runners = game.runnersOnBase;
+        const runnerData = runners[fromBase];
+        if (!runnerData) return;
+
+        const nextBaseMap = { first: 'second', second: 'third', third: 'home' };
+        const actualTo = toBase === 'next' ? nextBaseMap[fromBase] : 'home';
+
+        const prevRunnerValue = runnerData;
+
+        // 走者を移動
+        runners[fromBase] = null;
+        if (actualTo === 'home') {
+            gameManager.addRuns(1);
+        } else {
+            runners[actualTo] = prevRunnerValue;
+        }
+
+        const fromLabel = i18n.t(fromBase + '_base') || fromBase;
+        const toLabel = actualTo === 'home' ? '本塁（得点）' : (i18n.t(actualTo + '_base') || actualTo);
+        const description = `${fromLabel} → ${toLabel}`;
+
+        this.additionalPlays.push({
+            type: 'runner_advance',
+            description,
+            revert: () => {
+                runners[fromBase] = prevRunnerValue;
+                if (actualTo === 'home') {
+                    gameManager.addRuns(-1);
+                } else {
+                    runners[actualTo] = null;
+                }
+            }
+        });
+
+        this.updateAdditionalPlaySituation();
+        this.renderAdditionalPlayOptions();
+        this.updateGameDisplay();
+    }
+
+    applyRunnerOut() {
+        const fromBase = document.getElementById('outRunnerBase')?.value;
+        if (!fromBase) return;
+
+        const game = gameManager.currentGame;
+        const runners = game.runnersOnBase;
+        const runnerData = runners[fromBase];
+        if (!runnerData) return;
+
+        runners[fromBase] = null;
+        game.outs++;
+
+        const fromLabel = i18n.t(fromBase + '_base') || fromBase;
+        const description = `${fromLabel}走者 アウト`;
+
+        this.additionalPlays.push({
+            type: 'runner_out',
+            description,
+            revert: () => {
+                runners[fromBase] = runnerData;
+                game.outs--;
+            }
+        });
+
+        this.updateAdditionalPlaySituation();
+        this.renderAdditionalPlayOptions();
+        this.updateGameDisplay();
+    }
+
+    applyErrorPlay() {
+        const fielder = document.getElementById('errorFielder')?.value;
+        if (!fielder) return;
+
+        const description = `${fielder}番野手 ${i18n.t('error') || 'エラー'}`;
+
+        this.additionalPlays.push({
+            type: 'error_play',
+            description,
+            revert: () => {}
+        });
+
+        this.updateAdditionalPlaySituation();
+    }
+
+    async onCompleteAdditionalPlay() {
+        // 追加プレー記録を完了してプレーを終了
+        this.hideAdditionalPlayRecordingModal();
+
+        if (!this.pendingAtBat) {
+            // 投球モード（pendingAtBatなし）：打席は継続中なので表示更新のみ
+            this.additionalPlays = [];
+            this.updateGameDisplay();
+            this.updatePitchDisplay();
+            return;
+        }
+
+        // 打席完了モード
+        const { result, resultDetail, advancement, batter } = this.pendingAtBat;
+        const fromPitch = this.fromPitchInterface;
+        this.fromPitchInterface = false;
+
+        // 追加プレーで変更されたゲーム状態を反映してfinalizeAtBat
+        const updatedAdvancement = {
+            ...advancement,
+            newRunners: { ...gameManager.currentGame.runnersOnBase }
+        };
+
+        await this.finalizeAtBat(result, resultDetail, updatedAdvancement, batter);
+        if (fromPitch) this.prepareNextBatter();
+
+        // データをクリア
+        this.pendingAtBat = null;
+        this.additionalPlays = [];
+    }
+
+    showPitchAdditionalPlayModal() {
+        // 投球モード用：pendingAtBatなしで追加プレー確認モーダルを表示
+        this.pendingAtBat = null;
+        const modal = document.getElementById('additionalPlayModal');
+        modal.classList.remove('modal--hidden');
+        i18n.updatePageContent();
+    }
+
+    async onAdditionalPlayNo() {
+        // 「いいえ」が選択された場合、プレーを完了
+        this.hideAdditionalPlayModal();
+
+        if (!this.pendingAtBat) {
+            // 投球モード（ピッチ中の走者なしの確認）：何もせず終了
+            return;
+        }
+
+        // 打席完了モード
+        const { result, resultDetail, advancement, batter } = this.pendingAtBat;
+        const fromPitch = this.fromPitchInterface;
+        this.fromPitchInterface = false;
+        this.pendingAtBat = null;
+
+        await this.finalizeAtBat(result, resultDetail, advancement, batter);
+        if (fromPitch) this.prepareNextBatter();
     }
 
     async correctLastAtBat() {
@@ -4228,26 +9503,73 @@ class BaseballApp {
                 await gameManager.startAtBat(batter.name, batter.battingOrder);
             }
 
+            const result = selectedResult.dataset.result;
+
+            const selectedTypeEl = document.querySelector('.pitch-type-btn.selected');
+            const selectedPitchType = selectedTypeEl ? selectedTypeEl.dataset.type : null;
+
+            // 死球の場合は特別処理（打席完了）
+            if (result === 'hit_by_pitch') {
+                await this.processHitByPitch(selectedPitchType);
+                return;
+            }
+
+            // ファウルフライ落球の場合は特別処理（打席継続、エラー記録）
+            if (result === 'foul_fly_dropped') {
+                await this.processFoulFlyDropped(selectedPitchType);
+                return;
+            }
+
             const pitchData = {
-                pitchType: document.getElementById('pitchType').value,
-                velocity: parseInt(document.getElementById('velocity').value) || null,
-                location: document.getElementById('pitchLocation').value,
-                result: selectedResult.dataset.result
+                pitchType: selectedPitchType,
+                velocity: null,
+                location: null,
+                result: result
             };
 
             await gameManager.recordPitch(pitchData);
+
+            // アクション履歴に積む
+            if (!this.pitchActionHistory) this.pitchActionHistory = [];
+            this.pitchActionHistory.push({ type: 'pitch', result });
+            this._updatePitchUndoBtn();
 
             // 表示更新
             this.updateGameDisplay();
             this.updatePitchDisplay();
             this.clearPitchForm();
 
-            // 四球・三振・打球・暴投・捕逸の場合は特別処理
-            const result = selectedResult.dataset.result;
-            if (gameManager.currentGame.balls >= 4 || gameManager.currentGame.strikes >= 3 || result === 'hit') {
-                this.showAtBatCompletionPrompt(result);
-            } else if (result === 'wild_pitch' || result === 'passed_ball') {
-                this.handleWildPitchOrPassedBall(result);
+            // ボールデッド投球：ファウル系はバナーを表示して終了
+            const deadBallPitches = ['foul', 'foul_bunt'];
+            if (deadBallPitches.includes(result)) {
+                this.showBallDeadBanner();
+                return;
+            }
+
+            // 四球・三振・打球の場合は特別処理（at-bat完了フローへ）
+            if (gameManager.currentGame.balls >= 4) {
+                // 四球の場合は四球カテゴリのみ表示
+                this.showAtBatCompletionPrompt('walk');
+            } else if (gameManager.currentGame.strikes >= 3) {
+                // 三振の場合は三振結果のみ表示（見逃し/空振り/スリーバント失敗を区別）
+                if (result === 'strike_looking') {
+                    this.showAtBatCompletionPrompt('strikeout_looking');
+                } else if (result === 'strike_swinging') {
+                    this.showAtBatCompletionPrompt('strikeout_swinging');
+                } else if (result === 'foul_bunt') {
+                    // 2ストライク時のバントファウル = スリーバント失敗
+                    this.showAtBatCompletionPrompt('strikeout_bunt');
+                }
+            } else if (result === 'hit') {
+                // フェア（打球）の場合は打球系の結果のみ表示（at-batフローでボールインプレー/デッド判定）
+                this.showFairBallResults();
+            } else {
+                // ボールインプレー投球（ball / strike_looking / strike_swinging で打席未完了）
+                // 走者がいる場合のみ追加プレー確認を表示
+                const runners = gameManager.currentGame.runnersOnBase;
+                if (runners.first || runners.second || runners.third) {
+                    this.showPitchAdditionalPlayModal();
+                }
             }
 
         } catch (error) {
@@ -4256,13 +9578,926 @@ class BaseballApp {
         }
     }
 
+    async processHitByPitch() {
+        // 死球処理
+        const game = gameManager.currentGame;
+
+        // 走者を1塁進塁
+        const currentRunners = { ...game.runnersOnBase };
+        const newRunners = { first: null, second: null, third: null };
+        let runsScored = 0;
+
+        // 満塁の場合は3塁走者が得点
+        if (currentRunners.first && currentRunners.second && currentRunners.third) {
+            runsScored = 1;
+            newRunners.third = currentRunners.second;
+            newRunners.second = currentRunners.first;
+            newRunners.first = game.currentBatter;
+        }
+        // 1・2塁の場合
+        else if (currentRunners.first && currentRunners.second) {
+            newRunners.third = currentRunners.second;
+            newRunners.second = currentRunners.first;
+            newRunners.first = game.currentBatter;
+        }
+        // 1塁のみの場合
+        else if (currentRunners.first) {
+            newRunners.third = currentRunners.third;
+            newRunners.second = currentRunners.first;
+            newRunners.first = game.currentBatter;
+        }
+        // 走者なしまたは2塁・3塁のみの場合
+        else {
+            newRunners.third = currentRunners.third;
+            newRunners.second = currentRunners.second;
+            newRunners.first = game.currentBatter;
+        }
+
+        game.runnersOnBase = newRunners;
+
+        if (runsScored > 0) {
+            if (game.isTopHalf) {
+                game.awayScore += runsScored;
+            } else {
+                game.homeScore += runsScored;
+            }
+        }
+
+        await gameManager.recordAtBatResult('hit_by_pitch', '死球', runsScored, 0);
+
+        this.updateGameDisplay();
+        this.showSuccess('死球で出塁しました');
+    }
+
+    async processFoulFlyDropped(pitchType = null) {
+        // ファウルフライ落球処理（打席継続、エラー記録）
+        // 野手選択モーダルを表示
+        this.showFoulFlyDroppedPositionModal(pitchType);
+    }
+
+    showFoulFlyDroppedPositionModal(pitchType = null) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'foulFlyDroppedPositionModal';
+        const positions = BASEBALL_CONFIG.POSITIONS;
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>ファウルフライ落球 - 守備位置選択</h3>
+                <p>エラーした守備位置を選択してください</p>
+                <div class="position-buttons">
+                    ${Object.keys(positions).map(key => `
+                        <button class="position-btn" data-position="${key}">
+                            ${i18n.t(positions[key].label)}
+                        </button>
+                    `).join('')}
+                </div>
+                <button class="secondary-btn" id="cancelFoulFlyDroppedPosition">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 守備位置選択
+        modal.querySelectorAll('.position-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const position = btn.dataset.position;
+                modal.remove();
+                await this.completeFoulFlyDropped(position, pitchType);
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelFoulFlyDroppedPosition').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    async completeFoulFlyDropped(errorPosition, pitchType = null) {
+        const game = gameManager.currentGame;
+
+        // 投球を記録
+        const pitchData = {
+            pitchType: pitchType,
+            velocity: null,
+            location: null,
+            result: 'foul_fly_dropped'
+        };
+        await gameManager.recordPitch(pitchData);
+
+        // エラーを記録（守備側チームのエラー数を増やす）
+        const fieldingTeam = game.isTopHalf ? 'home' : 'away';
+        game.teamStats[fieldingTeam].errors++;
+
+        // エラーした選手の個人エラー数を増やす
+        const fieldingPlayers = game.players[fieldingTeam];
+        const errorPlayer = fieldingPlayers.find(p => p.position === errorPosition && p.isActive);
+        if (errorPlayer) {
+            errorPlayer.stats.errors++;
+        }
+
+        // ファウルフライ落球：打者は本来アウトになるべきだった → 仮想アウトをインクリメント
+        gameManager.incrementVirtualOuts();
+        // 当打席内のファウルフライ落球回数を記録（打席途中投手交代のカウント制約用）
+        if (gameManager.currentAtBat) {
+            gameManager.currentAtBat.foulFlyDroppedCount = (gameManager.currentAtBat.foulFlyDroppedCount || 0) + 1;
+        }
+
+        await gameManager.saveGame();
+
+        // 表示更新
+        this.updateGameDisplay();
+        this.updatePitchDisplay();
+        this.clearPitchForm();
+
+        const positionLabel = i18n.t(BASEBALL_CONFIG.POSITIONS[errorPosition].label);
+        this.showSuccess(`ファウルフライ落球（${positionLabel}のエラー）。打席継続です。`);
+
+        // ボールデッド：バナーを表示
+        this.showBallDeadBanner();
+    }
+
+    // 犠打の結果選択モーダルを表示
+    showSacrificeBuntOutcomeModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('selectSacrificeOutcome')}</h3>
+                <div class="sacrifice-outcome-options">
+                    <button class="sacrifice-outcome-btn" data-outcome="success">${i18n.t('sacrificeBuntSuccess')}</button>
+                    <button class="sacrifice-outcome-btn" data-outcome="failure">${i18n.t('sacrificeBuntFailure')}</button>
+                    <button class="sacrifice-outcome-btn" data-outcome="all_safe">${i18n.t('allSafe')}</button>
+                </div>
+                <button id="cancelSacrificeOutcome" class="secondary-btn">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 結果選択
+        modal.querySelectorAll('.sacrifice-outcome-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const outcome = btn.dataset.outcome;
+                modal.remove();
+                if (outcome === 'success') {
+                    this.handleSacrificeBuntSuccess();
+                } else if (outcome === 'failure') {
+                    this.handleSacrificeBuntFailure();
+                } else if (outcome === 'all_safe') {
+                    this.handleSacrificeBuntAllSafe();
+                }
+            });
+        });
+
+        // キャンセル
+        document.getElementById('cancelSacrificeOutcome').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    // 送りバント成功の処理
+    handleSacrificeBuntSuccess() {
+        const game = gameManager.currentGame;
+        const runners = { ...game.runnersOnBase };
+
+        // 1塁・3塁の特殊ケース：3塁走者の進塁有無を確認
+        if (runners.first && !runners.second && runners.third) {
+            this.showThirdRunnerAdvanceChoice(runners);
+        } else {
+            // 通常ケース：全走者を1つ進塁させた状態を作成
+            const advancedRunners = {
+                first: null,
+                second: runners.first,
+                third: runners.second
+            };
+
+            // 3塁走者がいた場合は得点
+            const runsScored = runners.third ? 1 : 0;
+
+            // 進塁確認モーダルを表示
+            this.showSacrificeAdvancementModal(advancedRunners, runsScored);
+        }
+    }
+
+    // 1塁・3塁での3塁走者進塁選択モーダル
+    showThirdRunnerAdvanceChoice(runners) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('thirdRunnerAdvanceCheck')}</h3>
+                <p>${i18n.t('currentSituation')}: ${i18n.t('firstAndThird')}</p>
+                <p>${i18n.t('thirdRunner')} ${runners.third.name}${i18n.t('thirdRunnerAdvanceQuestion')}</p>
+                <div class="third-runner-choice">
+                    <button id="thirdRunnerScored" class="primary-btn">${i18n.t('thirdRunnerScored')}</button>
+                    <button id="thirdRunnerStayed" class="secondary-btn">${i18n.t('thirdRunnerStayed')}</button>
+                </div>
+                <button id="cancelThirdChoice" class="tertiary-btn">${i18n.t('cancel')}</button>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 3塁走者が本塁へ進塁（スクイズ）
+        document.getElementById('thirdRunnerScored').addEventListener('click', () => {
+            modal.remove();
+            const advancedRunners = {
+                first: null,
+                second: runners.first,
+                third: null  // 3塁走者は得点
+            };
+            this.showSacrificeAdvancementModal(advancedRunners, 1);  // 1点
+        });
+
+        // 3塁走者が留まる（1塁走者のみ2塁へ）
+        document.getElementById('thirdRunnerStayed').addEventListener('click', () => {
+            modal.remove();
+            const advancedRunners = {
+                first: null,
+                second: runners.first,
+                third: runners.third  // 3塁走者はそのまま
+            };
+            this.showSacrificeAdvancementModal(advancedRunners, 0);  // 0点
+        });
+
+        // キャンセル
+        document.getElementById('cancelThirdChoice').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    // 送りバント成功の進塁確認モーダル
+    showSacrificeAdvancementModal(baseRunners, initialRuns) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+
+        const runnerDisplay = this.formatRunnersDisplay(baseRunners);
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('advancementConfirm')}</h3>
+                <p>${i18n.t('currentState')}</p>
+                <div class="runners-display">${runnerDisplay}</div>
+                <p>${i18n.t('runsScored')}: ${initialRuns}</p>
+                <div class="advancement-options">
+                    <button id="confirmAdvancement" class="primary-btn">${i18n.t('confirmAsIs')}</button>
+                    <button id="additionalAdvancement" class="secondary-btn">${i18n.t('additionalAdvancement')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // このまま確定
+        document.getElementById('confirmAdvancement').addEventListener('click', async () => {
+            modal.remove();
+            await this.completeSacrificeBuntSuccess(baseRunners, initialRuns);
+        });
+
+        // 追加進塁あり
+        document.getElementById('additionalAdvancement').addEventListener('click', () => {
+            modal.remove();
+            this.showAdditionalAdvancementModal(baseRunners, initialRuns);
+        });
+    }
+
+    // 走者表示のフォーマット
+    formatRunnersDisplay(runners) {
+        const display = [];
+        if (runners.first) display.push('一塁: ' + runners.first.name);
+        if (runners.second) display.push('二塁: ' + runners.second.name);
+        if (runners.third) display.push('三塁: ' + runners.third.name);
+        return display.length > 0 ? display.join('<br>') : '走者なし';
+    }
+
+    // 追加進塁モーダル
+    showAdditionalAdvancementModal(currentRunners, currentRuns) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+
+        // 走者選択UI生成
+        const runnerSelects = this.generateSacrificeRunnerSelects(currentRunners);
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('advancementSetup')}</h3>
+                <p>${i18n.t('selectFinalPositions')}</p>
+                <div class="runner-advancement-settings">
+                    ${runnerSelects}
+                </div>
+                <div class="runs-input">
+                    <label>${i18n.t('runsCount')}</label>
+                    <input type="number" id="additionalRuns" min="0" max="3" value="${currentRuns}">
+                </div>
+                <div class="modal-buttons">
+                    <button id="confirmAdditionalAdvancement" class="primary-btn">${i18n.t('confirm')}</button>
+                    <button id="cancelAdditionalAdvancement" class="secondary-btn">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('confirmAdditionalAdvancement').addEventListener('click', async () => {
+            const finalRunners = this.getSelectedRunners(modal);
+            const finalRuns = parseInt(document.getElementById('additionalRuns').value);
+            modal.remove();
+            await this.completeSacrificeBuntSuccess(finalRunners, finalRuns);
+        });
+
+        document.getElementById('cancelAdditionalAdvancement').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    // 犠打用の走者選択UI生成
+    generateSacrificeRunnerSelects(currentRunners) {
+        let html = '';
+
+        if (currentRunners.first) {
+            html += `
+                <div class="runner-select">
+                    <label>${currentRunners.first.name}${i18n.t('destination')}</label>
+                    <select id="runner-first-destination">
+                        <option value="out">${i18n.t('batterOut')}</option>
+                        <option value="first">${i18n.t('first')}</option>
+                        <option value="second" selected>${i18n.t('second')}</option>
+                        <option value="third">${i18n.t('third')}</option>
+                        <option value="home">${i18n.t('homeScore')}</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        if (currentRunners.second) {
+            html += `
+                <div class="runner-select">
+                    <label>${currentRunners.second.name}${i18n.t('destination')}</label>
+                    <select id="runner-second-destination">
+                        <option value="out">${i18n.t('batterOut')}</option>
+                        <option value="second">${i18n.t('second')}</option>
+                        <option value="third" selected>${i18n.t('third')}</option>
+                        <option value="home">${i18n.t('homeScore')}</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        if (currentRunners.third) {
+            html += `
+                <div class="runner-select">
+                    <label>${currentRunners.third.name}${i18n.t('destination')}</label>
+                    <select id="runner-third-destination">
+                        <option value="out">${i18n.t('batterOut')}</option>
+                        <option value="third">${i18n.t('third')}</option>
+                        <option value="home" selected>${i18n.t('homeScore')}</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        return html;
+    }
+
+    // モーダルから選択された走者状況を取得
+    getSelectedRunners(modal) {
+        const game = gameManager.currentGame;
+        const originalRunners = game.runnersOnBase;
+        const newRunners = {
+            first: null,
+            second: null,
+            third: null
+        };
+
+        // 元の一塁走者
+        if (originalRunners.first) {
+            const destination = modal.querySelector('#runner-first-destination')?.value;
+            if (destination === 'first') newRunners.first = originalRunners.first;
+            else if (destination === 'second') newRunners.second = originalRunners.first;
+            else if (destination === 'third') newRunners.third = originalRunners.first;
+        }
+
+        // 元の二塁走者
+        if (originalRunners.second) {
+            const destination = modal.querySelector('#runner-second-destination')?.value;
+            if (destination === 'second') newRunners.second = originalRunners.second;
+            else if (destination === 'third') newRunners.third = originalRunners.second;
+        }
+
+        // 元の三塁走者はホームか三塁のみ（一塁・二塁には戻れない）
+
+        return newRunners;
+    }
+
+    // 送りバント成功の確定処理
+    async completeSacrificeBuntSuccess(finalRunners, finalRuns) {
+        const game = gameManager.currentGame;
+        const batter = gameManager.getCurrentBatter();
+        const resultDetail = document.getElementById('atBatResultDetail').value;
+
+        // 打者をアウト、アウトカウント+1
+        game.outs++;
+
+        // 走者を更新
+        game.runnersOnBase = finalRunners;
+
+        // 得点を更新
+        const battingTeam = game.isTopHalf ? 'away' : 'home';
+        if (game.isTopHalf) {
+            game.awayScore += finalRuns;
+        } else {
+            game.homeScore += finalRuns;
+        }
+
+        // 打者の犠打数を+1
+        if (batter) {
+            batter.stats.sacrificeBunts++;
+        }
+
+        // 打席結果を記録
+        await gameManager.recordAtBatResult('sacrifice_bunt', resultDetail, finalRuns, 0);
+
+        // 投手統計を更新
+        gameManager.updatePitcherStats('sacrifice_bunt');
+
+        await gameManager.saveGame();
+
+        this.showSuccess(i18n.t('sacrificeBuntSuccessRecorded'));
+        this.updateGameDisplay();
+        this.prepareNextBatter();
+
+        // 3アウトチェック
+        if (game.outs >= 3) {
+            await gameManager.endHalfInning();
+        }
+    }
+
+    // 送りバント失敗の処理（走者がアウト）
+    handleSacrificeBuntFailure() {
+        const game = gameManager.currentGame;
+        const runners = game.runnersOnBase;
+
+        // アウトになった走者と打者の状況を選択するモーダルを表示
+        this.showSacrificeBuntFailureModal(runners);
+    }
+
+    // 送りバント失敗モーダル
+    showSacrificeBuntFailureModal(runners) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+
+        const runnerOptions = this.generateFailureRunnerOptions(runners);
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('sacrificeBuntFailureTitle')}</h3>
+                <p>${i18n.t('selectOutRunnersAndBatter')}</p>
+
+                <div class="out-runners-selection">
+                    <label>${i18n.t('outRunners')}</label>
+                    ${runnerOptions}
+                </div>
+
+                <div class="batter-status-selection">
+                    <label>${i18n.t('batterStatus')}</label>
+                    <select id="batterStatusSelect">
+                        <option value="out">${i18n.t('batterOut')}</option>
+                        <option value="safe_first">${i18n.t('batterSafeFirst')}</option>
+                    </select>
+                </div>
+
+                <div class="out-count-selection">
+                    <label>${i18n.t('outCountIncrease')}</label>
+                    <select id="failureOutCount">
+                        <option value="1">${i18n.t('oneOut')}</option>
+                        <option value="2" selected>${i18n.t('twoOuts')}</option>
+                        <option value="3">${i18n.t('threeOuts')}</option>
+                    </select>
+                </div>
+
+                <div class="modal-buttons">
+                    <button id="confirmSacrificeFailure" class="primary-btn">${i18n.t('confirm')}</button>
+                    <button id="cancelSacrificeFailure" class="secondary-btn">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('confirmSacrificeFailure').addEventListener('click', async () => {
+            const outRunners = this.getSelectedOutRunners(modal);
+            const batterStatus = document.getElementById('batterStatusSelect').value;
+            const outCount = parseInt(document.getElementById('failureOutCount').value);
+            modal.remove();
+            await this.completeSacrificeBuntFailure(outRunners, batterStatus, outCount);
+        });
+
+        document.getElementById('cancelSacrificeFailure').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    // 送りバント失敗用の走者選択オプション生成
+    generateFailureRunnerOptions(runners) {
+        let html = '<div class="runner-checkboxes">';
+
+        if (runners.first) {
+            html += `
+                <label>
+                    <input type="checkbox" class="out-runner-checkbox" data-base="first">
+                    ${i18n.t('firstRunner')} ${runners.first.name}
+                </label><br>
+            `;
+        }
+
+        if (runners.second) {
+            html += `
+                <label>
+                    <input type="checkbox" class="out-runner-checkbox" data-base="second">
+                    ${i18n.t('secondRunner')} ${runners.second.name}
+                </label><br>
+            `;
+        }
+
+        if (runners.third) {
+            html += `
+                <label>
+                    <input type="checkbox" class="out-runner-checkbox" data-base="third">
+                    ${i18n.t('thirdRunner')} ${runners.third.name}
+                </label><br>
+            `;
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    // 選択されたアウト走者を取得
+    getSelectedOutRunners(modal) {
+        const checkboxes = modal.querySelectorAll('.out-runner-checkbox:checked');
+        const outRunners = [];
+        checkboxes.forEach(cb => {
+            outRunners.push(cb.dataset.base);
+        });
+        return outRunners;
+    }
+
+    // 送りバント失敗の確定処理
+    async completeSacrificeBuntFailure(outRunners, batterStatus, outCount) {
+        const game = gameManager.currentGame;
+        const batter = gameManager.getCurrentBatter();
+        const resultDetail = document.getElementById('atBatResultDetail').value;
+
+        // アウトカウント増加
+        game.outs += outCount;
+
+        // アウトになった走者を塁から削除
+        const newRunners = { ...game.runnersOnBase };
+        outRunners.forEach(base => {
+            newRunners[base] = null;
+        });
+
+        // 打者がセーフの場合は一塁に配置
+        if (batterStatus === 'safe_first') {
+            newRunners.first = batter;
+        }
+
+        game.runnersOnBase = newRunners;
+
+        // 打席結果を記録
+        const finalResult = batterStatus === 'out' ? 'groundout' : 'fielders_choice';
+        await gameManager.recordAtBatResult(finalResult, resultDetail + ' (送りバント失敗)', 0, 0);
+
+        // 投手統計を更新
+        gameManager.updatePitcherStats(finalResult);
+
+        await gameManager.saveGame();
+
+        this.showSuccess(i18n.t('sacrificeBuntFailureRecorded'));
+        this.updateGameDisplay();
+        this.prepareNextBatter();
+
+        // 3アウトチェック
+        if (game.outs >= 3) {
+            await gameManager.endHalfInning();
+        }
+    }
+
+    // オールセーフの処理
+    handleSacrificeBuntAllSafe() {
+        // 野選・安打・失策から選択
+        this.showSacrificeBuntAllSafeModal();
+    }
+
+    // オールセーフ選択モーダル
+    showSacrificeBuntAllSafeModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('allSafeSelectResult')}</h3>
+                <p>${i18n.t('selectResultsMultiple')}</p>
+
+                <div class="allsafe-options">
+                    <label>
+                        <input type="checkbox" id="allsafe-fielders-choice" class="allsafe-checkbox">
+                        ${i18n.t('fieldersChoice')}
+                    </label><br>
+                    <label>
+                        <input type="checkbox" id="allsafe-hit" class="allsafe-checkbox">
+                        ${i18n.t('hit')}
+                    </label><br>
+                    <label>
+                        <input type="checkbox" id="allsafe-error" class="allsafe-checkbox">
+                        ${i18n.t('error')}
+                    </label>
+                </div>
+
+                <div id="hit-type-selection" style="display: none; margin-top: 10px;">
+                    <label>${i18n.t('hitType')}</label>
+                    <select id="hitTypeSelect">
+                        <option value="single">${i18n.t('single')}</option>
+                        <option value="double">${i18n.t('double')}</option>
+                        <option value="triple">${i18n.t('triple')}</option>
+                    </select>
+                </div>
+
+                <div class="modal-buttons">
+                    <button id="confirmAllSafe" class="primary-btn">${i18n.t('nextButton')}</button>
+                    <button id="cancelAllSafe" class="secondary-btn">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 安打チェックボックスの変更で安打種類選択を表示/非表示
+        const hitCheckbox = document.getElementById('allsafe-hit');
+        const hitTypeDiv = document.getElementById('hit-type-selection');
+        hitCheckbox.addEventListener('change', () => {
+            hitTypeDiv.style.display = hitCheckbox.checked ? 'block' : 'none';
+        });
+
+        document.getElementById('confirmAllSafe').addEventListener('click', () => {
+            const selectedResults = this.getSelectedAllSafeResults(modal);
+            if (selectedResults.length === 0) {
+                this.showError(i18n.t('selectAtLeastOne'));
+                return;
+            }
+            modal.remove();
+            this.showAllSafeAdvancementModal(selectedResults);
+        });
+
+        document.getElementById('cancelAllSafe').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    // 選択されたオールセーフ結果を取得
+    getSelectedAllSafeResults(modal) {
+        const results = [];
+
+        if (modal.querySelector('#allsafe-fielders-choice').checked) {
+            results.push({ type: 'fielders_choice', label: '野手選択' });
+        }
+
+        if (modal.querySelector('#allsafe-hit').checked) {
+            const hitType = modal.querySelector('#hitTypeSelect').value;
+            const hitLabels = {
+                'single': '単打',
+                'double': '二塁打',
+                'triple': '三塁打'
+            };
+            results.push({ type: hitType, label: hitLabels[hitType] });
+        }
+
+        if (modal.querySelector('#allsafe-error').checked) {
+            results.push({ type: 'reached_on_error', label: '失策' });
+        }
+
+        return results;
+    }
+
+    // オールセーフの進塁設定モーダル
+    showAllSafeAdvancementModal(selectedResults) {
+        const game = gameManager.currentGame;
+        const runners = game.runnersOnBase;
+        const batter = gameManager.getCurrentBatter();
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+
+        const runnerSelects = this.generateAllSafeRunnerSelects(runners, batter);
+
+        // 結果のラベル表示
+        const resultsLabel = selectedResults.map(r => r.label).join(' + ');
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('advancementSetup')}</h3>
+                <p>${i18n.t('record')}: ${resultsLabel}</p>
+                <p>${i18n.t('selectFinalPositions')}</p>
+
+                <div class="runner-advancement-settings">
+                    ${runnerSelects}
+                </div>
+
+                <div class="runs-input">
+                    <label>${i18n.t('runsCount')}</label>
+                    <input type="number" id="allsafeRuns" min="0" max="4" value="0">
+                </div>
+
+                <div class="modal-buttons">
+                    <button id="confirmAllSafeAdvancement" class="primary-btn">${i18n.t('confirm')}</button>
+                    <button id="cancelAllSafeAdvancement" class="secondary-btn">${i18n.t('cancel')}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('confirmAllSafeAdvancement').addEventListener('click', async () => {
+            const finalRunners = this.getAllSafeRunners(modal);
+            const finalRuns = parseInt(document.getElementById('allsafeRuns').value);
+            modal.remove();
+            await this.completeAllSafe(selectedResults, finalRunners, finalRuns);
+        });
+
+        document.getElementById('cancelAllSafeAdvancement').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
+    // オールセーフ用の走者選択UI生成（打者含む）
+    generateAllSafeRunnerSelects(runners, batter) {
+        let html = '';
+
+        // 打者
+        html += `
+            <div class="runner-select">
+                <label>${i18n.t('batter')} ${batter.name}${i18n.t('destination')}</label>
+                <select id="batter-destination">
+                    <option value="first" selected>${i18n.t('first')}</option>
+                    <option value="second">${i18n.t('second')}</option>
+                    <option value="third">${i18n.t('third')}</option>
+                    <option value="home">${i18n.t('homeScore')}</option>
+                </select>
+            </div>
+        `;
+
+        // 既存走者
+        if (runners.first) {
+            html += `
+                <div class="runner-select">
+                    <label>${i18n.t('firstRunner')} ${runners.first.name}${i18n.t('destination')}</label>
+                    <select id="runner-first-allsafe-destination">
+                        <option value="first">${i18n.t('first')}</option>
+                        <option value="second" selected>${i18n.t('second')}</option>
+                        <option value="third">${i18n.t('third')}</option>
+                        <option value="home">${i18n.t('homeScore')}</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        if (runners.second) {
+            html += `
+                <div class="runner-select">
+                    <label>${i18n.t('secondRunner')} ${runners.second.name}${i18n.t('destination')}</label>
+                    <select id="runner-second-allsafe-destination">
+                        <option value="second">${i18n.t('second')}</option>
+                        <option value="third" selected>${i18n.t('third')}</option>
+                        <option value="home">${i18n.t('homeScore')}</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        if (runners.third) {
+            html += `
+                <div class="runner-select">
+                    <label>${i18n.t('thirdRunner')} ${runners.third.name}${i18n.t('destination')}</label>
+                    <select id="runner-third-allsafe-destination">
+                        <option value="third">${i18n.t('third')}</option>
+                        <option value="home" selected>${i18n.t('homeScore')}</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        return html;
+    }
+
+    // オールセーフの走者状況を取得
+    getAllSafeRunners(modal) {
+        const game = gameManager.currentGame;
+        const originalRunners = game.runnersOnBase;
+        const batter = gameManager.getCurrentBatter();
+        const newRunners = {
+            first: null,
+            second: null,
+            third: null
+        };
+
+        // 打者
+        const batterDest = modal.querySelector('#batter-destination')?.value;
+        if (batterDest === 'first') newRunners.first = batter;
+        else if (batterDest === 'second') newRunners.second = batter;
+        else if (batterDest === 'third') newRunners.third = batter;
+
+        // 元の走者
+        if (originalRunners.first) {
+            const dest = modal.querySelector('#runner-first-allsafe-destination')?.value;
+            if (dest === 'first') newRunners.first = originalRunners.first;
+            else if (dest === 'second') newRunners.second = originalRunners.first;
+            else if (dest === 'third') newRunners.third = originalRunners.first;
+        }
+
+        if (originalRunners.second) {
+            const dest = modal.querySelector('#runner-second-allsafe-destination')?.value;
+            if (dest === 'second') newRunners.second = originalRunners.second;
+            else if (dest === 'third') newRunners.third = originalRunners.second;
+        }
+
+        return newRunners;
+    }
+
+    // オールセーフの確定処理
+    async completeAllSafe(selectedResults, finalRunners, finalRuns) {
+        const game = gameManager.currentGame;
+        const batter = gameManager.getCurrentBatter();
+        const resultDetail = document.getElementById('atBatResultDetail').value;
+
+        // 走者を更新
+        game.runnersOnBase = finalRunners;
+
+        // 得点を更新
+        const battingTeam = game.isTopHalf ? 'away' : 'home';
+        if (game.isTopHalf) {
+            game.awayScore += finalRuns;
+        } else {
+            game.homeScore += finalRuns;
+        }
+
+        // 主要な結果タイプを決定（安打があれば安打、なければ最初の結果）
+        const hitResult = selectedResults.find(r => ['single', 'double', 'triple'].includes(r.type));
+        const primaryResult = hitResult ? hitResult.type : selectedResults[0].type;
+
+        // 失策があればチーム・選手エラーを記録
+        if (selectedResults.some(r => r.type === 'reached_on_error')) {
+            const fieldingTeam = game.isTopHalf ? 'home' : 'away';
+            game.teamStats[fieldingTeam].errors++;
+        }
+
+        // 打者統計更新
+        if (batter) {
+            if (hitResult) {
+                batter.stats.hits++;
+                batter.stats.atBats++;
+                if (primaryResult === 'single') batter.stats.singles++;
+                else if (primaryResult === 'double') batter.stats.doubles++;
+                else if (primaryResult === 'triple') batter.stats.triples++;
+            } else {
+                batter.stats.atBats++;
+            }
+        }
+
+        // 結果ラベルを作成
+        const resultsLabel = selectedResults.map(r => r.label).join('+');
+        const detailWithResults = resultDetail ? `${resultDetail} (${resultsLabel})` : resultsLabel;
+
+        // 打席結果を記録
+        await gameManager.recordAtBatResult(primaryResult, detailWithResults, finalRuns, 0);
+
+        // 投手統計は更新しない（アウトではないため）
+
+        await gameManager.saveGame();
+
+        this.showSuccess(i18n.t('allSafeRecorded'));
+        this.updateGameDisplay();
+        this.prepareNextBatter();
+    }
+
     showAtBatCompletionPrompt(lastPitchResult) {
-        if (gameManager.currentGame.balls >= 4) {
+        if (lastPitchResult === 'walk') {
             this.showSuccess('四球です。打席結果を選択してください。');
-        } else if (gameManager.currentGame.strikes >= 3) {
+            this.updateAtBatResultButtonsFiltered(['walk', 'intentional_walk']);
+        } else if (lastPitchResult === 'strikeout_looking') {
+            this.showSuccess('見逃し三振です。打席結果を選択してください。');
+            this.updateAtBatResultButtonsFiltered(['strikeout', 'strikeout_looking']);
+        } else if (lastPitchResult === 'strikeout_swinging') {
+            this.showSuccess('空振り三振です。打席結果を選択してください。');
+            this.updateAtBatResultButtonsFiltered(['strikeout', 'strikeout_swinging', 'strikeout_passed_ball']);
+        } else if (lastPitchResult === 'strikeout_bunt') {
+            this.showSuccess('スリーバント失敗（三振）です。打席結果を選択してください。');
+            this.updateAtBatResultButtonsFiltered(['strikeout', 'strikeout_bunt']);
+        } else if (lastPitchResult === 'strikeout') {
+            // 後方互換性のため残す
             this.showSuccess('三振です。打席結果を選択してください。');
-        } else if (lastPitchResult === 'hit') {
-            this.showSuccess('打球です。打席結果を選択してください。');
+            this.updateAtBatResultButtonsFiltered(['strikeout', 'strikeout_swinging', 'strikeout_looking', 'strikeout_passed_ball']);
         }
 
         // 打席結果選択エリアにスクロール
@@ -4270,6 +10505,110 @@ class BaseballApp {
         if (completionSection) {
             completionSection.scrollIntoView({ behavior: 'smooth' });
         }
+    }
+
+    showFairBallResults() {
+        this.showSuccess('フェア（打球）です。打席結果を選択してください。');
+
+        // 打球系の結果のみをフィルタリング（四球・死球・三振を除外）
+        const fairBallResults = this.getFairBallResults();
+        this.updateAtBatResultButtonsFiltered(fairBallResults);
+
+        // 打席結果選択エリアにスクロール
+        const completionSection = document.querySelector('.at-bat-completion');
+        if (completionSection) {
+            completionSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    getFairBallResults() {
+        const game = gameManager.currentGame;
+        const outs = game.outs;
+        const runners = game.runnersOnBase;
+        const hasRunners = runners.first || runners.second || runners.third;
+
+        const results = [];
+
+        // 安打系（打球が飛んだもの）
+        results.push('single', 'double', 'triple', 'homerun');
+        results.push('single_error', 'double_error', 'triple_error');
+
+        // 凡退系（打球が飛んだもの）
+        results.push('groundout', 'flyout', 'lineout', 'popout', 'foulout');
+
+        // 犠打系（打球が飛んだもの）
+        // 犠打は0-1アウトで走者がいる場合のみ表示
+        if (gameManager.isSacrificeBuntEligible()) {
+            results.push('sacrifice_bunt');
+        }
+        results.push('sacrifice_fly');
+
+        // 野選・エラー出塁（打球が飛んだもの）
+        results.push('fielders_choice', 'reached_on_error');
+
+        // 併殺（走者がいて、二死未満の場合）
+        if (hasRunners && outs < 2) {
+            results.push('ground_double_play', 'fly_double_play', 'liner_double_play');
+        }
+
+        // 三重殺（走者2人以上いて、無死の場合）
+        const runnerCount = (runners.first ? 1 : 0) + (runners.second ? 1 : 0) + (runners.third ? 1 : 0);
+        if (runnerCount >= 2 && outs === 0) {
+            results.push('ground_triple_play', 'fly_triple_play', 'liner_triple_play');
+        }
+
+        // インフィールドフライ（走者が1・2塁または満塁で、無死または一死の場合）
+        if (outs < 2 && runners.first && runners.second) {
+            results.push('infield_fly');
+        }
+
+        // 故意落球（少なくとも1塁走者がいて、無死または一死の場合）
+        if (outs < 2 && runners.first) {
+            results.push('intentional_drop');
+        }
+
+        // 妨害・阻害（打球に関連する可能性のあるもの）
+        results.push('interference', 'obstruction');
+
+        return results;
+    }
+
+    updateAtBatResultButtonsFiltered(allowedResults) {
+        const container = document.getElementById('atBatResultButtons');
+        if (!container) return;
+
+        // 3塁走者の有無をチェック
+        const game = gameManager.currentGame;
+        const hasThirdRunner = game && game.runnersOnBase && game.runnersOnBase.third;
+
+        // インフィールドフライ条件：0-1アウトで1・2塁または満塁
+        const infieldFlyCondition = game && game.outs < 2 &&
+            game.runnersOnBase.first && game.runnersOnBase.second;
+
+        // 許可された結果のみ表示
+        container.innerHTML = allowedResults.map(result => {
+            let label = BASEBALL_CONFIG.AT_BAT_RESULTS[result] || result;
+
+            // 犠打の場合、3塁走者がいれば「犠打（スクイズ含む）」と表示
+            if (result === 'sacrifice_bunt' && hasThirdRunner) {
+                label = i18n.t('sacrificeBuntIncludingSqueeze');
+            }
+
+            // フライアウトの場合、インフィールドフライ条件下では括弧書きを追加
+            if (result === 'flyout' && infieldFlyCondition) {
+                label = (i18n.t('flyout') || label) + i18n.t('infieldFlyIncluded');
+            }
+
+            return `<button class="at-bat-result-btn" data-result="${result}">${label}</button>`;
+        }).join('');
+
+        // クリックイベントを設定
+        container.querySelectorAll('.at-bat-result-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                container.querySelectorAll('.at-bat-result-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+            });
+        });
     }
 
     handleWildPitchOrPassedBall(result) {
@@ -4474,20 +10813,50 @@ class BaseballApp {
         const resultDetail = document.getElementById('atBatResultDetail').value;
 
         try {
+            // 犠打の場合は特別なフローを実行
+            if (result === 'sacrifice_bunt') {
+                this.showSacrificeBuntOutcomeModal();
+                return;
+            }
+
+            // 故意落球の場合は野手選択モーダルを表示
+            if (result === 'intentional_drop') {
+                const advancement = gameManager.calculateRunnerAdvancement(result);
+                const batter = gameManager.getCurrentBatter();
+                this.showIntentionalDropFielderModal(result, resultDetail, advancement, batter);
+                return;
+            }
+
+            // ホームランの場合は柵越え確認
+            if (result === 'homerun') {
+                const batter = gameManager.getCurrentBatter();
+                const advancement = gameManager.calculateRunnerAdvancement(result);
+                this.fromPitchInterface = true;
+                this.showHomerunTypeModal(result, resultDetail, advancement, batter);
+                return;
+            }
+
             // 走者進塁・得点を自動計算
             const advancement = gameManager.calculateRunnerAdvancement(result);
+            const batter = gameManager.getCurrentBatter();
 
             // 複雑な状況の場合は調整画面を表示
             if (advancement.needsAdjustment) {
-                const batter = gameManager.getCurrentBatter();
+                this.fromPitchInterface = true;
                 this.showRunnerAdvancementModal(result, resultDetail, advancement, batter);
             } else {
-                // 自動計算結果でそのまま記録
-                const batter = gameManager.getCurrentBatter();
-                await this.finalizeAtBat(result, resultDetail, advancement, batter);
+                // ボールインプレー/デッド判定
+                const previousOuts = gameManager.currentGame.outs - (advancement.outsAdded || 0);
+                const isPlayContinuing = gameManager.isPlayContinuing(result, previousOuts);
 
-                // 次の打者の準備
-                this.prepareNextBatter();
+                if (isPlayContinuing) {
+                    this.fromPitchInterface = true;
+                    this.showAdditionalPlayModal(result, resultDetail, advancement, batter);
+                } else {
+                    await this.finalizeAtBat(result, resultDetail, advancement, batter);
+                    this.showBallDeadBanner();
+                    this.prepareNextBatter();
+                }
             }
 
         } catch (error) {
@@ -4496,43 +10865,294 @@ class BaseballApp {
         }
     }
 
+    // 打席途中の投手交代を検出し、必要に応じてカウント入力を求める
+    async handleMidAtBatPitcherChange(oldPitcherId) {
+        if (!gameManager.currentAtBat || !oldPitcherId) return;
+        const mode = gameManager.currentGame?.recordingMode;
+        if (mode === 'pitch') {
+            // 球ごとモード：カウントは自動取得
+            gameManager.currentAtBat.midAtBatPitchChange = {
+                previousPitcherId: oldPitcherId,
+                balls: gameManager.currentGame.balls,
+                strikes: gameManager.currentGame.strikes
+            };
+        } else if (mode === 'batter') {
+            // 打席ごとモード：ユーザーにカウントを選択させる
+            await this.showMidAtBatPitcherChangeCountModal(oldPitcherId);
+        }
+    }
+
+    // 打席途中交代カウント選択モーダル（打席ごとの記録モード用）
+    showMidAtBatPitcherChangeCountModal(oldPitcherId) {
+        return new Promise(resolve => {
+            const foulDrops = gameManager.currentAtBat?.foulFlyDroppedCount || 0;
+
+            // ストライクカウント制約
+            const strikeDisabled = [
+                foulDrops >= 1, // 0ストライクは不可（落球1回以上あり）
+                foulDrops >= 2, // 1ストライクは不可（落球2回あり）
+                false           // 2ストライクは常に可
+            ];
+            // 落球0回の場合は全て選択可能
+            if (foulDrops === 0) { strikeDisabled[0] = false; strikeDisabled[1] = false; }
+
+            const strikeButtons = [0, 1, 2].map(s => {
+                const disabled = strikeDisabled[s] ? 'disabled' : '';
+                return `<button class="count-btn strike-btn ${disabled}" data-strikes="${s}" ${disabled}>${s}</button>`;
+            }).join('');
+
+            const ballButtons = [0, 1, 2, 3].map(b =>
+                `<button class="count-btn ball-btn" data-balls="${b}">${b}</button>`
+            ).join('');
+
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>${i18n.t('midAtBatPitchChangeTitle')}</h3>
+                    <p class="modal-note">${i18n.t('midAtBatPitchChangeNote')}</p>
+                    <div class="count-selection">
+                        <div class="count-group">
+                            <label>${i18n.t('ballCount')}</label>
+                            <div class="count-buttons">${ballButtons}</div>
+                        </div>
+                        <div class="count-group">
+                            <label>${i18n.t('strikeCount')}</label>
+                            <div class="count-buttons">${strikeButtons}</div>
+                        </div>
+                    </div>
+                    <div class="count-display">${i18n.t('midAtBatCountSelected')}: <span id="selectedCountDisplay">-</span></div>
+                    <button id="confirmMidAtBatCount" class="primary-btn" disabled>${i18n.t('confirm')}</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            let selectedBalls = null;
+            let selectedStrikes = null;
+
+            const updateDisplay = () => {
+                const display = modal.querySelector('#selectedCountDisplay');
+                const confirmBtn = modal.querySelector('#confirmMidAtBatCount');
+                if (selectedBalls !== null && selectedStrikes !== null) {
+                    display.textContent = `${selectedBalls}B-${selectedStrikes}S`;
+                    confirmBtn.disabled = false;
+                } else {
+                    display.textContent = '-';
+                    confirmBtn.disabled = true;
+                }
+            };
+
+            modal.querySelectorAll('.ball-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    modal.querySelectorAll('.ball-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedBalls = parseInt(btn.dataset.balls);
+                    updateDisplay();
+                });
+            });
+
+            modal.querySelectorAll('.strike-btn:not([disabled])').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    modal.querySelectorAll('.strike-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedStrikes = parseInt(btn.dataset.strikes);
+                    updateDisplay();
+                });
+            });
+
+            // 落球2回の場合は2ストライクを自動選択
+            if (foulDrops >= 2) {
+                const twoStrikeBtn = modal.querySelector('.strike-btn[data-strikes="2"]');
+                if (twoStrikeBtn) { twoStrikeBtn.classList.add('selected'); selectedStrikes = 2; }
+            }
+
+            modal.querySelector('#confirmMidAtBatCount').addEventListener('click', () => {
+                if (selectedBalls !== null && selectedStrikes !== null) {
+                    gameManager.currentAtBat.midAtBatPitchChange = {
+                        previousPitcherId: oldPitcherId,
+                        balls: selectedBalls,
+                        strikes: selectedStrikes
+                    };
+                    modal.remove();
+                    resolve();
+                }
+            });
+        });
+    }
+
+    showIntentionalDropFielderModal(result, resultDetail, advancement, batter) {
+        const game = gameManager.currentGame;
+        const fieldingTeam = game.isTopHalf ? 'home' : 'away';
+        const fieldingTeamName = game.isTopHalf ? game.homeTeam : game.awayTeam;
+        const fieldingPlayers = game.players[fieldingTeam] || [];
+
+        const positionOrder = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
+
+        let fielderButtons;
+        if (game.playerDetailLevel === 'basic') {
+            // 基本モード：ポジション名のみ
+            fielderButtons = positionOrder.map(pos => {
+                const posName = i18n.t(`pos_${pos}`);
+                return `<button class="fielder-select-btn" data-position="${pos}" data-player-id="">${posName}</button>`;
+            }).join('');
+        } else {
+            // 標準/詳細モード：守備ポジション順に選手名付きで表示
+            const sortedPlayers = [...fieldingPlayers]
+                .filter(p => p.position && p.position !== 'DH')
+                .sort((a, b) => {
+                    const aNum = BASEBALL_CONFIG.POSITION_NUMBERS[a.position] || 99;
+                    const bNum = BASEBALL_CONFIG.POSITION_NUMBERS[b.position] || 99;
+                    return aNum - bNum;
+                });
+
+            if (sortedPlayers.length === 0) {
+                fielderButtons = positionOrder.map(pos => {
+                    const posName = i18n.t(`pos_${pos}`);
+                    return `<button class="fielder-select-btn" data-position="${pos}" data-player-id="">${posName}</button>`;
+                }).join('');
+            } else {
+                fielderButtons = sortedPlayers.map(player => {
+                    const posName = i18n.t(`pos_${player.position}`);
+                    return `<button class="fielder-select-btn" data-position="${player.position}" data-player-id="${player.id}">${posName}（${player.name}）</button>`;
+                }).join('');
+            }
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${i18n.t('intentionalDropFielderSelect')}</h3>
+                <p class="modal-note">${fieldingTeamName} &mdash; ${i18n.t('intentionalDropNoError')}</p>
+                <div class="fielder-selection-grid">
+                    ${fielderButtons}
+                </div>
+                <button id="cancelIntentionalDrop" class="secondary-btn">${i18n.t('cancel')}</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.querySelectorAll('.fielder-select-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const position = btn.dataset.position;
+                const playerId = btn.dataset.playerId;
+                const posName = i18n.t(`pos_${position}`);
+
+                let playerName = '';
+                if (playerId) {
+                    const player = fieldingPlayers.find(p => p.id === playerId);
+                    if (player) playerName = player.name;
+                }
+
+                const fielderDetail = playerName ? `${posName}（${playerName}）` : posName;
+                const finalDetail = resultDetail ? `${resultDetail} - ${fielderDetail}` : fielderDetail;
+
+                // 野手IDをat-batに設定（個人記録リンク用）
+                if (playerId && gameManager.currentAtBat) {
+                    gameManager.currentAtBat.fielderPlayerId = playerId;
+                }
+
+                modal.remove();
+
+                try {
+                    await this.finalizeAtBat(result, finalDetail, advancement, batter);
+                    this.showBallDeadBanner();
+                    this.prepareNextBatter();
+                } catch (error) {
+                    console.error('故意落球記録エラー:', error);
+                    this.showError('故意落球の記録に失敗しました');
+                }
+            });
+        });
+
+        document.getElementById('cancelIntentionalDrop').addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+
     prepareNextBatter() {
         // カウントリセット
         gameManager.currentGame.balls = 0;
         gameManager.currentGame.strikes = 0;
 
+        // 打席が変わったのでアクション履歴をリセット
+        this.pitchActionHistory = [];
+
         // 表示更新
         this.updatePitchDisplay();
         this.clearAtBatCompletionForm();
+        this._updatePitchUndoBtn();
     }
 
-    async undoLastPitch() {
-        if (!gameManager.currentAtBat || !gameManager.currentAtBat.pitches.length) {
-            this.showError('取り消す投球がありません');
+    async undoLastPitchAction() {
+        const history = this.pitchActionHistory;
+        if (!history?.length) {
+            this.showError('取り消せるプレーがありません');
             return;
         }
 
+        const last = history[history.length - 1];
+
         try {
-            // 最後の投球を削除
-            const lastPitch = gameManager.currentAtBat.pitches.pop();
+            if (last.type === 'pitch') {
+                // 投球取り消し: currentAtBat.pitches の末尾を削除
+                if (!gameManager.currentAtBat?.pitches.length) {
+                    this.showError('取り消す投球がありません');
+                    return;
+                }
+                const lastPitch = gameManager.currentAtBat.pitches.pop();
+                gameManager.currentGame.balls = lastPitch.count.balls;
+                gameManager.currentGame.strikes = lastPitch.count.strikes;
+                if (lastPitch.id) await storage.deleteData('pitches', lastPitch.id);
+                this.showSuccess('前球を取り消しました');
 
-            // カウントを戻す
-            gameManager.currentGame.balls = lastPitch.count.balls;
-            gameManager.currentGame.strikes = lastPitch.count.strikes;
-
-            // データベースから削除
-            if (lastPitch.id) {
-                await storage.deleteData('pitches', lastPitch.id);
+            } else if (last.type === 'baserunning') {
+                // 走者プレー取り消し: スナップショットから状態を復元
+                const s = last.snapshot;
+                const g = gameManager.currentGame;
+                g.runnersOnBase = s.runnersOnBase;
+                g.outs = s.outs;
+                g.homeScore = s.homeScore;
+                g.awayScore = s.awayScore;
+                if (gameManager.currentInning) gameManager.currentInning.runs = s.inningRuns;
+                const playLabel = last.playType.replace(/_/g, '');
+                this.showSuccess(`${playLabel} を取り消しました`);
             }
 
-            // 表示更新
+            history.pop();
+            this._updatePitchUndoBtn();
             this.updateGameDisplay();
             this.updatePitchDisplay();
-            this.showSuccess('前球を取り消しました');
 
         } catch (error) {
-            console.error('投球取り消しエラー:', error);
-            this.showError('投球の取り消しに失敗しました');
+            console.error('プレー取り消しエラー:', error);
+            this.showError('取り消しに失敗しました');
+        }
+    }
+
+    _updatePitchUndoBtn() {
+        const btn = document.getElementById('undoLastPitch');
+        if (!btn) return;
+        const history = this.pitchActionHistory;
+        if (!history?.length) {
+            btn.disabled = true;
+            btn.textContent = '前プレー取消';
+            return;
+        }
+        btn.disabled = false;
+        const last = history[history.length - 1];
+        if (last.type === 'pitch') {
+            const labelMap = {
+                ball: 'ボール', strike_looking: '見逃しST', strike_swinging: '空振りST',
+                foul: 'ファウル', foul_bunt: 'バントFoul', hit: 'フェア', hit_by_pitch: '死球'
+            };
+            btn.textContent = `取消: ${labelMap[last.result] ?? last.result}`;
+        } else if (last.type === 'baserunning') {
+            const labelMap = {
+                steal_success: '盗塁成功', steal_failure: '盗塁死',
+                pickoff_safe: '牽制帰塁', pickoff_out: '牽制死', balk: 'ボーク'
+            };
+            btn.textContent = `取消: ${labelMap[last.playType] ?? last.playType}`;
         }
     }
 
@@ -4549,25 +11169,30 @@ class BaseballApp {
         if (rbisEl) rbisEl.value = '0';
 
         // 階層的選択状態をリセット
-        this.currentResultView = 'categories';
+        this.currentResultView = 'top';
         this.selectedCategory = null;
+        this.selectedSubCategory = null;
         this.selectedResult = null;
+        this.selectedHitDirection = null; // 安打方向をクリア
+        this.selectedInterferingRunner = null; // 妨害走者をクリア
+        this.selectedOutDetail = null; // 三振詳細をクリア
+        this.selectedFairFoul = null; // Fair/Foulをクリア
+        this.selectedDroppedThird = null; // 振り逃げをクリア
 
         // エラー配列をクリア
         this.currentErrors = [];
         this.updateErrorsList();
 
-        // ボタンの選択状態をクリアして、カテゴリビューに戻る
+        // ボタンの選択状態をクリアして、トップレベルビューに戻る
         this.updateResultButtons();
     }
 
     clearPitchForm() {
-        const velocityEl = document.getElementById('velocity');
-        const locationEl = document.getElementById('pitchLocation');
-
-        if (velocityEl) velocityEl.value = '';
-        if (locationEl) locationEl.value = '';
-
+        // 球種ボタンの選択をクリア
+        document.querySelectorAll('.pitch-type-btn').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        // 投球結果ボタンの選択をクリア
         document.querySelectorAll('.pitch-result-btn').forEach(btn => {
             btn.classList.remove('selected');
         });
@@ -4592,6 +11217,9 @@ class BaseballApp {
         document.getElementById('homeScore').textContent = summary.homeScore;
         document.getElementById('awayScore').textContent = summary.awayScore;
         document.getElementById('currentInning').textContent = gameManager.getCurrentInningDisplay();
+
+        // 試合終了確定待ちバナーを更新
+        this._updateGameEndBanner();
 
         // 攻撃中チームをハイライト
         this.updateAttackingTeamHighlight();
@@ -4625,6 +11253,72 @@ class BaseballApp {
 
         if (gameManager.currentGame.recordingLevel === 'inning') {
             this.updateCurrentInningDisplay();
+        }
+    }
+
+    _updateGameEndBanner() {
+        const banner = document.getElementById('gameEndBanner');
+        if (!banner) return;
+
+        const game = gameManager.currentGame;
+        if (!game || game.status !== 'pending_confirm') {
+            banner.classList.add('hidden');
+            return;
+        }
+
+        banner.classList.remove('hidden');
+
+        // イニングモードはスナップショットがある場合のみ「戻す」ボタンを表示
+        const undoBtn = document.getElementById('undoFromEndBtn');
+        if (undoBtn) {
+            const level = game.recordingLevel;
+            if (level === 'inning') {
+                undoBtn.style.display = this._endHalfInningSnap ? '' : 'none';
+            } else {
+                undoBtn.style.display = '';
+            }
+        }
+    }
+
+    async confirmGame() {
+        try {
+            const finalStatus = await gameManager.confirmGame();
+            if (!finalStatus) return;
+            this.showSuccess(i18n.t('gameConfirmed') || '試合を確定しました');
+            this.showScreen('welcomeScreen');
+        } catch (err) {
+            console.error('試合確定エラー:', err);
+            this.showError(err.message || '試合の確定に失敗しました');
+        }
+    }
+
+    async undoFromGameEnd() {
+        const level = gameManager.currentGame?.recordingLevel;
+        if (level === 'inning') {
+            await this._undoEndHalfInning();
+        } else {
+            await this.undoLastAtBat();
+        }
+    }
+
+    async _undoEndHalfInning() {
+        const snap = this._endHalfInningSnap;
+        if (!snap) {
+            this.showError(i18n.t('nothingToUndo') || '取り消す操作がありません');
+            return;
+        }
+        try {
+            await gameManager.undoEndHalfInning(snap);
+            this._endHalfInningSnap = null;
+            this.inningActionHistory = snap.inningActionHistory || [];
+            this._updateInningUndoBtn();
+            this.updateCurrentInningDisplay();
+            this.updateGameDisplay();
+            this.loadInningHistory();
+            this.showSuccess(i18n.t('undoEndHalfInningDone') || '攻撃終了を取り消しました');
+        } catch (err) {
+            console.error('攻撃終了取消エラー:', err);
+            this.showError(err.message || '取り消しに失敗しました');
         }
     }
 
@@ -4695,9 +11389,19 @@ class BaseballApp {
                 // runnerNameが'batter'の場合は現在打者、それ以外は実際の名前表示
                 const displayName = runnerName === 'batter' ? i18n.t('batter') : this.getRunnerDisplayName(runnerName);
                 console.log(`Setting ${baseName} runner display:`, runnerName, '->', displayName);
-                runnerNameEl.textContent = displayName;
+
+                // 非自責走者の場合は視覚的インジケータを追加
+                const earnedStatus = gameManager.currentGame?.runnersEarnedStatus?.[baseName] ?? true;
+                if (!earnedStatus) {
+                    baseEl.classList.add('unearned-runner');
+                    runnerNameEl.textContent = displayName + ' *';
+                } else {
+                    baseEl.classList.remove('unearned-runner');
+                    runnerNameEl.textContent = displayName;
+                }
             } else {
                 baseEl.classList.remove('occupied');
+                baseEl.classList.remove('unearned-runner');
                 runnerNameEl.textContent = '-';
             }
         }
@@ -4791,6 +11495,38 @@ class BaseballApp {
         }
     }
 
+    async abandonCurrentGame() {
+        const game = gameManager.currentGame;
+        if (!game) {
+            this.showError('試合が開始されていません');
+            return;
+        }
+
+        const msg = i18n.t('abandonGameConfirm')
+            .replace('{away}', game.awayTeam || '?')
+            .replace('{home}', game.homeTeam || '?');
+        if (!confirm(msg)) return;
+
+        try {
+            const gameId = game.id;
+            // ゲームマネージャーの状態をリセット
+            gameManager.currentGame = null;
+            gameManager.currentInning = null;
+            gameManager.currentAtBat = null;
+            gameManager.isRecording = false;
+
+            // DBから全データ削除
+            if (gameId) {
+                await storage.deleteGame(gameId);
+            }
+
+            this.showScreen('welcomeScreen');
+        } catch (error) {
+            console.error('試合削除エラー:', error);
+            this.showError('試合データの削除に失敗しました');
+        }
+    }
+
     showGameTimeInfo() {
         const game = gameManager.currentGame;
         if (!game) {
@@ -4878,41 +11614,589 @@ class BaseballApp {
         }
     }
 
+    async loadActiveGamesOnWelcome() {
+        try {
+            const games = await storage.getAllGames();
+            const active = games.filter(g => g.status === 'active')
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+            const section = document.getElementById('activeGamesSection');
+            if (!section) return;
+
+            if (active.length === 0) {
+                section.classList.remove('has-games');
+                section.innerHTML = '';
+                return;
+            }
+
+            const levelLabel = l => i18n.t({ inning:'recordingLevelInningShort', batter:'recordingLevelBatterShort', pitch:'recordingLevelPitchShort' }[l] || 'recordingLevelInningShort');
+
+            const cards = active.map(game => {
+                const date = new Date(game.date).toLocaleDateString();
+                const progress = `${game.currentInning}回${game.isTopHalf ? '表' : '裏'} ${game.outs}アウト`;
+                return `<div class="welcome-active-card">
+                    <div class="welcome-active-card-info">
+                        <div class="welcome-active-card-teams">${game.awayTeam || '?'} ${game.awayScore ?? 0} - ${game.homeScore ?? 0} ${game.homeTeam || '?'}</div>
+                        <div class="welcome-active-card-meta">${date}　${levelLabel(game.recordingLevel)}</div>
+                        <div class="welcome-active-card-progress">${progress}</div>
+                    </div>
+                    <button type="button" class="welcome-resume-btn" data-game-id="${game.id}">${i18n.t('resumeGame')}</button>
+                </div>`;
+            }).join('');
+
+            section.innerHTML = `<div class="active-games-section-title">${i18n.t('activeGamesSection')}</div>${cards}`;
+            section.classList.add('has-games');
+
+            section.querySelectorAll('.welcome-resume-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    await this.loadGame(parseInt(btn.dataset.gameId));
+                });
+            });
+        } catch (e) {
+            console.error('継続試合の読み込みエラー:', e);
+        }
+    }
+
     showGamesModal(games) {
+        const statusClass = s => ({ active:'active', completed:'completed', draw:'draw', no_game:'no-game', called:'called' }[s] || 'completed');
+        const statusLabel = s => i18n.t({ active:'statusActive', completed:'statusCompleted', draw:'drawGame', no_game:'noGame', called:'statusCalled' }[s] || 'statusCompleted');
+        const levelLabel = l => i18n.t({ inning:'recordingLevelInningShort', batter:'recordingLevelBatterShort', pitch:'recordingLevelPitchShort' }[l] || 'recordingLevelInningShort');
+
+        const buildItem = (game) => {
+            const sc = statusClass(game.status);
+            const isActive = game.status === 'active';
+            const progressHtml = isActive
+                ? `<div class="game-item-progress">${game.currentInning}回${game.isTopHalf ? '表' : '裏'} ${game.outs}アウト</div>`
+                : '';
+            return `<div class="game-item game-item--${sc}" data-away="${(game.awayTeam||'').toLowerCase()}" data-home="${(game.homeTeam||'').toLowerCase()}">
+                <div class="game-item-header">
+                    <span class="status-badge status-badge--${sc}">${statusLabel(game.status)}</span>
+                    <span class="game-level-badge">${levelLabel(game.recordingLevel)}</span>
+                    <span class="game-date">${new Date(game.date).toLocaleDateString()}</span>
+                </div>
+                <div class="game-teams">
+                    <strong>${game.awayTeam || '?'} ${game.awayScore ?? '0'} - ${game.homeScore ?? '0'} ${game.homeTeam || '?'}</strong>
+                </div>
+                ${progressHtml}
+                <div class="game-item-actions">
+                    ${isActive ? `<button type="button" class="primary-btn load-game-btn" data-game-id="${game.id}">${i18n.t('resumeGame')}</button>` : ''}
+                    <button type="button" class="secondary-btn view-game-btn" data-game-id="${game.id}">${i18n.t('viewGame')}</button>
+                    <button type="button" class="danger-btn delete-game-btn" data-game-id="${game.id}">${i18n.t('delete')}</button>
+                </div>
+            </div>`;
+        };
+
+        const sorted = [...games].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const active = sorted.filter(g => g.status === 'active');
+        const others = sorted.filter(g => g.status !== 'active');
+
+        let listHtml = '';
+        if (sorted.length === 0) {
+            listHtml = `<p class="no-games-msg">${i18n.t('noSavedGames')}</p>`;
+        } else {
+            if (active.length > 0) {
+                listHtml += `<div class="games-section-title active-section">${i18n.t('activeGamesSection')}</div>`;
+                listHtml += active.map(buildItem).join('');
+            }
+            if (others.length > 0) {
+                listHtml += `<div class="games-section-title">${i18n.t('completedGamesSection')}</div>`;
+                listHtml += others.map(buildItem).join('');
+            }
+        }
+
         const modal = document.createElement('div');
         modal.className = 'modal';
+        modal.id = 'savedGamesModal';
         modal.innerHTML = `
-            <div class="modal-content">
-                <h3>保存された試合</h3>
-                <div class="games-list">
-                    ${games.map(game => `
-                        <div class="game-item" data-game-id="${game.id}">
-                            <div class="game-info">
-                                <strong>${game.awayTeam} vs ${game.homeTeam}</strong>
-                                <span>${new Date(game.date).toLocaleDateString()}</span>
-                                <span>${game.status === 'completed' ? '終了' : '進行中'}</span>
-                            </div>
-                            <button class="load-game-btn" data-game-id="${game.id}">読み込み</button>
-                        </div>
-                    `).join('')}
-                </div>
-                <button class="close-modal">閉じる</button>
-            </div>
-        `;
+            <div class="modal-content games-list-modal-content">
+                <h3>${i18n.t('savedGamesTitle')}</h3>
+                <input type="search" class="games-search-box" placeholder="${i18n.t('searchGamesPlaceholder')}">
+                <div class="games-list">${listHtml}</div>
+                <button type="button" class="secondary-btn close-modal">${i18n.t('cancel')}</button>
+            </div>`;
 
         document.body.appendChild(modal);
 
-        modal.querySelector('.close-modal').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-
-        modal.querySelectorAll('.load-game-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const gameId = parseInt(e.target.dataset.gameId);
-                await this.loadGame(gameId);
-                document.body.removeChild(modal);
+        // 検索フィルター
+        const searchBox = modal.querySelector('.games-search-box');
+        searchBox.addEventListener('input', () => {
+            const q = searchBox.value.toLowerCase().trim();
+            modal.querySelectorAll('.game-item').forEach(item => {
+                const match = !q || item.dataset.away.includes(q) || item.dataset.home.includes(q);
+                item.style.display = match ? '' : 'none';
+            });
+            // セクション見出しの表示制御
+            modal.querySelectorAll('.games-section-title').forEach(title => {
+                const next = title.nextElementSibling;
+                const hasVisible = [...title.parentNode.querySelectorAll('.game-item')].some(el => {
+                    const elTitle = el.previousElementSibling;
+                    // この見出しに属するアイテムかチェック
+                    let cursor = el.previousElementSibling;
+                    while (cursor && !cursor.classList.contains('games-section-title')) {
+                        cursor = cursor.previousElementSibling;
+                    }
+                    return cursor === title && el.style.display !== 'none';
+                });
+                title.style.display = hasVisible ? '' : 'none';
             });
         });
+
+        modal.querySelector('.close-modal').addEventListener('click', () => document.body.removeChild(modal));
+
+        const bindButtons = (container) => {
+            container.querySelectorAll('.load-game-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    await this.loadGame(parseInt(e.target.dataset.gameId));
+                    document.body.removeChild(modal);
+                });
+            });
+            container.querySelectorAll('.view-game-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    await this.showGameDetail(parseInt(e.target.dataset.gameId));
+                });
+            });
+            container.querySelectorAll('.delete-game-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    if (!confirm(i18n.t('confirmDeleteGame'))) return;
+                    const gameId = parseInt(e.target.dataset.gameId);
+                    try {
+                        await storage.deleteGame(gameId);
+                        const item = e.target.closest('.game-item');
+                        item.remove();
+                        if (modal.querySelectorAll('.game-item').length === 0) {
+                            modal.querySelector('.games-list').innerHTML = `<p class="no-games-msg">${i18n.t('noSavedGames')}</p>`;
+                        }
+                    } catch (err) {
+                        this.showError('削除に失敗しました');
+                    }
+                });
+            });
+        };
+
+        bindButtons(modal);
+    }
+
+    async showGameDetail(gameId) {
+        try {
+            const game = await storage.loadGame(gameId);
+            const allInnings = await storage.getInningsByGame(gameId);
+            allInnings.sort((a, b) => a.inning - b.inning || (a.isTopHalf ? -1 : 1));
+
+            const atBatsByInningId = {};
+            const pitchesByAtBatId = {};
+
+            if (game.recordingLevel === 'batter' || game.recordingLevel === 'pitch') {
+                for (const inning of allInnings) {
+                    const atBats = await storage.getAtBatsByInning(inning.id);
+                    atBatsByInningId[inning.id] = atBats;
+                    if (game.recordingLevel === 'pitch') {
+                        for (const ab of atBats) {
+                            pitchesByAtBatId[ab.id] = await storage.getPitchesByAtBat(ab.id);
+                        }
+                    }
+                }
+            }
+
+            // プレイヤーマップ作成
+            const playerMap = {};
+            ['home', 'away'].forEach(team => {
+                (game.players[team] || []).forEach(p => { playerMap[p.id] = p; });
+            });
+
+            document.getElementById('gameDetailBody').innerHTML =
+                this._buildGameDetailHTML(game, allInnings, atBatsByInningId, pitchesByAtBatId, playerMap);
+            document.getElementById('gameDetailTitle').textContent =
+                `${game.awayTeam || '?'} vs ${game.homeTeam || '?'}  ${new Date(game.date).toLocaleDateString()}`;
+            document.getElementById('gameDetailModal').classList.remove('modal--hidden');
+        } catch (err) {
+            console.error('試合詳細取得エラー:', err);
+            this.showError('試合詳細の取得に失敗しました');
+        }
+    }
+
+    _buildGameDetailHTML(game, innings, atBatsByInningId, pitchesByAtBatId, playerMap) {
+        let html = this._buildScoreboard(game, innings);
+        if (game.recordingLevel === 'batter' || game.recordingLevel === 'pitch') {
+            html += this._buildBattingTables(game, innings, atBatsByInningId, pitchesByAtBatId, playerMap);
+            html += this._buildPitcherSummary(game, innings, atBatsByInningId, pitchesByAtBatId, playerMap);
+        }
+        if (game.recordingLevel === 'pitch') {
+            html += this._buildPitchDetailSection(game, innings, atBatsByInningId, pitchesByAtBatId, playerMap);
+        }
+        return html;
+    }
+
+    // 投球結果を短縮記号に変換
+    _pitchResultSymbol(result) {
+        const map = {
+            'ball':             { sym: 'B',  cls: 'pr-ball' },
+            'strike_looking':   { sym: '見', cls: 'pr-strike' },
+            'strike_swinging':  { sym: '振', cls: 'pr-swing' },
+            'foul':             { sym: 'F',  cls: 'pr-foul' },
+            'foul_bunt':        { sym: 'Fバ',cls: 'pr-foul' },
+            'foul_fly_dropped': { sym: 'F↓', cls: 'pr-foul' },
+            'hit':              { sym: '打',  cls: 'pr-hit' },
+            'hit_by_pitch':     { sym: '死',  cls: 'pr-hbp' },
+        };
+        return map[result] || { sym: result || '?', cls: '' };
+    }
+
+    // 球ごと記録の投球詳細セクション
+    _buildPitchDetailSection(game, innings, atBatsByInningId, pitchesByAtBatId, playerMap) {
+        const sortedInnings = [...innings].sort((a, b) =>
+            a.inning !== b.inning ? a.inning - b.inning : (a.isTopHalf ? -1 : 1));
+
+        let blocks = '';
+        for (const inn of sortedInnings) {
+            const atBats = (atBatsByInningId[inn.id] || []);
+            if (atBats.length === 0) continue;
+
+            const halfLabel = inn.isTopHalf ? '表' : '裏';
+            const teamName  = inn.isTopHalf ? game.awayTeam : game.homeTeam;
+            const incTag    = inn.incomplete ? ' <span class="pitch-inc-tag">✕</span>' : '';
+
+            let atBatBlocks = '';
+            for (const ab of atBats) {
+                const player  = playerMap[ab.playerId];
+                const name    = player ? player.name : `${ab.battingOrder}番`;
+                const { text: resText, isHit } = this._atBatCellText(ab);
+                const resCls  = isHit ? 'pd-result-hit' : '';
+                const pitches = (pitchesByAtBatId[ab.id] || [])
+                    .sort((x, y) => x.pitchNumber - y.pitchNumber);
+
+                let pitchSeq = '';
+                if (pitches.length > 0) {
+                    pitchSeq = pitches.map(p => {
+                        const { sym, cls } = this._pitchResultSymbol(p.result);
+                        const typePart = p.pitchType ? `<span class="pd-ptype">${p.pitchType}</span>` : '';
+                        const velPart  = p.velocity  ? `<span class="pd-vel">${p.velocity}km</span>` : '';
+                        const count    = p.count ? `${p.count.balls}B-${p.count.strikes}S` : '';
+                        return `<span class="pd-pitch">
+                            <span class="pd-num">${p.pitchNumber}</span>
+                            <span class="pd-sym ${cls}">${sym}</span>
+                            ${typePart}${velPart}
+                            <span class="pd-count">${count}</span>
+                        </span>`;
+                    }).join('');
+                } else {
+                    pitchSeq = `<span class="pd-no-pitch">投球データなし</span>`;
+                }
+
+                const detail = ab.resultDetail ? `<span class="pd-detail">（${ab.resultDetail}）</span>` : '';
+                atBatBlocks += `<div class="pd-atbat">
+                    <div class="pd-atbat-header">
+                        <span class="pd-order">${ab.battingOrder}番</span>
+                        <span class="pd-name">${name}</span>
+                        <span class="pd-res ${resCls}">${resText}</span>
+                        ${detail}
+                        <span class="pd-total">${pitches.length}球</span>
+                    </div>
+                    <div class="pd-pitches">${pitchSeq}</div>
+                </div>`;
+            }
+
+            blocks += `<details class="pd-inning-block" open>
+                <summary class="pd-inning-title">
+                    ${inn.inning}回${halfLabel}【${teamName}】${incTag}
+                    <span class="pd-inning-runs">${inn.runs}点</span>
+                </summary>
+                ${atBatBlocks}
+            </details>`;
+        }
+
+        if (!blocks) return '';
+
+        return `<div class="game-detail-section pitch-detail-section">
+            <h4 class="game-detail-section-title">投球内容</h4>
+            ${blocks}
+        </div>`;
+    }
+
+    _buildScoreboard(game, innings) {
+        const reg = game.gameRules?.regulationInnings || 9;
+        const maxInning = Math.max(reg, ...innings.map(i => i.inning), 1);
+
+        const inningMap = {};
+        innings.forEach(inn => { inningMap[`${inn.inning}-${inn.isTopHalf}`] = inn; });
+
+        const cell = (n, isTop) => {
+            const inn = inningMap[`${n}-${isTop}`];
+            if (!inn) return '<td>-</td>';
+            if (inn.incomplete) return `<td><span class="score-incomplete">${inn.runs}✕</span></td>`;
+            return `<td>${inn.runs}</td>`;
+        };
+
+        const cols = Array.from({length: maxInning}, (_, i) => `<th>${i+1}</th>`).join('');
+        const awayRow = Array.from({length: maxInning}, (_, i) => cell(i+1, true)).join('');
+        const homeRow = Array.from({length: maxInning}, (_, i) => cell(i+1, false)).join('');
+
+        const sum = (isTop, key) => innings.filter(i => i.isTopHalf === isTop).reduce((s, i) => s + (i[key] || 0), 0);
+
+        return `<div class="game-detail-section">
+            <h4 class="game-detail-section-title">${i18n.t('gameDetailScoreboard')}</h4>
+            <div class="scoreboard-wrapper">
+                <table class="detail-scoreboard">
+                    <thead><tr><th class="team-name-col">チーム</th>${cols}<th class="total-col">R</th><th class="total-col">H</th><th class="total-col">E</th></tr></thead>
+                    <tbody>
+                        <tr><td class="team-name-col">${game.awayTeam}</td>${awayRow}<td class="total-col">${sum(true,'runs')}</td><td class="total-col">${sum(true,'hits')}</td><td class="total-col">${sum(true,'errors')}</td></tr>
+                        <tr><td class="team-name-col">${game.homeTeam}</td>${homeRow}<td class="total-col">${sum(false,'runs')}</td><td class="total-col">${sum(false,'hits')}</td><td class="total-col">${sum(false,'errors')}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    // 打球方向の略称を取得
+    _directionAbbr(text) {
+        const t = text || '';
+        const patterns = [
+            [/センター|中堅/, '中'], [/ライト|右翼/, '右'], [/レフト|左翼/, '左'],
+            [/ショート|遊撃/, '遊'], [/サード|三塁/, '三'], [/セカンド|二塁/, '二'],
+            [/ファースト|一塁/, '一'], [/ピッチャー|投手/, '投'], [/キャッチャー|捕手/, '捕'],
+            [/^中/, '中'], [/^右/, '右'], [/^左/, '左'], [/^遊/, '遊'],
+            [/^三/, '三'], [/^二/, '二'], [/^一/, '一'],
+        ];
+        for (const [pat, abbr] of patterns) { if (pat.test(t)) return abbr; }
+        return '';
+    }
+
+    // 打席結果を2〜3文字の略称に変換し、安打かどうかも返す
+    _atBatCellText(ab) {
+        if (!ab || !ab.result) return { text: '···', isHit: false, isWalk: false };
+        const r = ab.result;
+        const d = (ab.resultDetail || '').trim();
+        const isHit = ['single','double','triple','homerun','hit'].includes(r);
+        const isWalk = ['walk','intentional_walk','hit_by_pitch'].includes(r);
+        const dir = this._directionAbbr(d);
+        let text;
+        switch (r) {
+            case 'single': case 'hit':          text = dir + '安'; break;
+            case 'double':                       text = dir + '２'; break;
+            case 'triple':                       text = dir + '３'; break;
+            case 'homerun':                      text = (dir || '') + '本'; break;
+            case 'groundout':                    text = (dir || '') + 'ゴ'; break;
+            case 'flyout':                       text = (dir || '') + '飛'; break;
+            case 'lineout':                      text = (dir || '') + '直'; break;
+            case 'popout':                       text = (dir || '') + '飛'; break;
+            case 'strikeout':                    text = '三振'; break;
+            case 'strikeout_looking':            text = '見振'; break;
+            case 'walk':                         text = '四球'; break;
+            case 'intentional_walk':             text = '敬遠'; break;
+            case 'hit_by_pitch':                 text = '死球'; break;
+            case 'sacrifice_bunt':               text = '犠打'; break;
+            case 'sacrifice_fly':                text = '犠飛'; break;
+            case 'error':                        text = (dir || '') + 'E'; break;
+            case 'fielders_choice':              text = 'FC'; break;
+            case 'doubleplay':                   text = 'DP'; break;
+            case 'interference':                 text = '妨害'; break;
+            case 'intentional_drop':             text = '故落'; break;
+            default: text = d ? d.slice(0, 3) : r.slice(0, 3);
+        }
+        return { text, isHit, isWalk };
+    }
+
+    _buildBattingTables(game, innings, atBatsByInningId, pitchesByAtBatId, playerMap) {
+        const awayInnings = innings.filter(i => i.isTopHalf).sort((a,b) => a.inning - b.inning);
+        const homeInnings = innings.filter(i => !i.isTopHalf).sort((a,b) => a.inning - b.inning);
+        const maxInning = Math.max(
+            game.gameRules?.regulationInnings || 9,
+            ...innings.map(i => i.inning), 1
+        );
+
+        let html = `<div class="game-detail-section">
+            <h4 class="game-detail-section-title">${i18n.t('gameDetailBatting')}</h4>`;
+        html += this._buildTeamBattingGrid(game, 'away', awayInnings, atBatsByInningId, pitchesByAtBatId, playerMap, maxInning);
+        html += this._buildTeamBattingGrid(game, 'home', homeInnings, atBatsByInningId, pitchesByAtBatId, playerMap, maxInning);
+        html += '</div>';
+        return html;
+    }
+
+    _buildTeamBattingGrid(game, team, teamInnings, atBatsByInningId, pitchesByAtBatId, playerMap, maxInning) {
+        const teamName = team === 'away' ? game.awayTeam : game.homeTeam;
+        const players = (game.players[team] || [])
+            .filter(p => p.battingOrder > 0)
+            .sort((a,b) => a.battingOrder - b.battingOrder || (a.enteredGameAt||'') > (b.enteredGameAt||'') ? 1 : -1);
+
+        // inningId → { battingOrder → [AtBat] }
+        const abMap = {};
+        for (const inn of teamInnings) {
+            abMap[inn.id] = {};
+            for (const ab of (atBatsByInningId[inn.id] || [])) {
+                const key = ab.battingOrder;
+                if (!abMap[inn.id][key]) abMap[inn.id][key] = [];
+                abMap[inn.id][key].push(ab);
+            }
+        }
+        // inningNumber → Inning object
+        const innByNum = {};
+        teamInnings.forEach(i => { innByNum[i.inning] = i; });
+
+        const inningHeaders = Array.from({length: maxInning}, (_,i) => `<th class="inning-col">${i+1}</th>`).join('');
+
+        let rows = '';
+        let prevOrder = -1;
+        for (const player of players) {
+            const stats = player.stats || {};
+            const ab = stats.atBats || 0;
+            const h  = stats.hits || 0;
+            const avg = ab > 0 ? (h/ab).toFixed(3).replace(/^0/,'') : '.---';
+            const isSub = player.battingOrder === prevOrder;
+
+            const inningCells = Array.from({length: maxInning}, (_,idx) => {
+                const num = idx + 1;
+                const inn = innByNum[num];
+                if (!inn) return `<td class="no-bat-cell"><span>···</span></td>`;
+                const absHere = (abMap[inn.id] || {})[player.battingOrder] || [];
+                if (absHere.length === 0) return `<td class="no-bat-cell"><span>···</span></td>`;
+
+                const parts = absHere.map(a => {
+                    const { text, isHit, isWalk } = this._atBatCellText(a);
+                    const cls = isHit ? 'hit-cell' : isWalk ? 'walk-cell' : '';
+                    // pitch-level は投球詳細セクションで表示するのでツールチップ不要
+                    // batter-level はresultDetailをツールチップに表示
+                    const tip = (game.recordingLevel === 'batter' && a.resultDetail)
+                        ? ` title="${a.resultDetail}"` : '';
+                    return `<span class="ab-result ${cls}"${tip}>${text}</span>`;
+                });
+                const incMark = inn.incomplete ? ' inc' : '';
+                return `<td class="bat-cell${incMark}">${parts.join(' ')}</td>`;
+            }).join('');
+
+            const dp = stats.doublePlaysBatted || 0;
+            const dpCell = dp > 0 ? `<td class="stat-col dp-cell">${dp}</td>` : `<td class="stat-col">-</td>`;
+            rows += `<tr class="${isSub ? 'substitute-row' : ''}">
+                <td class="pos-col">${player.position||'-'}</td>
+                <td class="name-col">${player.name||'-'}</td>
+                <td class="stat-col">${ab}</td>
+                <td class="stat-col">${h}</td>
+                <td class="stat-col">${stats.rbis||0}</td>
+                <td class="stat-col">${avg}</td>
+                <td class="stat-col">${stats.homeruns||0}</td>
+                ${dpCell}
+                ${inningCells}
+            </tr>`;
+            prevOrder = player.battingOrder;
+        }
+
+        // 合計行
+        const totAB  = players.reduce((s,p) => s+(p.stats?.atBats||0), 0);
+        const totH   = players.reduce((s,p) => s+(p.stats?.hits||0), 0);
+        const totRBI = players.reduce((s,p) => s+(p.stats?.rbis||0), 0);
+        const totHR  = players.reduce((s,p) => s+(p.stats?.homeruns||0), 0);
+        const totDP  = players.reduce((s,p) => s+(p.stats?.doublePlaysBatted||0), 0);
+        const totAvg = totAB > 0 ? (totH/totAB).toFixed(3).replace(/^0/,'') : '.---';
+        const totLOB = teamInnings.reduce((s,i) => s+(i.leftOnBase||0), 0);
+        const blankCols = Array.from({length: maxInning}, () => '<td></td>').join('');
+        const lobNote = totLOB > 0 ? `　残塁${totLOB}` : '';
+
+        return `<div class="team-batting-grid">
+            <h5 class="batting-grid-title">【${teamName}】</h5>
+            <div class="batting-grid-scroll">
+                <table class="batting-grid-table">
+                    <thead><tr>
+                        <th class="pos-col">守備</th>
+                        <th class="name-col">選手名</th>
+                        <th class="stat-col">打数</th><th class="stat-col">安打</th>
+                        <th class="stat-col">打点</th><th class="stat-col">打率</th>
+                        <th class="stat-col">HR</th>
+                        <th class="stat-col" title="併殺打">DP</th>
+                        ${inningHeaders}
+                    </tr></thead>
+                    <tbody>
+                        ${rows}
+                        <tr class="totals-row">
+                            <td colspan="2">計${lobNote}</td>
+                            <td class="stat-col">${totAB}</td><td class="stat-col">${totH}</td>
+                            <td class="stat-col">${totRBI}</td><td class="stat-col">${totAvg}</td>
+                            <td class="stat-col">${totHR}</td>
+                            <td class="stat-col">${totDP > 0 ? totDP : '-'}</td>
+                            ${blankCols}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    _buildPitcherSummary(game, innings, atBatsByInningId, pitchesByAtBatId, playerMap) {
+        const t = k => i18n.t(k);
+        const isPitch = game.recordingLevel === 'pitch';
+        const isBatterOrPitch = game.recordingLevel === 'batter' || isPitch;
+
+        // 球数集計（pitch level時：投手チームの半イニングの投球数を合算）
+        const pitchCountByTeam = { away: 0, home: 0 };
+        if (isPitch && pitchesByAtBatId) {
+            for (const inn of (innings || [])) {
+                const pitchingTeam = inn.isTopHalf ? 'home' : 'away'; // 守備側が投手チーム
+                for (const ab of (atBatsByInningId[inn.id] || [])) {
+                    pitchCountByTeam[pitchingTeam] += (pitchesByAtBatId[ab.id] || []).length;
+                }
+            }
+        }
+
+        let html = `<div class="game-detail-section"><h4 class="game-detail-section-title">${t('gameDetailPitcher')}</h4>`;
+
+        ['away', 'home'].forEach(team => {
+            const teamName = team === 'away' ? game.awayTeam : game.homeTeam;
+            const pitchers = (game.players[team] || []).filter(p =>
+                p.stats && (p.stats.inningsPitched > 0 || p.position === 'P')
+            );
+            if (pitchers.length === 0) return;
+
+            const pitchCol   = isPitch        ? `<th>球数</th>`          : '';
+            const erEraCol   = isBatterOrPitch ? `<th title="自責点">ER</th><th title="防御率">ERA</th>` : '';
+            html += `<h5 class="pitcher-team-title">${teamName}</h5>
+                <table class="pitcher-table">
+                    <thead><tr>
+                        <th>${t('colPlayer')}</th><th>${t('colInningsPitched')}</th>
+                        <th>${t('colHitsAllowed')}</th><th>${t('colStrikeouts')}</th>
+                        <th>${t('colWalks')}</th><th>${t('colHBP')}</th>
+                        <th title="失点">R</th>
+                        ${erEraCol}
+                        ${pitchCol}
+                    </tr></thead><tbody>`;
+
+            const totalPitches = pitchCountByTeam[team];
+            for (const p of pitchers) {
+                const ip = p.stats.inningsPitched || 0;
+                const full = Math.floor(ip / 3);
+                const outs = ip % 3;
+                const ipStr = outs > 0 ? `${full}.${outs}` : `${full}`;
+                const runsAllowed = p.stats.runsAllowed ?? 0;
+                const era = isBatterOrPitch ? (gameManager.getERA(p) ?? '-') : '';
+                const er  = isBatterOrPitch ? (p.stats.earnedRuns ?? 0) : '';
+                // 複数投手の場合は球数を正確に按分できないため合計のみ表示
+                const pitchTd  = isPitch
+                    ? `<td class="pitch-count-cell">${pitchers.length === 1 ? totalPitches : '-'}</td>`
+                    : '';
+                const erEraTds = isBatterOrPitch
+                    ? `<td class="earned-runs-cell">${er}</td><td class="era-cell">${era}</td>`
+                    : '';
+                html += `<tr>
+                    <td>${p.name}</td><td>${ipStr}</td>
+                    <td>${p.stats.hits || 0}</td><td>${p.stats.strikeoutsPitched || 0}</td>
+                    <td>${p.stats.walksAllowed || 0}</td><td>${p.stats.hitByPitchAllowed || 0}</td>
+                    <td class="runs-allowed-cell">${runsAllowed}</td>
+                    ${erEraTds}
+                    ${pitchTd}
+                </tr>`;
+            }
+            if (isPitch && pitchers.length > 1) {
+                // 複数投手なら合計行を追加
+                const totalR  = pitchers.reduce((s, p) => s + (p.stats.runsAllowed ?? 0), 0);
+                const totalER = pitchers.reduce((s, p) => s + (p.stats.earnedRuns ?? 0), 0);
+                const blankER = isBatterOrPitch ? `<td></td><td></td>` : '';
+                html += `<tr class="totals-row">
+                    <td>合計</td><td></td><td></td><td></td><td></td><td></td>
+                    <td class="runs-allowed-cell">${totalR}</td>
+                    ${isBatterOrPitch ? `<td class="earned-runs-cell">${totalER}</td><td></td>` : ''}
+                    <td class="pitch-count-cell">${totalPitches}</td>
+                </tr>`;
+            }
+            html += `</tbody></table>`;
+        });
+
+        html += '</div>';
+        return html;
     }
 
     async loadGame(gameId) {
@@ -4954,6 +12238,11 @@ class BaseballApp {
         });
         document.getElementById(screenId).classList.add('active');
         this.currentScreen = screenId;
+
+        // ウェルカム画面に戻るときは継続試合カードを更新
+        if (screenId === 'welcomeScreen') {
+            this.loadActiveGamesOnWelcome();
+        }
 
         // 画面切り替え後に翻訳を更新
         setTimeout(() => {
@@ -5139,13 +12428,14 @@ class BaseballApp {
     showRunnerAdvancementModal(result, resultDetail, advancement, batter) {
         const currentRunners = gameManager.currentGame.runnersOnBase;
         const outs = gameManager.currentGame.outs;
-        const resultLabel = BASEBALL_CONFIG.AT_BAT_RESULTS[result] || result;
+        const resultLabel = i18n.t(result) || BASEBALL_CONFIG.AT_BAT_RESULTS[result] || result;
+        const isHit = ['single', 'double', 'triple', 'homerun'].includes(result);
 
         const modal = document.createElement('div');
         modal.className = 'modal runner-modal';
         modal.innerHTML = `
             <div class="modal-content runner-modal-content">
-                <h3>走者進塁調整</h3>
+                <h3>${i18n.t('runner_advancement')}</h3>
 
                 <div class="situation-summary">
                     <div class="play-summary">
@@ -5153,15 +12443,15 @@ class BaseballApp {
                         ${resultDetail ? `(${resultDetail})` : ''}
                     </div>
                     <div class="before-situation">
-                        <strong>打席前:</strong> ${outs}アウト
+                        <strong>打席前:</strong> ${outs}${i18n.t('outs')}
                         ${this.formatRunnersDisplay(currentRunners)}
                     </div>
                 </div>
 
                 <div class="runner-adjustment">
-                    <h4>走者進塁設定</h4>
+                    <h4>${i18n.t('runner_advancement')}</h4>
 
-                    ${gameManager.isOutResult(result) ? `
+                    ${!isHit && gameManager.isOutResult(result) ? `
                     <div class="out-detail-setting">
                         <h5>アウト詳細</h5>
                         <div class="runner-setting">
@@ -5183,54 +12473,11 @@ class BaseballApp {
                     </div>
                     ` : ''}
 
-                    ${currentRunners.third ? `
-                    <div class="runner-setting">
-                        <label>3塁走者:</label>
-                        <select id="third-runner-result">
-                            <option value="home" ${advancement.runsScored > 0 ? 'selected' : ''}>本塁生還</option>
-                            <option value="third" ${advancement.newRunners.third ? 'selected' : ''}>3塁残留</option>
-                            <option value="out">本塁憤死(アウト)</option>
-                        </select>
-                    </div>
-                    ` : ''}
-
-                    ${currentRunners.second ? `
-                    <div class="runner-setting">
-                        <label>2塁走者:</label>
-                        <select id="second-runner-result">
-                            <option value="home">本塁生還</option>
-                            <option value="third" ${advancement.newRunners.third ? 'selected' : ''}>3塁進塁</option>
-                            <option value="second" ${advancement.newRunners.second ? 'selected' : ''}>2塁残留</option>
-                            <option value="out">憤死(アウト)</option>
-                        </select>
-                    </div>
-                    ` : ''}
-
-                    ${currentRunners.first ? `
-                    <div class="runner-setting">
-                        <label>1塁走者:</label>
-                        <select id="first-runner-result">
-                            <option value="home">本塁生還</option>
-                            <option value="third">3塁進塁</option>
-                            <option value="second" ${advancement.newRunners.second ? 'selected' : ''}>2塁進塁</option>
-                            <option value="first" ${advancement.newRunners.first ? 'selected' : ''}>1塁残留</option>
-                            <option value="out">憤死(アウト)</option>
-                        </select>
-                    </div>
-                    ` : ''}
-
-                    ${advancement.batterResult !== 'out' ? `
-                    <div class="runner-setting">
-                        <label>打者:</label>
-                        <select id="batter-result">
-                            <option value="home" ${advancement.batterResult === 4 ? 'selected' : ''}>本塁生還</option>
-                            <option value="third" ${advancement.batterResult === 3 ? 'selected' : ''}>3塁到達</option>
-                            <option value="second" ${advancement.batterResult === 2 ? 'selected' : ''}>2塁到達</option>
-                            <option value="first" ${advancement.batterResult === 1 ? 'selected' : ''}>1塁到達</option>
-                            <option value="out">アウト</option>
-                        </select>
-                    </div>
-                    ` : ''}
+                    ${isHit ? this.generateHitRunnerSelections(result, currentRunners) :
+                      result === 'groundout' ? this.generateGroundoutRunnerSelections(currentRunners) :
+                      (result === 'flyout' || result === 'lineout') ? this.generateTagUpRunnerSelections(currentRunners) :
+                      (result === 'strikeout' && this.selectedDroppedThird === 'yes') ? this.generateDroppedThirdStrikeSelections(currentRunners) :
+                      this.generateGenericRunnerSelections(result, currentRunners, advancement)}
                 </div>
 
                 <div class="play-description">
@@ -5268,18 +12515,373 @@ class BaseballApp {
 
         modal.querySelector('.apply-advancement').addEventListener('click', async () => {
             const customAdvancement = this.getCustomAdvancement(modal, advancement);
-            await this.finalizeAtBat(result, resultDetail, customAdvancement, batter);
             document.body.removeChild(modal);
+
+            // ボールインプレー/デッド判定
+            const previousOuts = gameManager.currentGame.outs - (customAdvancement.outsAdded || 0);
+            const isPlayContinuing = gameManager.isPlayContinuing(result, previousOuts);
+
+            if (isPlayContinuing) {
+                // ボールインプレー：追加プレー確認モーダルを表示（fromPitchInterfaceフラグは引き継がれる）
+                this.showAdditionalPlayModal(result, resultDetail, customAdvancement, batter);
+            } else {
+                // ボールデッド：即座に完了してバナーを表示
+                const fromPitch = this.fromPitchInterface;
+                this.fromPitchInterface = false;
+                await this.finalizeAtBat(result, resultDetail, customAdvancement, batter);
+                this.showBallDeadBanner();
+                if (fromPitch) this.prepareNextBatter();
+            }
         });
 
         modal.querySelector('.auto-apply').addEventListener('click', async () => {
-            await this.finalizeAtBat(result, resultDetail, advancement, batter);
             document.body.removeChild(modal);
+
+            // ボールインプレー/デッド判定
+            const previousOuts = gameManager.currentGame.outs - (advancement.outsAdded || 0);
+            const isPlayContinuing = gameManager.isPlayContinuing(result, previousOuts);
+
+            if (isPlayContinuing) {
+                // ボールインプレー：追加プレー確認モーダルを表示（fromPitchInterfaceフラグは引き継がれる）
+                this.showAdditionalPlayModal(result, resultDetail, advancement, batter);
+            } else {
+                // ボールデッド：即座に完了してバナーを表示
+                const fromPitch = this.fromPitchInterface;
+                this.fromPitchInterface = false;
+                await this.finalizeAtBat(result, resultDetail, advancement, batter);
+                this.showBallDeadBanner();
+                if (fromPitch) this.prepareNextBatter();
+            }
         });
 
         modal.querySelector('.cancel-advancement').addEventListener('click', () => {
             document.body.removeChild(modal);
         });
+    }
+
+    generateHitRunnerSelections(hitType, currentRunners) {
+        let html = '';
+
+        // 三塁走者
+        if (currentRunners.third) {
+            const options = gameManager.getHitAdvancementOptions(hitType, 'third', currentRunners);
+            html += `
+                <div class="runner-setting">
+                    <label>${i18n.t('third_runner_to')}</label>
+                    <select id="third-runner-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${i18n.t(opt.label)}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        // 二塁走者
+        if (currentRunners.second) {
+            const options = gameManager.getHitAdvancementOptions(hitType, 'second', currentRunners);
+            html += `
+                <div class="runner-setting">
+                    <label>${i18n.t('second_runner_to')}</label>
+                    <select id="second-runner-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${i18n.t(opt.label)}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        // 一塁走者
+        if (currentRunners.first) {
+            const options = gameManager.getHitAdvancementOptions(hitType, 'first', currentRunners);
+            html += `
+                <div class="runner-setting">
+                    <label>${i18n.t('first_runner_to')}</label>
+                    <select id="first-runner-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${i18n.t(opt.label)}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        // 打者走者（本塁打以外）
+        if (hitType !== 'homerun') {
+            const options = gameManager.getHitAdvancementOptions(hitType, 'batter', currentRunners);
+            html += `
+                <div class="runner-setting">
+                    <label>${i18n.t('batter_runner_to')}</label>
+                    <select id="batter-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${opt.label}${i18n.t('baseSuffix')}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        return html;
+    }
+
+    generateGenericRunnerSelections(result, currentRunners, advancement) {
+        let html = '';
+
+        // 三塁走者
+        if (currentRunners.third) {
+            html += `
+                <div class="runner-setting">
+                    <label>3塁走者:</label>
+                    <select id="third-runner-result">
+                        <option value="home" ${advancement.runsScored > 0 ? 'selected' : ''}>本塁生還</option>
+                        <option value="third" ${advancement.newRunners.third ? 'selected' : ''}>3塁残留</option>
+                        <option value="out">本塁憤死(アウト)</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        // 二塁走者
+        if (currentRunners.second) {
+            html += `
+                <div class="runner-setting">
+                    <label>2塁走者:</label>
+                    <select id="second-runner-result">
+                        <option value="home">本塁生還</option>
+                        <option value="third" ${advancement.newRunners.third ? 'selected' : ''}>3塁進塁</option>
+                        <option value="second" ${advancement.newRunners.second ? 'selected' : ''}>2塁残留</option>
+                        <option value="out">憤死(アウト)</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        // 一塁走者
+        if (currentRunners.first) {
+            html += `
+                <div class="runner-setting">
+                    <label>1塁走者:</label>
+                    <select id="first-runner-result">
+                        <option value="home">本塁生還</option>
+                        <option value="third">3塁進塁</option>
+                        <option value="second" ${advancement.newRunners.second ? 'selected' : ''}>2塁進塁</option>
+                        <option value="first" ${advancement.newRunners.first ? 'selected' : ''}>1塁残留</option>
+                        <option value="out">憤死(アウト)</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        // 打者
+        if (advancement.batterResult !== 'out') {
+            html += `
+                <div class="runner-setting">
+                    <label>打者:</label>
+                    <select id="batter-result">
+                        <option value="home" ${advancement.batterResult === 4 ? 'selected' : ''}>本塁生還</option>
+                        <option value="third" ${advancement.batterResult === 3 ? 'selected' : ''}>3塁到達</option>
+                        <option value="second" ${advancement.batterResult === 2 ? 'selected' : ''}>2塁到達</option>
+                        <option value="first" ${advancement.batterResult === 1 ? 'selected' : ''}>1塁到達</option>
+                        <option value="out">アウト</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        return html;
+    }
+
+    generateGroundoutRunnerSelections(currentRunners) {
+        let html = '';
+        const classification = gameManager.getGroundoutRunnerClassification(currentRunners);
+
+        html += '<p class="info-text">⚾ ゴロアウト: 走者の進塁を選択してください</p>';
+
+        // 打者は常にアウト
+        html += `
+            <div class="runner-setting">
+                <label><strong>打者:</strong></label>
+                <span>アウト（固定）</span>
+            </div>
+        `;
+
+        // 三塁走者
+        if (currentRunners.third) {
+            const options = gameManager.getGroundoutRunnerOptions('third', classification.third, 0);
+            const classLabel = classification.third === 'forced' ? '【強制走者】' : '【自由走者】';
+            html += `
+                <div class="runner-setting">
+                    <label>3塁走者 ${classLabel}:</label>
+                    <select id="third-runner-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${opt.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        // 二塁走者
+        if (currentRunners.second) {
+            const options = gameManager.getGroundoutRunnerOptions('second', classification.second, 0);
+            const classLabel = classification.second === 'forced' ? '【強制走者】' : '【自由走者】';
+            html += `
+                <div class="runner-setting">
+                    <label>2塁走者 ${classLabel}:</label>
+                    <select id="second-runner-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${opt.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        // 一塁走者
+        if (currentRunners.first) {
+            const options = gameManager.getGroundoutRunnerOptions('first', classification.first, 0);
+            const classLabel = classification.first === 'forced' ? '【強制走者】' : '【自由走者】';
+            html += `
+                <div class="runner-setting">
+                    <label>1塁走者 ${classLabel}:</label>
+                    <select id="first-runner-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${opt.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        return html;
+    }
+
+    generateTagUpRunnerSelections(currentRunners) {
+        let html = '';
+
+        html += '<p class="info-text">⚾ フライ/ライナーアウト: タッチアップを選択してください（3塁→2塁→1塁の順）</p>';
+
+        // 打者は常にアウト
+        html += `
+            <div class="runner-setting">
+                <label><strong>打者:</strong></label>
+                <span>アウト（固定）</span>
+            </div>
+        `;
+
+        // 三塁走者から処理（タッチアップは後方から処理）
+        if (currentRunners.third) {
+            const options = gameManager.getTagUpOptions('third');
+            html += `
+                <div class="runner-setting">
+                    <label>3塁走者:</label>
+                    <select id="third-runner-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${opt.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        // 二塁走者
+        if (currentRunners.second) {
+            const options = gameManager.getTagUpOptions('second');
+            html += `
+                <div class="runner-setting">
+                    <label>2塁走者:</label>
+                    <select id="second-runner-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${opt.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        // 一塁走者
+        if (currentRunners.first) {
+            const options = gameManager.getTagUpOptions('first');
+            html += `
+                <div class="runner-setting">
+                    <label>1塁走者:</label>
+                    <select id="first-runner-result">
+                        ${options.map(opt =>
+                            `<option value="${opt.value}">${opt.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        return html;
+    }
+
+    generateDroppedThirdStrikeSelections(currentRunners) {
+        let html = '';
+
+        html += '<p class="info-text">⚾ 三振+振り逃げ: 打者と走者の進塁を選択してください</p>';
+
+        // 打者の選択肢
+        const batterOptions = gameManager.getDroppedThirdStrikeOptions();
+        html += `
+            <div class="runner-setting">
+                <label><strong>打者:</strong></label>
+                <select id="batter-result">
+                    ${batterOptions.map(opt =>
+                        `<option value="${opt.value}">${opt.label}</option>`
+                    ).join('')}
+                </select>
+            </div>
+        `;
+
+        // 三塁走者（走者がいれば、盗塁・牽制死の可能性）
+        if (currentRunners.third) {
+            html += `
+                <div class="runner-setting">
+                    <label>3塁走者:</label>
+                    <select id="third-runner-result">
+                        <option value="stay">3塁残留</option>
+                        <option value="home">ホーム生還（盗塁成功）</option>
+                        <option value="home-out">ホーム試みてアウト（盗塁失敗）</option>
+                        <option value="out">牽制死</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        // 二塁走者
+        if (currentRunners.second) {
+            html += `
+                <div class="runner-setting">
+                    <label>2塁走者:</label>
+                    <select id="second-runner-result">
+                        <option value="stay">2塁残留</option>
+                        <option value="3B">3塁進塁（盗塁成功）</option>
+                        <option value="3B-out">3塁試みてアウト（盗塁失敗）</option>
+                        <option value="out">牽制死</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        // 一塁走者（1塁が空いている場合のみ存在しない、または2アウトなら存在可能）
+        if (currentRunners.first) {
+            html += `
+                <div class="runner-setting">
+                    <label>1塁走者:</label>
+                    <select id="first-runner-result">
+                        <option value="stay">1塁残留</option>
+                        <option value="2B">2塁進塁（盗塁成功）</option>
+                        <option value="2B-out">2塁試みてアウト（盗塁失敗）</option>
+                        <option value="out">牽制死</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        return html;
     }
 
     formatRunnersDisplay(runners) {
@@ -5302,19 +12904,31 @@ class BaseballApp {
             outsAdded = parseInt(outCountSelect.value) || 0;
         }
 
-        // 各走者の結果を確認
+        // 各走者の結果を確認（安打形式の値も処理）
         ['third', 'second', 'first', 'batter'].forEach(runnerId => {
             const select = modal.querySelector(`#${runnerId}-runner-result`);
             if (select) {
                 const result = select.value;
-                if (result === 'home') {
+
+                // 得点
+                if (result === 'home' || result.includes('home')) {
                     runs++;
-                } else if (result === 'first') {
-                    newRunners.first = runnerId === 'batter' ? 'batter' : runnerId;
-                } else if (result === 'second') {
-                    newRunners.second = runnerId === 'batter' ? 'batter' : runnerId;
-                } else if (result === 'third') {
-                    newRunners.third = runnerId === 'batter' ? 'batter' : runnerId;
+                    if (result === 'home-out') outsAdded++;
+                }
+                // アウトのみ（得点せず）
+                else if (result === 'out' || result.endsWith('-out')) {
+                    outsAdded++;
+                }
+                // 塁への到達（stay, 1B, 2B, 3B）
+                else if (result !== 'stay') {
+                    const runnerValue = runnerId === 'batter' ? 'batter' : runnerId;
+                    if (result === '1B' || result === 'first') {
+                        newRunners.first = runnerValue;
+                    } else if (result === '2B' || result === 'second') {
+                        newRunners.second = runnerValue;
+                    } else if (result === '3B' || result === 'third') {
+                        newRunners.third = runnerValue;
+                    }
                 }
             }
         });
@@ -5343,19 +12957,31 @@ class BaseballApp {
         // プレー説明
         const playDescription = modal.querySelector('#playDescription').value;
 
-        // 各走者の結果を確認
+        // 各走者の結果を確認（安打形式の値も処理）
         ['third', 'second', 'first', 'batter'].forEach(runnerId => {
             const select = modal.querySelector(`#${runnerId}-runner-result`);
             if (select) {
                 const result = select.value;
-                if (result === 'home') {
+
+                // 得点
+                if (result === 'home' || result.includes('home')) {
                     runs++;
-                } else if (result === 'first') {
-                    newRunners.first = runnerId === 'batter' ? 'batter' : runnerId;
-                } else if (result === 'second') {
-                    newRunners.second = runnerId === 'batter' ? 'batter' : runnerId;
-                } else if (result === 'third') {
-                    newRunners.third = runnerId === 'batter' ? 'batter' : runnerId;
+                    if (result === 'home-out') outsAdded++;
+                }
+                // アウトのみ（得点せず）
+                else if (result === 'out' || result.endsWith('-out')) {
+                    outsAdded++;
+                }
+                // 塁への到達（stay, 1B, 2B, 3B）
+                else if (result !== 'stay') {
+                    const runnerValue = runnerId === 'batter' ? 'batter' : runnerId;
+                    if (result === '1B' || result === 'first') {
+                        newRunners.first = runnerValue;
+                    } else if (result === '2B' || result === 'second') {
+                        newRunners.second = runnerValue;
+                    } else if (result === '3B' || result === 'third') {
+                        newRunners.third = runnerValue;
+                    }
                 }
             }
         });
@@ -6494,10 +14120,22 @@ class BaseballApp {
     }
 }
 
+// ヘルパー関数：投手のイニング数を帯分数表示に変換
+function formatInningsPitched(outs) {
+    const fullInnings = Math.floor(outs / 3);
+    const remainingOuts = outs % 3;
+    if (remainingOuts === 0) {
+        return `${fullInnings}回`;
+    } else {
+        return `${fullInnings}回${remainingOuts}/3`;
+    }
+}
+
 const app = new BaseballApp();
 
 // グローバルアクセス用
 window.app = app;
+window.formatInningsPitched = formatInningsPitched;
 
 document.addEventListener('DOMContentLoaded', () => {
     app.init();

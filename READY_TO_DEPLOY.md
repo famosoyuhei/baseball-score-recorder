@@ -94,11 +94,9 @@ git push -u origin main
 
 ---
 
-## ⚠️ デプロイ後に詰まりやすいポイント（2選）
+## ⚠️ もし画面が真っ白になったら
 
-### 1. 画面が真っ白になる / 更新が反映されない
-
-**原因:** 古いキャッシュが残っている
+**原因:** キャッシュが古い可能性
 
 **解決策:**
 1. `sw.js` を開く
@@ -108,14 +106,6 @@ git push -u origin main
    ```
 3. Git commit & push
 4. 数分後にリロード（古いキャッシュが自動削除される）
-
-**重要:** 更新を配布するときは**必ず** `CACHE_NAME` のバージョンを上げてから push すること
-
-### 2. GitHub Pages の URL がわからなくなった
-
-**確認方法:**
-- リポジトリページ → Settings → Pages → "Your site is live at" の下に表示
-- 形式: `https://YOUR_USERNAME.github.io/REPO_NAME/`
 
 ---
 

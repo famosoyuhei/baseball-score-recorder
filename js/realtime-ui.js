@@ -449,6 +449,16 @@ class RealtimeUI {
             if (hitsEl) {
                 hitsEl.textContent = pitcher.stats.hits || 0;
             }
+
+            const erEl = document.getElementById('pitcherER');
+            if (erEl) {
+                erEl.textContent = pitcher.stats.earnedRuns ?? 0;
+            }
+
+            const eraEl = document.getElementById('pitcherERA');
+            if (eraEl) {
+                eraEl.textContent = gameManager.getERA(pitcher) ?? '-';
+            }
         }
     }
 }

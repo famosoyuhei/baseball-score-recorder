@@ -62,6 +62,10 @@
             <div id="welcomeScreen" class="screen active">
                 <h2 data-i18n="welcome">野球スコア記録アプリへようこそ</h2>
                 <p data-i18n="description">オフラインで使用できる野球試合記録システムです</p>
+
+                <!-- 継続中の試合カード（動的生成） -->
+                <div id="activeGamesSection" class="active-games-section"></div>
+
                 <div class="feature-list">
                     <h3 data-i18n="features">機能</h3>
                     <ul>
@@ -79,12 +83,12 @@
                 <h2 data-i18n="gameSetup">試合設定</h2>
                 <form id="gameSetupForm">
                     <div class="form-group">
-                        <label for="homeTeam" data-i18n="homeTeam">ホームチーム名:</label>
+                        <label for="homeTeam" data-i18n="homeTeamSetupLabel">ホームチーム名:</label>
                         <input type="text" id="homeTeam" required data-i18n-placeholder="homeTeamPlaceholder">
                     </div>
 
                     <div class="form-group">
-                        <label for="awayTeam" data-i18n="awayTeam">アウェイチーム名:</label>
+                        <label for="awayTeam" data-i18n="awayTeamSetupLabel">アウェイチーム名:</label>
                         <input type="text" id="awayTeam" required data-i18n-placeholder="awayTeamPlaceholder">
                     </div>
 
@@ -113,6 +117,26 @@
                             <option value="tv" data-i18n="tvMode">TV観戦記録</option>
                         </select>
                         <small data-i18n="recordingModeHelp">ベンチ記録は簡素化された高速入力、TV観戦記録は詳細分析機能を含みます</small>
+                    </div>
+
+                    <!-- コールドゲームルール設定 -->
+                    <div class="form-group">
+                        <label data-i18n="mercyRuleLabel">コールドゲームルール:</label>
+                        <div class="mercy-rule-presets">
+                            <button type="button" class="mercy-preset-btn active" data-preset="none" data-i18n="mercyNone">なし</button>
+                            <button type="button" class="mercy-preset-btn" data-preset="highSchool" data-i18n="mercyHighSchool">高校野球</button>
+                            <button type="button" class="mercy-preset-btn" data-preset="youth" data-i18n="mercyYouth">少年野球</button>
+                            <button type="button" class="mercy-preset-btn" data-preset="youthLow" data-i18n="mercyYouthLow">少年野球（低学年）</button>
+                            <button type="button" class="mercy-preset-btn" data-preset="amateur" data-i18n="mercyAmateur">社会人/草野球</button>
+                            <button type="button" class="mercy-preset-btn" data-preset="custom" data-i18n="mercyCustom">カスタム</button>
+                        </div>
+                        <!-- プリセット内容の表示 -->
+                        <div id="mercyRuleDisplay" class="mercy-rule-display modal--hidden"></div>
+                        <!-- カスタムルール編集 -->
+                        <div id="mercyRuleCustomEditor" class="mercy-rule-custom-editor modal--hidden">
+                            <div id="mercyRuleCustomList"></div>
+                            <button type="button" id="addMercyRuleBtn" class="secondary-btn mercy-add-btn" data-i18n="addMercyRule">＋ ルールを追加</button>
+                        </div>
                     </div>
 
                     <div class="button-group">
@@ -194,6 +218,12 @@
                     </div>
                 </div>
 
+                <!-- ボールデッドバナー（ボールデッド事象後に表示） -->
+                <div id="ballDeadBanner" class="ball-dead-banner ball-dead-banner--hidden">
+                    <span class="ball-dead-label" data-i18n="ballDead">ボールデッド</span>
+                    <button id="resumePlayBtn" type="button" class="resume-play-btn" data-i18n="resumePlay">プレー再開</button>
+                </div>
+
                 <!-- 打者・投手情報グリッド -->
                 <div class="player-stats-container">
                     <!-- 現在打者の成績表示 -->
@@ -252,6 +282,14 @@
                                         <span class="mini-stat-label" data-i18n="hitsAllowed">被安打</span>
                                         <span class="mini-stat-value" id="pitcherHits">0</span>
                                     </div>
+                                    <div class="mini-stat">
+                                        <span class="mini-stat-label" data-i18n="earnedRunsLabel">自責点</span>
+                                        <span class="mini-stat-value" id="pitcherER">0</span>
+                                    </div>
+                                    <div class="mini-stat">
+                                        <span class="mini-stat-label">ERA</span>
+                                        <span class="mini-stat-value" id="pitcherERA">-</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -284,6 +322,17 @@
                 <!-- NPB公式スコアブック -->
                 <div id="npbScoreboardContainer" style="display: none;">
                     <!-- NPBスコアブックが動的に生成される -->
+                </div>
+
+                <!-- 試合終了確定待ちバナー -->
+                <div id="gameEndBanner" class="game-end-banner hidden">
+                    <div class="game-end-banner-content">
+                        <span class="game-end-banner-title" data-i18n="gameEndPendingConfirm">試合終了（確定待ち）</span>
+                        <div class="game-end-banner-actions">
+                            <button id="undoFromEndBtn" class="undo-btn" data-i18n="undoFromEnd">前の状態に戻す</button>
+                            <button id="confirmGameBtn" class="primary-btn" data-i18n="confirmGame">試合を確定する</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="gameContent">
@@ -413,12 +462,15 @@
                         <button id="editTeamInfoBtn" class="secondary-btn" data-i18n="editTeamInfo">チーム情報を編集</button>
                         <button id="playerSubstitution" class="secondary-btn" style="display: none;" data-i18n="playerSubstitution">選手交代</button>
                         <button id="editPlayersBtn" class="secondary-btn" data-i18n="editPlayers">選手情報編集</button>
+                        <button id="gameRulesBtn" class="secondary-btn" data-i18n="gameRules">ゲームルール</button>
                         <button id="endGame" class="secondary-btn" data-i18n="endGame">試合終了</button>
                     </div>
                     <div class="control-row manual-controls">
                         <button id="noNextInning" class="warning-btn" data-i18n="noNextInning">次のイニングに進まない</button>
+                        <button id="weatherCallBtn" class="warning-btn" data-i18n="weatherCall">雨天等コールド</button>
                         <button id="forceGameEnd" class="danger-btn" data-i18n="forceGameEnd">強制終了</button>
                         <button id="showGameTime" class="info-btn" data-i18n="showGameTime">時刻確認</button>
+                        <button id="abandonGameBtn" class="abandon-btn" data-i18n="abandonGame">試合を削除してやり直す</button>
                     </div>
                 </div>
             </div>
@@ -455,7 +507,201 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 追加プレー確認モーダル -->
+            <div id="additionalPlayModal" class="modal additional-play-modal modal--hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 data-i18n="additionalPlayQuestion">追加プレーはありますか？</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p class="ball-state-indicator">
+                            <span class="ball-state-label" data-i18n="ballInPlay">ボールインプレー</span>
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="yesAdditionalPlayBtn" class="primary-btn" data-i18n="yesAdditionalPlay">はい（追加プレーあり）</button>
+                        <button id="noAdditionalPlayBtn" class="secondary-btn" data-i18n="noAdditionalPlay">いいえ（プレー完了）</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 追加プレー記録モーダル -->
+            <div id="additionalPlayRecordingModal" class="modal additional-play-recording-modal modal--hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 data-i18n="additionalPlayMode">追加プレー記録モード</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p class="instructions" data-i18n="additionalPlayInstructions">
+                            送球エラー、走者進塁、走者アウト等を記録してください
+                        </p>
+
+                        <div class="current-situation">
+                            <h4 data-i18n="currentSituation">現在の状況</h4>
+                            <div id="additionalPlaySituation"></div>
+                        </div>
+
+                        <div class="additional-play-actions">
+                            <h4 data-i18n="recordAdditionalPlay">追加プレーを記録</h4>
+                            <div id="additionalPlayOptions"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="completeAdditionalPlayBtn" class="primary-btn" data-i18n="completePlay">プレー完了</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- タイブレーク設定モーダル -->
+            <div id="tiebreakerSetupModal" class="modal tiebreaker-setup-modal modal--hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 data-i18n="extraInningsBegin">延長戦に突入しました</h3>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Step 1: タイブレーク確認 -->
+                        <div id="tiebreakerStep1">
+                            <p data-i18n="tiebreakerQuestion">タイブレークを使用しますか？</p>
+                            <div class="tiebreaker-step-buttons">
+                                <button id="tiebreakerYesBtn" type="button" class="primary-btn" data-i18n="tiebreakerYes">はい（タイブレークあり）</button>
+                                <button id="tiebreakerNoBtn" type="button" class="secondary-btn" data-i18n="tiebreakerNo">いいえ（通常の延長）</button>
+                                <button id="tiebreakerNoneBtn" type="button" class="secondary-btn" data-i18n="tiebreakerNone">延長なし（引き分け）</button>
+                            </div>
+                        </div>
+                        <!-- Step 2a: ランナー配置選択（タイブレークあり） -->
+                        <div id="tiebreakerStep2a" class="modal--hidden">
+                            <p data-i18n="tiebreakerRunnersQuestion">延長イニング開始時のランナー配置を選択してください：</p>
+                            <div id="tiebreakerRunnerOptions" class="runner-placement-options">
+                                <button type="button" class="runner-option-btn" data-placement="second" data-i18n="runnerSecondOnly">２塁のみ</button>
+                                <button type="button" class="runner-option-btn" data-placement="first" data-i18n="runnerFirstOnly">１塁のみ</button>
+                                <button type="button" class="runner-option-btn" data-placement="third" data-i18n="runnerThirdOnly">３塁のみ</button>
+                                <button type="button" class="runner-option-btn" data-placement="first_second" data-i18n="runnerFirstSecond">１・２塁</button>
+                                <button type="button" class="runner-option-btn" data-placement="first_third" data-i18n="runnerFirstThird">１・３塁</button>
+                                <button type="button" class="runner-option-btn" data-placement="second_third" data-i18n="runnerSecondThird">２・３塁</button>
+                                <button type="button" class="runner-option-btn" data-placement="bases_loaded" data-i18n="runnerBasesLoaded">満塁</button>
+                            </div>
+                            <div class="tiebreaker-step-buttons">
+                                <button id="tiebreakerRunnerConfirmBtn" type="button" class="primary-btn modal--hidden" data-i18n="confirm">決定</button>
+                            </div>
+                        </div>
+                        <!-- Step 2b: 最大イニング入力（タイブレークなし） -->
+                        <div id="tiebreakerStep2b" class="modal--hidden">
+                            <p id="tiebreakerMaxInningsLabel"></p>
+                            <div class="max-innings-input-row">
+                                <input id="tiebreakerMaxInningsInput" type="number" class="inning-number-input" min="10" title="最大イニング数">
+                                <span data-i18n="innings">回</span>
+                            </div>
+                            <p id="tiebreakerMaxInningsError" class="error-text modal--hidden" data-i18n="tiebreakerMaxInningsError"></p>
+                            <div class="tiebreaker-step-buttons">
+                                <button id="tiebreakerMaxInningsConfirmBtn" type="button" class="primary-btn" data-i18n="confirm">決定</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ホームラン柵越え確認モーダル -->
+            <div id="homerunTypeModal" class="modal homerun-type-modal modal--hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 data-i18n="homerunFenceOver">柵越えホームランですか？</h3>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="fenceOverYesBtn" type="button" class="primary-btn" data-i18n="fenceOverYes">はい（柵越え）</button>
+                        <button id="fenceOverNoBtn" type="button" class="secondary-btn" data-i18n="fenceOverNo">いいえ（ランニング）</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ゲームルール設定モーダル（試合中） -->
+            <div id="gameRulesModal" class="modal game-rules-modal modal--hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 data-i18n="gameRulesTitle">ゲームルール設定</h3>
+                    </div>
+                    <div class="modal-body">
+                        <!-- 規定回数 -->
+                        <div class="form-group game-rules-row">
+                            <label for="regulationInningsInput" data-i18n="regulationInningsLabel">規定回数:</label>
+                            <div class="innings-input-row">
+                                <input id="regulationInningsInput" type="number" min="1" max="20" value="9" class="inning-number-input" title="規定回数">
+                                <span data-i18n="innings">回</span>
+                            </div>
+                        </div>
+                        <!-- 試合成立回数 -->
+                        <div class="form-group game-rules-row">
+                            <label data-i18n="minInningsLabel">試合成立回数:</label>
+                            <div class="official-inning-presets">
+                                <button type="button" class="official-preset-btn" data-min="5" data-i18n="officialNPB">NPB（5回）</button>
+                                <button type="button" class="official-preset-btn" data-min="7" data-i18n="officialHighSchool">高校野球（7回）</button>
+                                <button type="button" class="official-preset-btn" data-min="4" data-i18n="officialYouth">少年野球（4回）</button>
+                                <button type="button" class="official-preset-btn" data-min="3" data-i18n="officialYouthLow">低学年（3回）</button>
+                            </div>
+                            <div class="innings-input-row">
+                                <input id="minInningsForOfficialInput" type="number" min="1" max="20" value="5" class="inning-number-input" title="試合成立回数">
+                                <span data-i18n="innings">回</span>
+                                <span data-i18n="minInningsUnit">以上で成立</span>
+                            </div>
+                        </div>
+                        <!-- コールドゲームルール -->
+                        <div class="form-group">
+                            <label data-i18n="mercyRuleLabel">コールドゲームルール:</label>
+                            <div class="mercy-rule-presets" id="gameRulesMercyPresets">
+                                <button type="button" class="mercy-preset-btn" data-preset="none" data-i18n="mercyNone">なし</button>
+                                <button type="button" class="mercy-preset-btn" data-preset="highSchool" data-i18n="mercyHighSchool">高校野球</button>
+                                <button type="button" class="mercy-preset-btn" data-preset="youth" data-i18n="mercyYouth">少年野球</button>
+                                <button type="button" class="mercy-preset-btn" data-preset="youthLow" data-i18n="mercyYouthLow">少年野球（低学年）</button>
+                                <button type="button" class="mercy-preset-btn" data-preset="amateur" data-i18n="mercyAmateur">社会人/草野球</button>
+                                <button type="button" class="mercy-preset-btn" data-preset="custom" data-i18n="mercyCustom">カスタム</button>
+                            </div>
+                            <div id="gameRulesMercyDisplay" class="mercy-rule-display modal--hidden"></div>
+                            <div id="gameRulesMercyCustomEditor" class="mercy-rule-custom-editor modal--hidden">
+                                <div id="gameRulesMercyCustomList"></div>
+                                <button type="button" id="addGameRulesMercyRuleBtn" class="secondary-btn mercy-add-btn" data-i18n="addMercyRule">＋ ルールを追加</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="gameRulesSaveBtn" type="button" class="primary-btn" data-i18n="save">保存</button>
+                        <button id="gameRulesCancelBtn" type="button" class="secondary-btn" data-i18n="cancel">キャンセル</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 雨天等コールド確認モーダル -->
+            <div id="weatherCallModal" class="modal weather-call-modal modal--hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 data-i18n="weatherCallTitle">雨天等コールド</h3>
+                    </div>
+                    <div class="modal-body">
+                        <div id="weatherCallStatus" class="weather-call-status"></div>
+                        <div id="weatherCallOfficialBadge" class="official-badge"></div>
+                        <div id="weatherCallScoreInfo" class="weather-call-score-info"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="weatherCallConfirmBtn" type="button" class="primary-btn" data-i18n="weatherCallConfirm">コールド確定</button>
+                        <button id="weatherCallCancelBtn" type="button" class="secondary-btn" data-i18n="cancel">キャンセル</button>
+                    </div>
+                </div>
+            </div>
         </main>
+    </div>
+
+    <!-- 試合詳細閲覧モーダル -->
+    <div id="gameDetailModal" class="modal modal--hidden">
+        <div class="modal-content game-detail-modal-content">
+            <div class="modal-header game-detail-header">
+                <h3 id="gameDetailTitle"></h3>
+                <button type="button" id="gameDetailCloseBtn" class="modal-close-btn" aria-label="閉じる">×</button>
+            </div>
+            <div class="modal-body" id="gameDetailBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="gameDetailClose2Btn" class="secondary-btn" data-i18n="close">閉じる</button>
+            </div>
+        </div>
     </div>
 
     <script src="./js/storage.js"></script>
@@ -475,6 +721,4 @@
                     .catch(err => console.error('SW registration failed:', err));
             });
         }
-    </script>
-</body>
-</html>
+    </scr
