@@ -704,13 +704,13 @@
         </div>
     </div>
 
-    <script src="./js/storage.js"></script>
-    <script src="./js/data.js"></script>
-    <script src="./js/game.js"></script>
-    <script src="./js/i18n.js"></script>
-    <script src="./js/realtime-ui.js"></script>
-    <script src="./js/npb-scorebook.js"></script>
-    <script src="./js/app.js"></script>
+    <script defer src="./js/storage.js"></script>
+    <script defer src="./js/data.js"></script>
+    <script defer src="./js/game.js"></script>
+    <script defer src="./js/i18n.js"></script>
+    <script defer src="./js/realtime-ui.js"></script>
+    <script defer src="./js/npb-scorebook.js"></script>
+    <script defer src="./js/app.js"></script>
 
     <!-- Service Worker Registration -->
     <script>
@@ -718,7 +718,4 @@
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js')
                     .then(reg => console.log('SW registered:', reg.scope))
-                    .catch(err => console.error('SW registration failed:', err));
-            });
-        }
-    </scr
+                    .catch(err => console.error('SW registration failed:', 
