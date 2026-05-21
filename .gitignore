@@ -29,3 +29,7 @@ test/
 # OS
 .DS_Store
 desktop.ini
+
+# ビルド成果物・依存
+node_modules/
+dist/
