@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="オフラインで使用できる野球試合記録アプリ">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
     <title>野球スコア記録アプリ</title>
 
     <!-- PWA Manifest -->
@@ -49,7 +50,7 @@
                 <button id="newGameBtn" class="nav-btn" data-i18n="newGame">新規試合</button>
                 <button id="loadGameBtn" class="nav-btn" data-i18n="loadGame">試合を読込</button>
                 <button id="settingsBtn" class="nav-btn" data-i18n="settings">設定</button>
-                <select id="languageSelect" class="language-select">
+                <select id="languageSelect" class="language-select" aria-label="言語 / Language">
                     <option value="ja">日本語</option>
                     <option value="en">English</option>
                     <option value="es">Español</option>
@@ -409,11 +410,11 @@
 
                         <div class="player-selection">
                             <div class="selection-group">
-                                <label data-i18n="outPlayer">退場選手:</label>
+                                <label for="benchOutPlayer" data-i18n="outPlayer">退場選手:</label>
                                 <select id="benchOutPlayer"></select>
                             </div>
                             <div class="selection-group">
-                                <label data-i18n="inPlayer">入場選手:</label>
+                                <label for="benchInPlayer" data-i18n="inPlayer">入場選手:</label>
                                 <select id="benchInPlayer"></select>
                             </div>
                         </div>
@@ -435,11 +436,11 @@
 
                         <div class="steal-selection">
                             <div class="selection-group">
-                                <label data-i18n="stealRunner">盗塁走者:</label>
+                                <label for="benchStealRunner" data-i18n="stealRunner">盗塁走者:</label>
                                 <select id="benchStealRunner"></select>
                             </div>
                             <div class="selection-group">
-                                <label data-i18n="stealTarget">目標塁:</label>
+                                <label for="benchStealTarget" data-i18n="stealTarget">目標塁:</label>
                                 <select id="benchStealTarget">
                                     <option value="second" data-i18n="secondBase">2塁</option>
                                     <option value="third" data-i18n="thirdBase">3塁</option>
@@ -487,12 +488,12 @@
 
                         <div class="team-edit-form">
                             <div class="form-group">
-                                <label data-i18n="awayTeamNameLabel">アウェイチーム名</label>
+                                <label for="editAwayTeamName" data-i18n="awayTeamNameLabel">アウェイチーム名</label>
                                 <input type="text" id="editAwayTeamName" class="team-name-input" placeholder="アウェイチーム">
                             </div>
 
                             <div class="form-group">
-                                <label data-i18n="homeTeamNameLabel">ホームチーム名</label>
+                                <label for="editHomeTeamName" data-i18n="homeTeamNameLabel">ホームチーム名</label>
                                 <input type="text" id="editHomeTeamName" class="team-name-input" placeholder="ホームチーム">
                             </div>
 
@@ -631,7 +632,7 @@
                         </div>
                         <!-- 試合成立回数 -->
                         <div class="form-group game-rules-row">
-                            <label data-i18n="minInningsLabel">試合成立回数:</label>
+                            <label for="minInningsForOfficialInput" data-i18n="minInningsLabel">試合成立回数:</label>
                             <div class="official-inning-presets">
                                 <button type="button" class="official-preset-btn" data-min="5" data-i18n="officialNPB">NPB（5回）</button>
                                 <button type="button" class="official-preset-btn" data-min="7" data-i18n="officialHighSchool">高校野球（7回）</button>
@@ -712,10 +713,7 @@
     <script defer src="./js/npb-scorebook.js"></script>
     <script defer src="./js/app.js"></script>
 
-    <!-- Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('SW registered:', reg.scope))
-                    .catch(err => console.error('SW registration failed:', 
+    <!-- Service Worker は js/app.js の setupServiceWorker() で登録 -->
+    <!-- The Service Worker is registered in js/app.js (setupServiceWorker) to avoid double registration -->
+</body>
+</html>
