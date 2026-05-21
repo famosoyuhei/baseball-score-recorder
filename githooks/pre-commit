@@ -1,0 +1,31 @@
+#!/bin/sh
+# ============================================================
+# Auto-bump Service Worker cache version (baseball-score-vN)
+# アプリのアセット(html/css/js/manifest)がステージされたコミット時に
+# sw.js の CACHE_NAME を自動で +1 する。手動更新忘れを防ぐ。
+# 有効化: git config core.hooksPath githooks  (リポジトリで1回だけ)
+# ============================================================
+SW="sw.js"
+[ -f "$SW" ] || exit 0
+
+# 監視対象アセットがステージされているか(sw.js 自身のみの変更ではスキップ)
+if ! git diff --cached --name-only | grep -Eq '^(index\.html|manifest\.json|css/.+\.css|js/.+\.js)$'; then
+  exit 0
+fi
+
+cur=$(grep -oE 'baseball-score-v[0-9]+' "$SW" | head -1 | grep -oE '[0-9]+$')
+head=$(git show HEAD:"$SW" 2>/dev/null | grep -oE 'baseball-score-v[0-9]+' | head -1 | grep -oE '[0-9]+$')
+
+# 既に HEAD よりバージョンが上がっていれば(手動で上げた場合)二重インクリメントしない
+if [ -n "$head" ] && [ -n "$cur" ] && [ "$cur" -gt "$head" ]; then
+  git add "$SW"
+  exit 0
+fi
+
+base=${head:-$cur}
+next=$((base + 1))
+# GNU sed (Git for Windows / Linux) 互換
+sed -i.bak -E "s/baseball-score-v[0-9]+/baseball-score-v${next}/" "$SW" && rm -f "${SW}.bak"
+git add "$SW"
+echo "[pre-commit] sw.js CACHE_NAME -> baseball-score-v${next}"
+exit 0
