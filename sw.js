@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baseball-score-v113';
+const CACHE_NAME = 'baseball-score-v154';
 const urlsToCache = [
   './',
   './index.html',
@@ -24,10 +24,26 @@ self.addEventListener('install', function(event) {
       .then(function(cache) {
         return cache.addAll(urlsToCache);
       })
+      .then(function() {
+        return self.skipWaiting();
+      })
   );
 });
 
 self.addEventListener('fetch', function(event) {
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(function() {
+        return caches.match('./index.html');
+      })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(function(response) {
@@ -50,6 +66,14 @@ self.addEventListener('activate', function(event) {
           }
         })
       );
+    }).then(function() {
+      return self.clients.claim();
     })
   );
+});
+
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

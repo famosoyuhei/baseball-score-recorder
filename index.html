@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="オフラインで使用できる野球試合記録アプリ">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://www.youtube-nocookie.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; font-src 'self'; connect-src 'self' https://www.googleapis.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com; object-src 'none'; base-uri 'self'; form-action 'self'">
     <title>野球スコア記録アプリ</title>
 
     <!-- PWA Manifest -->
@@ -49,7 +49,6 @@
             <nav>
                 <button id="newGameBtn" class="nav-btn" data-i18n="newGame">新規試合</button>
                 <button id="loadGameBtn" class="nav-btn" data-i18n="loadGame">試合を読込</button>
-                <button id="settingsBtn" class="nav-btn" data-i18n="settings">設定</button>
                 <select id="languageSelect" class="language-select" aria-label="言語 / Language">
                     <option value="ja">日本語</option>
                     <option value="en">English</option>
@@ -122,8 +121,8 @@
 
                     <!-- コールドゲームルール設定 -->
                     <div class="form-group">
-                        <label data-i18n="mercyRuleLabel">コールドゲームルール:</label>
-                        <div class="mercy-rule-presets">
+                        <div id="setupMercyRuleLabel" class="form-label" data-i18n="mercyRuleLabel">コールドゲームルール:</div>
+                        <div class="mercy-rule-presets" role="group" aria-labelledby="setupMercyRuleLabel">
                             <button type="button" class="mercy-preset-btn active" data-preset="none" data-i18n="mercyNone">なし</button>
                             <button type="button" class="mercy-preset-btn" data-preset="highSchool" data-i18n="mercyHighSchool">高校野球</button>
                             <button type="button" class="mercy-preset-btn" data-preset="youth" data-i18n="mercyYouth">少年野球</button>
@@ -216,6 +215,45 @@
                         <span><span data-i18n="outs">アウト</span>: <span id="outs">0</span></span>
                         <span><span data-i18n="balls">ボール</span>: <span id="balls">0</span></span>
                         <span><span data-i18n="strikes">ストライク</span>: <span id="strikes">0</span></span>
+                    </div>
+                </div>
+
+                <!-- YouTube動画連動シミュレーション -->
+                <div id="youtubeSimulationPanel" class="youtube-simulation-panel hidden">
+                    <div class="youtube-panel-header">
+                        <div>
+                            <h4 data-i18n="youtubeSimulationTitle">YouTube連動シミュレーション</h4>
+                            <p data-i18n="youtubeSimulationPanelHelp">動画を見ながら、記録したい場面の時刻メモを残せます</p>
+                        </div>
+                        <button type="button" id="youtubePanelToggleBtn" class="secondary-btn" data-i18n="collapse">折りたたむ</button>
+                    </div>
+                    <div id="youtubePanelBody" class="youtube-panel-body">
+                        <div class="youtube-player-frame">
+                            <div id="youtubeSimulationPlayer"></div>
+                        </div>
+                        <div class="youtube-simulation-tools">
+                            <div class="form-group">
+                                <label for="youtubeRuntimeUrl" data-i18n="youtubeVideoUrl">YouTube URL</label>
+                                <input type="url" id="youtubeRuntimeUrl" placeholder="https://www.youtube.com/watch?v=..." data-i18n-placeholder="youtubeVideoUrlPlaceholder">
+                            </div>
+                            <div class="youtube-time-controls">
+                                <button type="button" id="youtubeBack10Btn" class="secondary-btn">-10s</button>
+                                <input type="text" id="youtubeTimestampInput" value="0:00" inputmode="numeric" aria-label="YouTube timestamp">
+                                <button type="button" id="youtubeForward10Btn" class="secondary-btn">+10s</button>
+                                <button type="button" id="youtubeSeekBtn" class="secondary-btn" data-i18n="seekVideo">移動</button>
+                            </div>
+                            <div class="youtube-note-row">
+                                <input type="text" id="youtubeTimestampNote" data-i18n-placeholder="youtubeTimestampNotePlaceholder" placeholder="例: 1回表 先頭打者">
+                                <button type="button" id="youtubeMarkTimestampBtn" class="primary-btn" data-i18n="markTimestamp">時刻メモ</button>
+                            </div>
+                            <div class="youtube-link-actions">
+                                <button type="button" id="youtubeLoadVideoBtn" class="secondary-btn" data-i18n="loadYoutubeVideo">動画を読み込む</button>
+                                <a id="youtubeOpenLink" class="secondary-btn" href="#" target="_blank" rel="noopener" data-i18n="openInYoutube">YouTubeで開く</a>
+                                <button type="button" id="youtubeDensityReportBtn" class="secondary-btn" data-i18n="operationDensityReport">操作密度</button>
+                            </div>
+                            <div id="youtubeDensityReport" class="youtube-density-report"></div>
+                            <div id="youtubeTimestampList" class="youtube-timestamp-list"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -647,8 +685,8 @@
                         </div>
                         <!-- コールドゲームルール -->
                         <div class="form-group">
-                            <label data-i18n="mercyRuleLabel">コールドゲームルール:</label>
-                            <div class="mercy-rule-presets" id="gameRulesMercyPresets">
+                            <div id="gameRulesMercyRuleLabel" class="form-label" data-i18n="mercyRuleLabel">コールドゲームルール:</div>
+                            <div class="mercy-rule-presets" id="gameRulesMercyPresets" role="group" aria-labelledby="gameRulesMercyRuleLabel">
                                 <button type="button" class="mercy-preset-btn" data-preset="none" data-i18n="mercyNone">なし</button>
                                 <button type="button" class="mercy-preset-btn" data-preset="highSchool" data-i18n="mercyHighSchool">高校野球</button>
                                 <button type="button" class="mercy-preset-btn" data-preset="youth" data-i18n="mercyYouth">少年野球</button>
@@ -700,7 +738,24 @@
             <div class="modal-body" id="gameDetailBody">
             </div>
             <div class="modal-footer">
+                <button type="button" id="gameDetailShareBtn" class="primary-btn" data-i18n="shareGame">共有</button>
                 <button type="button" id="gameDetailClose2Btn" class="secondary-btn" data-i18n="close">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- アプリ設定モーダル -->
+    <div id="appSettingsModal" class="modal modal--hidden">
+        <div class="modal-content app-settings-modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="appSettingsTitle">アプリ設定</h3>
+                <a href="#" id="appSettingsCloseBtn" class="modal-close-btn" aria-label="閉じる">×</a>
+            </div>
+            <div class="modal-body">
+                <p class="help-text" data-i18n="appSettingsHelp">アプリ全体で使う設定を管理します。</p>
+            </div>
+            <div class="modal-footer">
+                <a href="#" id="appSettingsClose2Btn" class="secondary-btn" data-i18n="close">閉じる</a>
             </div>
         </div>
     </div>

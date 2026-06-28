@@ -98,6 +98,21 @@ class Game {
         this.ruleCompliance = {
             specialSituations: []          // 特殊状況記録
         };
+        this.pitchingDecisions = null;     // 勝利投手・敗戦投手・セーブ・ホールド
+        this.classification = {
+            category: 'uncategorized',
+            tags: [],
+            memo: ''
+        };
+        this.youtubeSimulation = {
+            enabled: false,
+            url: '',
+            videoId: '',
+            lastTimestamp: 0,
+            notes: [],
+            operationLogs: [],
+            unsupportedPlays: []
+        };
     }
 
     toJSON() {
@@ -132,14 +147,34 @@ class Game {
             protestInfo: this.protestInfo,
             suspensionInfo: this.suspensionInfo,
             manualGameControl: this.manualGameControl,
-            ruleCompliance: this.ruleCompliance
+            ruleCompliance: this.ruleCompliance,
+            pitchingDecisions: this.pitchingDecisions,
+            classification: this.classification,
+            youtubeSimulation: this.youtubeSimulation
         };
     }
 
     static fromJSON(data) {
         const game = new Game(data.homeTeam, data.awayTeam, data.recordingLevel, data.playerDetailLevel);
         Object.assign(game, data);
+        game.classification = Game.normalizeClassification(game.classification);
         return game;
+    }
+
+    static normalizeClassification(classification) {
+        const source = classification && typeof classification === 'object' ? classification : {};
+        const tags = Array.isArray(source.tags)
+            ? source.tags
+            : String(source.tags || '')
+                .split(',')
+                .map(tag => tag.trim())
+                .filter(Boolean);
+        return {
+            category: source.category || 'uncategorized',
+            folderName: source.folderName || '',
+            tags,
+            memo: source.memo || ''
+        };
     }
 }
 

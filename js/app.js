@@ -2,6 +2,12 @@ class BaseballApp {
     constructor() {
         this.currentScreen = 'welcomeScreen';
         this.isInitialized = false;
+        this.youtubePanelCollapsed = false;
+        this.youtubePlayer = null;
+        this.youtubeCurrentVideoId = '';
+        this.youtubeApiReadyPromise = null;
+        this.youtubeTimeSyncTimer = null;
+        this.youtubeDataApiKeyStorageKey = 'baseballScoreYouTubeDataApiKey';
     }
 
     async init() {
@@ -29,6 +35,9 @@ class BaseballApp {
             navigator.serviceWorker.register('./sw.js')
                 .then((registration) => {
                     console.log('Service Worker登録成功:', registration.scope);
+                    if (registration.waiting) {
+                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    }
                 })
                 .catch((error) => {
                     console.log('Service Worker登録失敗:', error);
@@ -37,6 +46,9 @@ class BaseballApp {
     }
 
     setupEventListeners() {
+        document.addEventListener('click', (event) => this.captureYouTubeOperationClick(event));
+        this.setupYouTubeApiKeyControls();
+
         document.getElementById('startBtn').addEventListener('click', () => {
             this.showScreen('gameSetupScreen');
         });
@@ -47,6 +59,10 @@ class BaseballApp {
 
         document.getElementById('loadGameBtn').addEventListener('click', () => {
             this.loadGamesList();
+        });
+
+        document.getElementById('settingsBtn')?.addEventListener('click', () => {
+            this.showAppSettingsModal();
         });
 
         document.getElementById('backToWelcome').addEventListener('click', () => {
@@ -72,6 +88,23 @@ class BaseballApp {
         });
         document.getElementById('gameDetailClose2Btn').addEventListener('click', () => {
             document.getElementById('gameDetailModal').classList.add('modal--hidden');
+        });
+        document.getElementById('gameDetailShareBtn').addEventListener('click', () => {
+            const gameId = parseInt(document.getElementById('gameDetailShareBtn').dataset.gameId, 10);
+            if (gameId) this.shareSavedGame(gameId);
+        });
+
+        document.getElementById('appSettingsCloseBtn')?.addEventListener('click', () => {
+            this.hideAppSettingsModal();
+        });
+        document.getElementById('appSettingsClose2Btn')?.addEventListener('click', () => {
+            this.hideAppSettingsModal();
+        });
+        document.getElementById('youtubeApiTestBtn')?.addEventListener('click', () => {
+            this.testYouTubeDataApiKey();
+        });
+        document.getElementById('youtubeSearchBtn')?.addEventListener('click', () => {
+            this.searchYouTubeFullGameVideos();
         });
 
         // ゲームルール設定モーダル（試合中）
@@ -206,6 +239,7 @@ class BaseballApp {
         // 初期言語設定
         document.getElementById('languageSelect').value = i18n.getCurrentLanguage();
         i18n.updatePageContent();
+        this.updateYouTubeApiKeyControls();
 
         // ベンチモード用イベントリスナー
         this.setupBenchModeListeners();
@@ -270,6 +304,8 @@ class BaseballApp {
         const recordingLevel = document.getElementById('recordingLevel').value;
         const playerDetailLevel = document.getElementById('playerDetailLevel').value;
         const recordingMode = document.getElementById('recordingMode').value;
+        const youtubeEnabled = document.getElementById('youtubeSimulationEnabled')?.checked || false;
+        const youtubeUrl = document.getElementById('youtubeVideoUrl')?.value.trim() || '';
 
         if (!homeTeam || !awayTeam) {
             this.showError(i18n.t('teamNameRequired'));
@@ -283,6 +319,24 @@ class BaseballApp {
             const mercyRule = this.getMercyRuleFromSetup();
             if (mercyRule !== undefined) {
                 gameManager.currentGame.gameRules.mercyRule = mercyRule;
+            }
+
+            if (youtubeEnabled || youtubeUrl) {
+                const videoId = this.extractYouTubeVideoId(youtubeUrl);
+                if (!videoId) {
+                    this.showError(i18n.t('youtubeVideoUrlInvalid') || 'YouTube URLを確認してください');
+                    return;
+                }
+                gameManager.currentGame.youtubeSimulation = {
+                    enabled: true,
+                    url: youtubeUrl,
+                    videoId,
+                    lastTimestamp: 0,
+                    notes: [],
+                    operationLogs: [],
+                    unsupportedPlays: []
+                };
+                await gameManager.saveGame();
             }
 
             this.setupGameScreen();
@@ -314,6 +368,9 @@ class BaseballApp {
         // 記録レベルと記録モードに応じたクラスを追加
         const gameScreen = document.getElementById('gameScreen');
         gameScreen.className = `screen ${game.recordingLevel}-level ${game.recordingMode}-mode`;
+        if (game.youtubeSimulation?.enabled) {
+            gameScreen.classList.add('youtube-simulation-active');
+        }
 
         // チーム統計の初期化（既存データ互換性のため）
         if (!game.teamStats) {
@@ -333,6 +390,7 @@ class BaseballApp {
 
         // 攻撃中チームをハイライト
         this.updateAttackingTeamHighlight();
+        this.setupYouTubeSimulationPanel();
 
         // 選手交代ボタンの表示制御
         const substitutionBtn = document.getElementById('playerSubstitution');
@@ -358,6 +416,878 @@ class BaseballApp {
         }
     }
 
+    extractYouTubeVideoId(url) {
+        if (!url) return '';
+        try {
+            const parsed = new URL(url);
+            const host = parsed.hostname.replace(/^www\./, '');
+            if (host === 'youtu.be') {
+                return parsed.pathname.split('/').filter(Boolean)[0] || '';
+            }
+            if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com' || host === 'youtube-nocookie.com') {
+                if (parsed.pathname === '/watch') return parsed.searchParams.get('v') || '';
+                const parts = parsed.pathname.split('/').filter(Boolean);
+                if (['embed', 'shorts', 'live'].includes(parts[0])) return parts[1] || '';
+            }
+        } catch (error) {
+            return '';
+        }
+        return '';
+    }
+
+    setupYouTubeSimulationPanel() {
+        const game = gameManager.currentGame;
+        const panel = document.getElementById('youtubeSimulationPanel');
+        if (!panel) return;
+
+        if (!this.isAiYouTubeToolsEnabled() || !game?.youtubeSimulation?.enabled) {
+            panel.classList.add('hidden');
+            return;
+        }
+
+        const sim = game.youtubeSimulation;
+        if (!Array.isArray(sim.notes)) sim.notes = [];
+        const urlInput = document.getElementById('youtubeRuntimeUrl');
+        const timestampInput = document.getElementById('youtubeTimestampInput');
+        const openLink = document.getElementById('youtubeOpenLink');
+        const body = document.getElementById('youtubePanelBody');
+        const toggleBtn = document.getElementById('youtubePanelToggleBtn');
+
+        panel.classList.remove('hidden');
+        if (urlInput) urlInput.value = sim.url || '';
+        if (timestampInput) timestampInput.value = this.formatYouTubeTimestamp(sim.lastTimestamp || 0);
+        if (openLink && sim.url) openLink.href = sim.url;
+        if (body) body.classList.toggle('hidden', this.youtubePanelCollapsed);
+        if (toggleBtn) {
+            toggleBtn.textContent = this.youtubePanelCollapsed
+                ? (i18n.t('expand') || '展開')
+                : (i18n.t('collapse') || '折りたたむ');
+            toggleBtn.onclick = () => {
+                this.youtubePanelCollapsed = !this.youtubePanelCollapsed;
+                this.setupYouTubeSimulationPanel();
+            };
+        }
+
+        document.getElementById('youtubeLoadVideoBtn').onclick = async () => this.updateYouTubeSimulationVideo();
+        document.getElementById('youtubeSeekBtn').onclick = async () => this.seekYouTubeSimulation();
+        document.getElementById('youtubeBack10Btn').onclick = async () => this.shiftYouTubeTimestamp(-10);
+        document.getElementById('youtubeForward10Btn').onclick = async () => this.shiftYouTubeTimestamp(10);
+        document.getElementById('youtubeMarkTimestampBtn').onclick = async () => this.markYouTubeTimestamp();
+        document.getElementById('youtubeDensityReportBtn').onclick = () => this.renderYouTubeDensityReport();
+        this.setupYouTubeApiKeyControls();
+        this.updateYouTubeApiKeyControls();
+
+        this.renderYouTubeFrame();
+        this.renderYouTubeTimestampList();
+        this.renderYouTubeDensityReport();
+        this.startYouTubeTimeSync();
+    }
+
+    isAiYouTubeToolsEnabled() {
+        return localStorage.getItem('baseballScoreAiYouTubeTools') === 'true' ||
+            new URLSearchParams(window.location.search).get('aiYoutube') === '1';
+    }
+
+    setupYouTubeApiKeyControls() {
+        const pairs = [
+            {
+                input: document.getElementById('youtubeApiKeyInput'),
+                save: document.getElementById('youtubeApiKeySaveBtn'),
+                clear: document.getElementById('youtubeApiKeyClearBtn')
+            },
+            {
+                input: document.getElementById('youtubeRuntimeApiKeyInput'),
+                save: document.getElementById('youtubeRuntimeApiKeySaveBtn'),
+                clear: document.getElementById('youtubeRuntimeApiKeyClearBtn')
+            },
+            {
+                input: document.getElementById('settingsYoutubeApiKeyInput'),
+                save: document.getElementById('settingsYoutubeApiKeySaveBtn'),
+                clear: document.getElementById('settingsYoutubeApiKeyClearBtn')
+            }
+        ];
+
+        pairs.forEach(({ input, save, clear }) => {
+            if (input && !input.dataset.youtubeApiKeyBound) {
+                input.dataset.youtubeApiKeyBound = 'true';
+                input.addEventListener('input', () => {
+                    input.classList.toggle('has-unsaved-value', Boolean(input.value.trim()));
+                });
+            }
+            if (save && !save.dataset.youtubeApiKeyBound) {
+                save.dataset.youtubeApiKeyBound = 'true';
+                save.addEventListener('click', () => this.saveYouTubeDataApiKey(input?.value || ''));
+            }
+            if (clear && !clear.dataset.youtubeApiKeyBound) {
+                clear.dataset.youtubeApiKeyBound = 'true';
+                clear.addEventListener('click', () => this.clearYouTubeDataApiKey());
+            }
+        });
+    }
+
+    getYouTubeDataApiKey() {
+        return localStorage.getItem(this.youtubeDataApiKeyStorageKey) || '';
+    }
+
+    getMaskedYouTubeDataApiKey() {
+        const key = this.getYouTubeDataApiKey();
+        if (!key) return '';
+        const visible = key.slice(-4);
+        return `${'*'.repeat(Math.max(8, Math.min(16, key.length - 4)))}${visible}`;
+    }
+
+    updateYouTubeApiKeyControls(messageKey = '') {
+        const masked = this.getMaskedYouTubeDataApiKey();
+        const statusText = messageKey
+            ? i18n.t(messageKey)
+            : masked
+                ? `${i18n.t('apiKeySaved')}: ${masked}`
+                : i18n.t('apiKeyNotSaved');
+
+        [
+            ['youtubeApiKeyInput', 'youtubeApiKeyStatus'],
+            ['youtubeRuntimeApiKeyInput', 'youtubeRuntimeApiKeyStatus'],
+            ['settingsYoutubeApiKeyInput', 'settingsYoutubeApiKeyStatus']
+        ].forEach(([inputId, statusId]) => {
+            const input = document.getElementById(inputId);
+            const status = document.getElementById(statusId);
+            if (input) {
+                input.value = '';
+                input.classList.remove('has-unsaved-value');
+            }
+            if (status) {
+                status.textContent = statusText;
+                status.classList.toggle('saved', Boolean(masked));
+            }
+        });
+    }
+
+    saveYouTubeDataApiKey(rawKey) {
+        const key = String(rawKey || '').trim();
+        if (!key) {
+            this.showError(i18n.t('apiKeyEmpty') || 'APIキーを入力してください');
+            return;
+        }
+        localStorage.setItem(this.youtubeDataApiKeyStorageKey, key);
+        this.updateYouTubeApiKeyControls('apiKeySavedMessage');
+        this.showSuccess(i18n.t('apiKeySavedMessage') || 'YouTube Data APIキーを保存しました');
+    }
+
+    clearYouTubeDataApiKey() {
+        localStorage.removeItem(this.youtubeDataApiKeyStorageKey);
+        this.updateYouTubeApiKeyControls('apiKeyClearedMessage');
+        this.showSuccess(i18n.t('apiKeyClearedMessage') || 'YouTube Data APIキーを削除しました');
+    }
+
+    async testYouTubeDataApiKey() {
+        const status = document.getElementById('youtubeApiTestStatus');
+        const key = this.getYouTubeDataApiKey();
+        if (!key) {
+            if (status) status.textContent = i18n.t('apiKeyNotSaved') || '未保存';
+            this.showError(i18n.t('apiKeyEmpty') || 'APIキーを入力してください');
+            return;
+        }
+
+        if (status) status.textContent = i18n.t('youtubeApiTesting') || '接続確認中...';
+        try {
+            const params = new URLSearchParams({
+                part: 'snippet',
+                id: 'SVR83qQ9Xwk',
+                key
+            });
+            const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?${params.toString()}`);
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data?.error?.message || response.statusText);
+            }
+            const ok = Array.isArray(data.items) && data.items.length > 0;
+            if (!ok) throw new Error(i18n.t('youtubeApiNoVideo') || '動画情報を取得できませんでした');
+            if (status) {
+                status.textContent = i18n.t('youtubeApiTestSuccess') || '接続確認OK';
+                status.classList.add('saved');
+            }
+            this.showSuccess(i18n.t('youtubeApiTestSuccess') || '接続確認OK');
+        } catch (error) {
+            if (status) {
+                status.textContent = `${i18n.t('youtubeApiTestFailed') || '接続確認失敗'}: ${error.message}`;
+                status.classList.remove('saved');
+            }
+            this.showError(`${i18n.t('youtubeApiTestFailed') || '接続確認失敗'}: ${error.message}`);
+        }
+    }
+
+    async searchYouTubeFullGameVideos() {
+        const resultsEl = document.getElementById('youtubeSearchResults');
+        const queryInput = document.getElementById('youtubeSearchQuery');
+        const key = this.getYouTubeDataApiKey();
+        const query = queryInput?.value.trim() || 'baseball full game';
+        if (!key) {
+            this.showError(i18n.t('apiKeyEmpty') || 'APIキーを入力してください');
+            return;
+        }
+        if (resultsEl) {
+            resultsEl.innerHTML = `<div class="youtube-search-message">${i18n.t('youtubeSearchRunning') || '検索中...'}</div>`;
+        }
+
+        try {
+            const searchParams = new URLSearchParams({
+                part: 'snippet',
+                q: query,
+                type: 'video',
+                videoDuration: 'long',
+                maxResults: '12',
+                relevanceLanguage: 'ja',
+                key
+            });
+            const searchResponse = await fetch(`https://www.googleapis.com/youtube/v3/search?${searchParams.toString()}`);
+            const searchData = await searchResponse.json();
+            if (!searchResponse.ok) {
+                throw new Error(searchData?.error?.message || searchResponse.statusText);
+            }
+            const ids = (searchData.items || [])
+                .map(item => item.id?.videoId)
+                .filter(Boolean);
+            if (ids.length === 0) {
+                this.renderYouTubeSearchResults([]);
+                return;
+            }
+
+            const videoParams = new URLSearchParams({
+                part: 'snippet,contentDetails,statistics',
+                id: ids.join(','),
+                key
+            });
+            const videoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?${videoParams.toString()}`);
+            const videoData = await videoResponse.json();
+            if (!videoResponse.ok) {
+                throw new Error(videoData?.error?.message || videoResponse.statusText);
+            }
+            const candidates = (videoData.items || [])
+                .map(video => this.normalizeYouTubeCandidate(video))
+                .filter(video => video.durationSeconds >= 7200 && video.durationSeconds <= 27000)
+                .sort((a, b) => Math.abs(a.durationSeconds - 10800) - Math.abs(b.durationSeconds - 10800));
+
+            this.renderYouTubeSearchResults(candidates);
+        } catch (error) {
+            if (resultsEl) {
+                resultsEl.innerHTML = `<div class="youtube-search-message error">${this.escapeHtml(error.message)}</div>`;
+            }
+            this.showError(`${i18n.t('youtubeSearchFailed') || '検索に失敗しました'}: ${error.message}`);
+        }
+    }
+
+    normalizeYouTubeCandidate(video) {
+        const durationSeconds = this.parseYouTubeIsoDuration(video.contentDetails?.duration || 'PT0S');
+        const videoId = video.id;
+        return {
+            videoId,
+            url: `https://www.youtube.com/watch?v=${videoId}`,
+            title: video.snippet?.title || '',
+            channelTitle: video.snippet?.channelTitle || '',
+            publishedAt: video.snippet?.publishedAt || '',
+            thumbnail: video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || '',
+            durationSeconds,
+            viewCount: Number(video.statistics?.viewCount || 0)
+        };
+    }
+
+    parseYouTubeIsoDuration(duration) {
+        const match = String(duration || '').match(/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+        if (!match) return 0;
+        const [, days, hours, minutes, seconds] = match.map(value => parseInt(value || '0', 10));
+        return (days * 86400) + (hours * 3600) + (minutes * 60) + seconds;
+    }
+
+    renderYouTubeSearchResults(candidates) {
+        const resultsEl = document.getElementById('youtubeSearchResults');
+        if (!resultsEl) return;
+        if (candidates.length === 0) {
+            resultsEl.innerHTML = `<div class="youtube-search-message">${i18n.t('youtubeSearchNoResults') || '条件に合う長尺動画が見つかりませんでした'}</div>`;
+            return;
+        }
+        resultsEl.innerHTML = candidates.map(video => `
+            <div class="youtube-search-result">
+                ${video.thumbnail ? `<img src="${this.escapeHtml(video.thumbnail)}" alt="">` : ''}
+                <div class="youtube-search-result-body">
+                    <strong>${this.escapeHtml(video.title)}</strong>
+                    <span>${this.escapeHtml(video.channelTitle)} · ${this.formatYouTubeTimestamp(video.durationSeconds)}</span>
+                    <button type="button" class="secondary-btn use-youtube-result" data-url="${this.escapeHtml(video.url)}">${i18n.t('useThisVideo') || 'この動画を使う'}</button>
+                </div>
+            </div>
+        `).join('');
+        resultsEl.querySelectorAll('.use-youtube-result').forEach(button => {
+            button.addEventListener('click', () => this.useYouTubeSearchResult(button.dataset.url));
+        });
+    }
+
+    useYouTubeSearchResult(url) {
+        const enabled = document.getElementById('youtubeSimulationEnabled');
+        const urlInput = document.getElementById('youtubeVideoUrl');
+        if (enabled) enabled.checked = true;
+        if (urlInput) urlInput.value = url;
+        this.hideAppSettingsModal();
+        this.showScreen('gameSetupScreen');
+        this.showSuccess(i18n.t('youtubeVideoSelected') || 'YouTube動画URLを試合設定に入力しました');
+    }
+
+    showAppSettingsModal() {
+        const modal = document.getElementById('appSettingsModal');
+        if (!modal) return;
+        this.setupYouTubeApiKeyControls();
+        this.updateYouTubeApiKeyControls();
+        modal.classList.remove('modal--hidden');
+        modal.style.display = 'flex';
+        if (window.location.hash !== '#appSettingsModal') {
+            history.replaceState(null, '', '#appSettingsModal');
+        }
+    }
+
+    hideAppSettingsModal() {
+        const modal = document.getElementById('appSettingsModal');
+        if (!modal) return;
+        modal.classList.add('modal--hidden');
+        modal.style.removeProperty('display');
+        if (window.location.hash === '#appSettingsModal') {
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+    }
+
+    loadYouTubeIframeApi() {
+        if (window.YT?.Player) return Promise.resolve(window.YT);
+        if (this.youtubeApiReadyPromise) return this.youtubeApiReadyPromise;
+
+        this.youtubeApiReadyPromise = new Promise((resolve, reject) => {
+            const previousReady = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => {
+                if (typeof previousReady === 'function') previousReady();
+                resolve(window.YT);
+            };
+
+            if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+                const script = document.createElement('script');
+                script.src = 'https://www.youtube.com/iframe_api';
+                script.async = true;
+                script.onerror = () => reject(new Error('YouTube IFrame API failed to load'));
+                document.head.appendChild(script);
+            }
+        });
+
+        return this.youtubeApiReadyPromise;
+    }
+
+    async renderYouTubeFrame() {
+        const sim = gameManager.currentGame?.youtubeSimulation;
+        const playerTarget = document.getElementById('youtubeSimulationPlayer');
+        if (!playerTarget || !sim?.videoId) return;
+        const start = Math.max(0, parseInt(sim.lastTimestamp || 0));
+        const playerVars = {
+            start,
+            rel: 0,
+            modestbranding: 1,
+            playsinline: 1,
+            enablejsapi: 1
+        };
+        if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+            playerVars.origin = window.location.origin;
+        }
+
+        try {
+            const YTApi = await this.loadYouTubeIframeApi();
+            if (this.youtubePlayer && typeof this.youtubePlayer.cueVideoById === 'function') {
+                if (this.youtubeCurrentVideoId !== sim.videoId) {
+                    this.youtubePlayer.cueVideoById({ videoId: sim.videoId, startSeconds: start });
+                    this.youtubeCurrentVideoId = sim.videoId;
+                } else {
+                    this.youtubePlayer.seekTo(start, true);
+                }
+                return;
+            }
+
+            this.youtubePlayer = new YTApi.Player('youtubeSimulationPlayer', {
+                width: '100%',
+                height: '100%',
+                videoId: sim.videoId,
+                host: 'https://www.youtube-nocookie.com',
+                playerVars,
+                events: {
+                    onReady: () => {
+                        this.youtubeCurrentVideoId = sim.videoId;
+                        this.updateYouTubeTimestampFromPlayer();
+                    }
+                }
+            });
+        } catch (error) {
+            console.warn('YouTube IFrame API unavailable; falling back to iframe embed.', error);
+            playerTarget.innerHTML = `<iframe title="YouTube simulation video" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(sim.videoId)}?start=${start}&rel=0&modestbranding=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+        }
+    }
+
+    parseYouTubeTimestamp(value) {
+        const text = String(value || '').trim();
+        if (!text) return 0;
+        if (/^\d+$/.test(text)) return parseInt(text, 10);
+        const parts = text.split(':').map(part => parseInt(part, 10));
+        if (parts.some(Number.isNaN)) return 0;
+        return parts.reduce((total, part) => total * 60 + part, 0);
+    }
+
+    formatYouTubeTimestamp(seconds) {
+        const total = Math.max(0, parseInt(seconds || 0));
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const secs = total % 60;
+        if (hours > 0) {
+            return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+        return `${minutes}:${String(secs).padStart(2, '0')}`;
+    }
+
+    async updateYouTubeSimulationVideo() {
+        const game = gameManager.currentGame;
+        const url = document.getElementById('youtubeRuntimeUrl')?.value.trim() || '';
+        const videoId = this.extractYouTubeVideoId(url);
+        if (!game || !videoId) {
+            this.showError(i18n.t('youtubeVideoUrlInvalid') || 'YouTube URLを確認してください');
+            return;
+        }
+        game.youtubeSimulation = {
+            ...(game.youtubeSimulation || {}),
+            enabled: true,
+            url,
+            videoId,
+            lastTimestamp: 0,
+            notes: game.youtubeSimulation?.notes || [],
+            operationLogs: game.youtubeSimulation?.operationLogs || [],
+            unsupportedPlays: game.youtubeSimulation?.unsupportedPlays || []
+        };
+        await gameManager.saveGame();
+        this.setupYouTubeSimulationPanel();
+    }
+
+    async seekYouTubeSimulation() {
+        const game = gameManager.currentGame;
+        if (!game?.youtubeSimulation) return;
+        const input = document.getElementById('youtubeTimestampInput');
+        game.youtubeSimulation.lastTimestamp = this.parseYouTubeTimestamp(input?.value);
+        if (input) input.value = this.formatYouTubeTimestamp(game.youtubeSimulation.lastTimestamp);
+        await gameManager.saveGame();
+        if (this.youtubePlayer && typeof this.youtubePlayer.seekTo === 'function') {
+            this.youtubePlayer.seekTo(game.youtubeSimulation.lastTimestamp, true);
+            return;
+        }
+        await this.renderYouTubeFrame();
+    }
+
+    async shiftYouTubeTimestamp(delta) {
+        const input = document.getElementById('youtubeTimestampInput');
+        const next = Math.max(0, this.getYouTubeCurrentTime() + delta);
+        if (input) input.value = this.formatYouTubeTimestamp(next);
+        await this.seekYouTubeSimulation();
+    }
+
+    async markYouTubeTimestamp() {
+        const game = gameManager.currentGame;
+        if (!game?.youtubeSimulation) return;
+        const timeSeconds = this.getYouTubeCurrentTime();
+        const noteInput = document.getElementById('youtubeTimestampNote');
+        const half = game.isTopHalf ? (i18n.t('top') || '表') : (i18n.t('bottom') || '裏');
+        const note = {
+            id: Date.now(),
+            timeSeconds,
+            label: noteInput?.value.trim() || `${game.currentInning}${i18n.t('inningSuffix') || '回'}${half}`,
+            inning: game.currentInning,
+            isTopHalf: game.isTopHalf,
+            score: { home: game.homeScore, away: game.awayScore },
+            createdAt: new Date().toISOString()
+        };
+        game.youtubeSimulation.lastTimestamp = timeSeconds;
+        game.youtubeSimulation.notes = [note, ...(game.youtubeSimulation.notes || [])].slice(0, 50);
+        this.recordYouTubeOperation('timestamp_note', i18n.t('markTimestamp') || '時刻メモ', { saveImmediately: false });
+        if (noteInput) noteInput.value = '';
+        await gameManager.saveGame();
+        this.renderYouTubeTimestampList();
+        this.renderYouTubeDensityReport();
+    }
+
+    renderYouTubeTimestampList() {
+        const list = document.getElementById('youtubeTimestampList');
+        const notes = gameManager.currentGame?.youtubeSimulation?.notes || [];
+        if (!list) return;
+        if (notes.length === 0) {
+            list.innerHTML = `<div class="youtube-timestamp-empty">${i18n.t('youtubeNoTimestampNotes') || '時刻メモはまだありません'}</div>`;
+            return;
+        }
+        list.innerHTML = notes.map(note => `
+            <button type="button" class="youtube-timestamp-item" data-seconds="${note.timeSeconds}">
+                <span class="youtube-timestamp-time">${this.formatYouTubeTimestamp(note.timeSeconds)}</span>
+                <span class="youtube-timestamp-label">${this.escapeHtml(note.label)}</span>
+                <span class="youtube-timestamp-score">${gameManager.currentGame.awayTeam} ${note.score?.away ?? 0} - ${note.score?.home ?? 0} ${gameManager.currentGame.homeTeam}</span>
+            </button>
+        `).join('');
+        list.querySelectorAll('.youtube-timestamp-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                document.getElementById('youtubeTimestampInput').value = this.formatYouTubeTimestamp(parseInt(item.dataset.seconds, 10));
+                await this.seekYouTubeSimulation();
+            });
+        });
+    }
+
+    getYouTubeCurrentTime() {
+        try {
+            if (this.youtubePlayer && typeof this.youtubePlayer.getCurrentTime === 'function') {
+                const current = Math.floor(this.youtubePlayer.getCurrentTime());
+                if (!Number.isNaN(current)) {
+                    const input = document.getElementById('youtubeTimestampInput');
+                    if (input) input.value = this.formatYouTubeTimestamp(current);
+                    return current;
+                }
+            }
+        } catch (error) {
+            // Fall back to the visible timestamp input.
+        }
+
+        const sim = gameManager.currentGame?.youtubeSimulation;
+        return this.parseYouTubeTimestamp(document.getElementById('youtubeTimestampInput')?.value || sim?.lastTimestamp || 0);
+    }
+
+    updateYouTubeTimestampFromPlayer() {
+        const game = gameManager.currentGame;
+        if (!game?.youtubeSimulation?.enabled) return;
+        const current = this.getYouTubeCurrentTime();
+        game.youtubeSimulation.lastTimestamp = current;
+    }
+
+    startYouTubeTimeSync() {
+        clearInterval(this.youtubeTimeSyncTimer);
+        this.youtubeTimeSyncTimer = setInterval(() => {
+            if (this.currentScreen !== 'gameScreen' || !gameManager.currentGame?.youtubeSimulation?.enabled) {
+                clearInterval(this.youtubeTimeSyncTimer);
+                this.youtubeTimeSyncTimer = null;
+                return;
+            }
+            this.updateYouTubeTimestampFromPlayer();
+        }, 1000);
+    }
+
+    captureYouTubeOperationClick(event) {
+        const game = gameManager.currentGame;
+        if (!game?.youtubeSimulation?.enabled || this.currentScreen !== 'gameScreen') return;
+
+        const target = event.target.closest('button, select, input[type="checkbox"], input[type="radio"]');
+        if (!target) return;
+        if (target.closest('#youtubeSimulationPanel')) return;
+        if (target.closest('#gameSetupForm')) return;
+
+        const label = target.textContent?.trim() ||
+            target.getAttribute('data-i18n') ||
+            target.getAttribute('aria-label') ||
+            target.id ||
+            target.className ||
+            'operation';
+        this.recordYouTubeOperation('ui_click', label);
+    }
+
+    recordYouTubeOperation(operationType, operationLabel, options = {}) {
+        const game = gameManager.currentGame;
+        if (!game?.youtubeSimulation?.enabled) return;
+
+        const sim = game.youtubeSimulation;
+        if (!Array.isArray(sim.operationLogs)) sim.operationLogs = [];
+        const videoTimestamp = this.getYouTubeCurrentTime();
+        sim.lastTimestamp = videoTimestamp;
+        sim.operationLogs.push({
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            videoTimestamp,
+            operationType,
+            operationLabel: String(operationLabel || '').slice(0, 80),
+            recordingLevel: game.recordingLevel,
+            detailLevel: game.playerDetailLevel,
+            recordingMode: game.recordingMode,
+            inning: game.currentInning,
+            isTopHalf: game.isTopHalf,
+            createdAt: new Date().toISOString()
+        });
+        sim.operationLogs = sim.operationLogs.slice(-500);
+
+        if (options.saveImmediately === false) return;
+        clearTimeout(this.youtubeOperationSaveTimer);
+        this.youtubeOperationSaveTimer = setTimeout(async () => {
+            try {
+                await gameManager.saveGame();
+                this.renderYouTubeDensityReport();
+            } catch (error) {
+                console.error('YouTube操作ログ保存エラー:', error);
+            }
+        }, 300);
+    }
+
+    recordUnsupportedPlay(playType, playLabel, details = {}) {
+        const game = gameManager.currentGame;
+        const label = playLabel || playType || 'unsupported play';
+
+        this.recordYouTubeOperation('unsupported_play', label, { saveImmediately: false });
+
+        if (!game?.youtubeSimulation?.enabled) return;
+
+        const sim = game.youtubeSimulation;
+        if (!Array.isArray(sim.unsupportedPlays)) sim.unsupportedPlays = [];
+        const videoTimestamp = this.getYouTubeCurrentTime();
+        sim.lastTimestamp = videoTimestamp;
+        sim.unsupportedPlays.push({
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            videoTimestamp,
+            playType,
+            playLabel: String(label).slice(0, 80),
+            details,
+            recordingLevel: game.recordingLevel,
+            detailLevel: game.playerDetailLevel,
+            recordingMode: game.recordingMode,
+            inning: game.currentInning,
+            isTopHalf: game.isTopHalf,
+            createdAt: new Date().toISOString()
+        });
+        sim.unsupportedPlays = sim.unsupportedPlays.slice(-100);
+
+        gameManager.saveGame()
+            .then(() => this.renderYouTubeDensityReport())
+            .catch(error => console.error('未対応プレーログ保存エラー:', error));
+    }
+
+    getYouTubeOperationDensityReport() {
+        const logs = gameManager.currentGame?.youtubeSimulation?.operationLogs || [];
+        const buckets = new Map();
+        for (const log of logs) {
+            const start = Math.floor((log.videoTimestamp || 0) / 10) * 10;
+            if (!buckets.has(start)) buckets.set(start, []);
+            buckets.get(start).push(log);
+        }
+
+        const rows = Array.from(buckets.entries())
+            .map(([start, items]) => ({
+                start,
+                end: start + 10,
+                count: items.length,
+                items,
+                verdict: this.getYouTubeDensityVerdict(items.length)
+            }))
+            .sort((a, b) => b.count - a.count || a.start - b.start);
+
+        return {
+            totalOperations: logs.length,
+            maxBucket: rows[0] || null,
+            rows
+        };
+    }
+
+    getYouTubeDensityVerdict(count) {
+        if (count >= 11) return { level: 'critical', label: i18n.t('densityCritical') || '非現実的' };
+        if (count >= 7) return { level: 'hard', label: i18n.t('densityHard') || 'リアルタイム記録は厳しい' };
+        if (count >= 4) return { level: 'caution', label: i18n.t('densityCaution') || '慣れれば可能' };
+        return { level: 'ok', label: i18n.t('densityOk') || 'リアルタイム記録可能' };
+    }
+
+    renderYouTubeDensityReport() {
+        const reportEl = document.getElementById('youtubeDensityReport');
+        if (!reportEl) return;
+        const report = this.getYouTubeOperationDensityReport();
+        const unsupportedPlays = gameManager.currentGame?.youtubeSimulation?.unsupportedPlays || [];
+        if (!report.maxBucket && unsupportedPlays.length === 0) {
+            reportEl.innerHTML = `<div class="youtube-density-empty">${i18n.t('densityNoOperations') || '操作ログはまだありません'}</div>`;
+            return;
+        }
+
+        const unsupportedHtml = unsupportedPlays.length > 0 ? `
+            <div class="density-summary density-critical unsupported-play-summary">
+                <div class="density-main">
+                    <strong>${i18n.t('unsupportedPlayDetected') || '未対応プレー検出'}</strong>
+                    <span>${unsupportedPlays.length}${i18n.t('unsupportedPlayCountUnit') || '件'}</span>
+                </div>
+                <div class="density-verdict">${i18n.t('unsupportedPlayP1') || 'P1: 対応する操作を実装するまで実用不可'}</div>
+                <ul>
+                    ${unsupportedPlays.slice(-5).reverse().map(item => {
+                        const half = item.isTopHalf ? (i18n.t('top') || '表') : (i18n.t('bottom') || '裏');
+                        return `<li>${this.formatYouTubeTimestamp(item.videoTimestamp || 0)} ${item.inning || '-'}${half}: ${this.escapeHtml(item.playLabel || item.playType || '')}</li>`;
+                    }).join('')}
+                </ul>
+            </div>
+        ` : '';
+
+        const densityHtml = report.maxBucket ? (() => {
+            const max = report.maxBucket;
+            const operations = max.items.slice(0, 6)
+                .map(item => `<li>${this.escapeHtml(item.operationLabel)}</li>`)
+                .join('');
+            return `
+                <div class="density-summary density-${max.verdict.level}">
+                    <div class="density-main">
+                        <strong>${this.formatYouTubeTimestamp(max.start)}-${this.formatYouTubeTimestamp(max.end)}</strong>
+                        <span>${max.count}${i18n.t('operationsPer10s') || '操作/10秒'}</span>
+                    </div>
+                    <div class="density-verdict">${this.escapeHtml(max.verdict.label)}</div>
+                    <div class="density-total">${i18n.t('densityTotalOperations') || '総操作数'}: ${report.totalOperations}</div>
+                    <ul>${operations}</ul>
+                </div>
+            `;
+        })() : `<div class="youtube-density-empty">${i18n.t('densityNoOperations') || '操作ログはまだありません'}</div>`;
+
+        reportEl.innerHTML = `${unsupportedHtml}${densityHtml}`;
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
+    normalizeGameClassification(classification) {
+        if (typeof Game !== 'undefined' && Game.normalizeClassification) {
+            return Game.normalizeClassification(classification);
+        }
+        const source = classification && typeof classification === 'object' ? classification : {};
+        const tags = Array.isArray(source.tags)
+            ? source.tags
+            : String(source.tags || '').split(',').map(tag => tag.trim()).filter(Boolean);
+        return {
+            category: source.category || 'uncategorized',
+            folderName: source.folderName || '',
+            tags,
+            memo: source.memo || ''
+        };
+    }
+
+    getGameCategoryOptions() {
+        return [
+            { value: 'uncategorized', labelKey: 'gameCategoryUncategorized' },
+            { value: 'youth', labelKey: 'gameCategoryYouth' },
+            { value: 'senior', labelKey: 'gameCategorySenior' },
+            { value: 'juniorHigh', labelKey: 'gameCategoryJuniorHigh' },
+            { value: 'highSchool', labelKey: 'gameCategoryHighSchool' },
+            { value: 'university', labelKey: 'gameCategoryUniversity' },
+            { value: 'adult', labelKey: 'gameCategoryAdult' },
+            { value: 'pro', labelKey: 'gameCategoryPro' },
+            { value: 'other', labelKey: 'gameCategoryOther' }
+        ];
+    }
+
+    getGameCategoryLabel(category) {
+        const option = this.getGameCategoryOptions().find(item => item.value === category);
+        return i18n.t(option?.labelKey || 'gameCategoryUncategorized');
+    }
+
+    slugifyFileName(value) {
+        return String(value || 'game')
+            .trim()
+            .replace(/[\\/:*?"<>|]+/g, '-')
+            .replace(/\s+/g, '_')
+            .slice(0, 80) || 'game';
+    }
+
+    async buildSavedGameExportBundle(gameId) {
+        const game = await storage.loadGame(gameId);
+        if (!game) throw new Error('Game not found');
+
+        const innings = await storage.getInningsByGame(gameId);
+        innings.sort((a, b) => a.inning - b.inning || (a.isTopHalf ? -1 : 1));
+
+        const atBats = [];
+        const pitches = [];
+        for (const inning of innings) {
+            const inningAtBats = await storage.getAtBatsByInning(inning.id);
+            inningAtBats.sort((a, b) => (a.createdAt || a.id || 0) - (b.createdAt || b.id || 0));
+            atBats.push(...inningAtBats);
+            for (const atBat of inningAtBats) {
+                const atBatPitches = await storage.getPitchesByAtBat(atBat.id);
+                atBatPitches.sort((a, b) => (a.pitchNumber || a.id || 0) - (b.pitchNumber || b.id || 0));
+                pitches.push(...atBatPitches);
+            }
+        }
+
+        return {
+            format: 'baseball-score-game-export',
+            formatVersion: 1,
+            exportedAt: new Date().toISOString(),
+            app: {
+                name: 'Baseball Score Recorder',
+                cacheVersion: typeof CACHE_NAME !== 'undefined' ? CACHE_NAME : null
+            },
+            game,
+            innings,
+            atBats,
+            pitches
+        };
+    }
+
+    getSavedGameExportFileName(game) {
+        const date = game?.date ? new Date(game.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const teams = this.slugifyFileName(`${game?.awayTeam || 'away'}-vs-${game?.homeTeam || 'home'}`);
+        return `${date}_${teams}.baseball-game.json`;
+    }
+
+    downloadBlob(blob, fileName) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    async shareSavedGame(gameId) {
+        try {
+            const bundle = await this.buildSavedGameExportBundle(gameId);
+            const fileName = this.getSavedGameExportFileName(bundle.game);
+            const json = JSON.stringify(bundle, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const title = `${bundle.game.awayTeam || '?'} vs ${bundle.game.homeTeam || '?'}`;
+            const text = i18n.t('shareGameText')
+                .replace('{away}', bundle.game.awayTeam || '?')
+                .replace('{home}', bundle.game.homeTeam || '?');
+
+            if (typeof navigator.share === 'function' && typeof File !== 'undefined') {
+                const file = new File([blob], fileName, { type: 'application/json' });
+                if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+                    await navigator.share({ title, text, files: [file] });
+                    this.showSuccess(i18n.t('shareGameReady'));
+                    return;
+                }
+            }
+
+            this.downloadBlob(blob, fileName);
+            this.showSuccess(i18n.t('shareGameDownloaded'));
+        } catch (error) {
+            console.error('試合共有エラー:', error);
+            this.showError(i18n.t('shareGameError'));
+        }
+    }
+
+    getSavedGameFolderEntries(games) {
+        const entries = new Map();
+        games.forEach(game => {
+            const classification = this.normalizeGameClassification(game.classification);
+            if (!classification.folderName) return;
+            const key = `${classification.category}\u0000${classification.folderName.toLowerCase()}`;
+            if (!entries.has(key)) {
+                entries.set(key, {
+                    category: classification.category,
+                    folderName: classification.folderName,
+                    count: 0
+                });
+            }
+            entries.get(key).count += 1;
+        });
+        return [...entries.values()].sort((a, b) => {
+            const categoryCompare = this.getGameCategoryLabel(a.category).localeCompare(this.getGameCategoryLabel(b.category));
+            if (categoryCompare !== 0) return categoryCompare;
+            return a.folderName.localeCompare(b.folderName);
+        });
+    }
+
     needsPlayerSetup() {
         const game = gameManager.currentGame;
         if (!game) return false;
@@ -378,8 +1308,10 @@ class BaseballApp {
         const game = gameManager.currentGame;
         const gameContent = document.getElementById('gameContent');
 
-        // 標準・詳細レベルの場合はDH制設定を表示
-        const dhSetupSection = (game.playerDetailLevel === 'standard' || game.playerDetailLevel === 'detailed') ? `
+        const basicPitchMode = this.isBasicPitchMode(game);
+
+        // 標準・詳細レベル、または基本+1球ごとの場合はDH制設定を表示
+        const dhSetupSection = (game.playerDetailLevel === 'standard' || game.playerDetailLevel === 'detailed' || basicPitchMode) ? `
             <div class="dh-setup-section">
                 <h4 data-i18n="dhRuleSetup">${i18n.t('dhRuleSetup')}</h4>
                 <div class="dh-options">
@@ -413,6 +1345,7 @@ class BaseballApp {
                         <div class="batting-order-list" id="awayBattingOrder">
                             ${this.generateBattingOrderInputs('away')}
                         </div>
+                        ${this.generateBasicPitcherSetup('away')}
                         ${game.playerDetailLevel === 'detailed' ? this.generateBenchPlayersSection('away') : ''}
                     </div>
 
@@ -421,6 +1354,7 @@ class BaseballApp {
                         <div class="batting-order-list" id="homeBattingOrder">
                             ${this.generateBattingOrderInputs('home')}
                         </div>
+                        ${this.generateBasicPitcherSetup('home')}
                         ${game.playerDetailLevel === 'detailed' ? this.generateBenchPlayersSection('home') : ''}
                     </div>
                 </div>
@@ -432,12 +1366,13 @@ class BaseballApp {
         `;
 
         // DH制設定変更イベント
-        if (game.playerDetailLevel === 'standard' || game.playerDetailLevel === 'detailed') {
+        if (game.playerDetailLevel === 'standard' || game.playerDetailLevel === 'detailed' || basicPitchMode) {
             const dhRadios = gameContent.querySelectorAll('input[name="dhRule"]');
             dhRadios.forEach(radio => {
                 radio.addEventListener('change', () => {
                     game.dhRule = radio.value === 'true';
                     this.updateBattingOrderInputs();
+                    this.updateBasicPitcherSetup();
                 });
             });
 
@@ -509,6 +1444,22 @@ class BaseballApp {
         }
     }
 
+    updateBasicPitcherSetup() {
+        const awayContainer = document.getElementById('awayBasicPitcherSetup');
+        const homeContainer = document.getElementById('homeBasicPitcherSetup');
+
+        if (awayContainer) {
+            awayContainer.outerHTML = this.generateBasicPitcherSetup('away');
+        }
+        if (homeContainer) {
+            homeContainer.outerHTML = this.generateBasicPitcherSetup('home');
+        }
+    }
+
+    isBasicPitchMode(game = gameManager.currentGame) {
+        return game && game.recordingLevel === 'pitch' && game.playerDetailLevel === 'basic';
+    }
+
     generateBattingOrderInputs(team) {
         const game = gameManager.currentGame;
         let html = '';
@@ -516,7 +1467,7 @@ class BaseballApp {
             i18n.t('playerNamePlaceholder') : i18n.t('playerNameRequired');
 
         // DH制に応じて打順数を決定
-        const maxBattingOrder = (game.dhRule === true) ? 10 : 9;
+        const maxBattingOrder = (game.dhRule === true && !this.isBasicPitchMode(game)) ? 10 : 9;
 
         for (let i = 1; i <= maxBattingOrder; i++) {
             const existingPlayer = game.players[team].find(p => p.battingOrder === i);
@@ -601,6 +1552,57 @@ class BaseballApp {
             }
         }
 
+        return html;
+    }
+
+    generateBasicPitcherSetup(team) {
+        const game = gameManager.currentGame;
+        if (!this.isBasicPitchMode(game)) {
+            return '';
+        }
+
+        const existingPitcher = game.players[team].find(p => p.position === 'P' && p.isActive);
+        const existingOrder = existingPitcher?.battingOrder || 1;
+        const existingName = existingPitcher?.battingOrder ? '' : (existingPitcher?.name || '');
+
+        if (game.dhRule === true) {
+            return `
+                <div class="basic-pitcher-setup" id="${team}BasicPitcherSetup">
+                    <h5 data-i18n="basicPitcherSetup">${i18n.t('basicPitcherSetup')}</h5>
+                    <p data-i18n="basicPitcherSetupHelp">${i18n.t('basicPitcherSetupHelp')}</p>
+                    <label>
+                        <span data-i18n="dhPitcherName">${i18n.t('dhPitcherName')}</span>
+                        <input type="text"
+                               class="basic-dh-pitcher-name"
+                               data-team="${team}"
+                               value="${existingName}"
+                               placeholder="${i18n.t('dhPitcherNamePlaceholder')}"
+                               data-i18n-placeholder="dhPitcherNamePlaceholder">
+                    </label>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="basic-pitcher-setup" id="${team}BasicPitcherSetup">
+                <h5 data-i18n="basicPitcherSetup">${i18n.t('basicPitcherSetup')}</h5>
+                <p data-i18n="basicPitcherSetupHelp">${i18n.t('basicPitcherSetupHelp')}</p>
+                <label>
+                    <span data-i18n="startingPitcherBattingOrder">${i18n.t('startingPitcherBattingOrder')}</span>
+                    <select class="basic-pitcher-order" data-team="${team}">
+                        ${this.generatePitcherOrderOptions(existingOrder)}
+                    </select>
+                </label>
+            </div>
+        `;
+    }
+
+    generatePitcherOrderOptions(selectedOrder) {
+        let html = '';
+        for (let i = 1; i <= 9; i++) {
+            const selected = Number(selectedOrder) === i ? 'selected' : '';
+            html += `<option value="${i}" ${selected}>${i}${i18n.t('playerNumber')}</option>`;
+        }
         return html;
     }
 
@@ -708,6 +1710,12 @@ class BaseballApp {
                         );
                         position = positionSelect ? positionSelect.value || null : null;
                     }
+                } else if (this.isBasicPitchMode(game) && game.dhRule !== true) {
+                    const pitcherOrderSelect = document.querySelector(
+                        `.basic-pitcher-order[data-team="${team}"]`
+                    );
+                    const pitcherOrder = pitcherOrderSelect ? parseInt(pitcherOrderSelect.value) : 1;
+                    position = order === pitcherOrder ? 'P' : null;
                 }
 
                 const player = new Player(name, team, position, order);
@@ -724,6 +1732,20 @@ class BaseballApp {
 
                 console.log(`Player created and saved:`, player);
                 game.players[team].push(player);
+            }
+
+            if (this.isBasicPitchMode(game) && game.dhRule === true) {
+                for (const team of ['home', 'away']) {
+                    const pitcherInput = document.querySelector(`.basic-dh-pitcher-name[data-team="${team}"]`);
+                    const pitcherName = pitcherInput?.value.trim() || i18n.t('dhPitcherNamePlaceholder');
+                    const pitcher = new Player(pitcherName, team, 'P', null);
+                    pitcher.isStarter = true;
+                    pitcher.isBench = false;
+                    pitcher.isQuickRegistered = !pitcherInput?.value.trim();
+                    pitcher.needsDetailFill = pitcher.isQuickRegistered;
+                    pitcher.id = await storage.savePlayer(pitcher.toJSON());
+                    game.players[team].push(pitcher);
+                }
             }
 
             console.log('savePlayerSetup - final player data:', game.players);
@@ -748,6 +1770,7 @@ class BaseballApp {
             // 後から選手リストモーダルで守備位置を追記可能
 
             // ゲーム保存
+            await this.ensureCurrentInningPitcherStint();
             await gameManager.saveGame();
 
             // ゲーム画面に遷移
@@ -757,6 +1780,33 @@ class BaseballApp {
         } catch (error) {
             console.error('選手登録エラー:', error);
             this.showError(i18n.t('playerRegistrationError'));
+        }
+    }
+
+    async ensureCurrentInningPitcherStint() {
+        const game = gameManager.currentGame;
+        const inning = gameManager.currentInning;
+        if (!game || !inning) return;
+
+        const pitchingTeam = game.isTopHalf ? 'home' : 'away';
+        const pitcher = game.players[pitchingTeam]?.find(p => p.position === 'P' && p.isActive);
+        if (!pitcher) return;
+
+        game.currentPitcher = {
+            name: pitcher.name,
+            playerId: pitcher.id,
+            position: 'P'
+        };
+
+        if (!inning.pitcherStints || inning.pitcherStints.length === 0) {
+            inning.pitcherStints = [{
+                pitcherId: pitcher.id,
+                runnersInherited: 0,
+                runsAtEntry: inning.runs || 0,
+                earnedRunsAtEntry: inning.earnedRuns || 0
+            }];
+            inning.pitcherId = pitcher.id;
+            await storage.saveInning(inning.toJSON());
         }
     }
 
@@ -2400,7 +3450,9 @@ class BaseballApp {
                         this.showPickoffErrorModal();
                     } else {
                         console.log('Runner play selected:', key, config);
-                        this.showInfo('このプレイの処理は今後実装予定です');
+                        const label = i18n.t(config?.label) || config?.label || key;
+                        this.recordUnsupportedPlay(key, label, { area: 'runner_play' });
+                        this.showInfo(i18n.t('unsupportedPlayMessage') || '未対応プレーを検出しました。操作ログに記録しました。');
                     }
                 }
             });
@@ -3557,15 +4609,21 @@ class BaseballApp {
 
         const runnersOnBase = [];
         const game = gameManager.currentGame;
+        const batter = gameManager.getCurrentBatter();
+
+        runnersOnBase.push({
+            base: 'batter',
+            name: batter?.name || i18n.t('currentBatter') || '打者'
+        });
 
         if (game.runnersOnBase.first) {
-            runnersOnBase.push({ base: 'first', name: game.runnersOnBase.first.name });
+            runnersOnBase.push({ base: 'first', name: this.getRunnerDisplayName(game.runnersOnBase.first) });
         }
         if (game.runnersOnBase.second) {
-            runnersOnBase.push({ base: 'second', name: game.runnersOnBase.second.name });
+            runnersOnBase.push({ base: 'second', name: this.getRunnerDisplayName(game.runnersOnBase.second) });
         }
         if (game.runnersOnBase.third) {
-            runnersOnBase.push({ base: 'third', name: game.runnersOnBase.third.name });
+            runnersOnBase.push({ base: 'third', name: this.getRunnerDisplayName(game.runnersOnBase.third) });
         }
 
         modal.innerHTML = `
@@ -3575,7 +4633,7 @@ class BaseballApp {
                 <div class="runner-selection-buttons">
                     ${runnersOnBase.map(runner => `
                         <button class="runner-btn" data-base="${runner.base}">
-                            ${i18n.t(runner.base + '_base')}: ${runner.name}
+                            ${runner.base === 'batter' ? (i18n.t('batterRunner') || '打者走者') : this.getBaseLabel(runner.base)}: ${runner.name}
                         </button>
                     `).join('')}
                 </div>
@@ -3598,8 +4656,17 @@ class BaseballApp {
         document.getElementById('cancelObstruction').addEventListener('click', () => {
             modal.remove();
             this.currentResultView = 'top';
-            this.showAtBatResult();
+            this.updateResultButtons();
         });
+    }
+
+    getBaseLabel(base) {
+        const labels = {
+            first: i18n.t('firstBase') || '1塁',
+            second: i18n.t('secondBase') || '2塁',
+            third: i18n.t('thirdBase') || '3塁'
+        };
+        return labels[base] || base;
     }
 
     showObstructingFielderModal(obstructedRunnerBase) {
@@ -3630,7 +4697,7 @@ class BaseballApp {
             btn.addEventListener('click', () => {
                 const position = btn.dataset.position;
                 modal.remove();
-                this.showRunnerAdvancementModal(obstructedRunnerBase, position);
+                this.showObstructionRunnerAwardModal(obstructedRunnerBase, position);
             });
         });
 
@@ -3641,43 +4708,128 @@ class BaseballApp {
         });
     }
 
-    showRunnerAdvancementModal(obstructedRunnerBase, obstructingFielder) {
+    showObstructionRunnerAwardModal(obstructedRunnerBase, obstructingFielder) {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.id = 'runnerAdvancementModal';
 
-        const currentBaseNum = obstructedRunnerBase === 'first' ? 1 : obstructedRunnerBase === 'second' ? 2 : 3;
-        const minAdvancement = currentBaseNum + BASEBALL_CONFIG.OBSTRUCTION_CONFIG.minimumAdvancement;
+        const game = gameManager.currentGame;
+        const batter = gameManager.getCurrentBatter();
+        const participants = [
+            {
+                key: 'batter',
+                label: i18n.t('batterRunner') || '打者走者',
+                name: batter?.name || i18n.t('currentBatter') || '打者',
+                currentBase: 0,
+                active: true
+            },
+            {
+                key: 'first',
+                label: i18n.t('firstBase') || '1塁',
+                name: this.getRunnerDisplayName(game.runnersOnBase.first),
+                currentBase: 1,
+                active: !!game.runnersOnBase.first
+            },
+            {
+                key: 'second',
+                label: i18n.t('secondBase') || '2塁',
+                name: this.getRunnerDisplayName(game.runnersOnBase.second),
+                currentBase: 2,
+                active: !!game.runnersOnBase.second
+            },
+            {
+                key: 'third',
+                label: i18n.t('thirdBase') || '3塁',
+                name: this.getRunnerDisplayName(game.runnersOnBase.third),
+                currentBase: 3,
+                active: !!game.runnersOnBase.third
+            }
+        ].filter(item => item.active);
 
-        const bases = [];
-        for (let i = minAdvancement; i <= 4; i++) {
-            bases.push(i);
-        }
+        const baseOptions = [
+            { value: 'none', label: i18n.t('notApplicable') || '対象外' },
+            { value: 'stay', label: i18n.t('stayOnCurrentBase') || '元の塁' },
+            { value: 'first', label: i18n.t('firstBase') || '1塁' },
+            { value: 'second', label: i18n.t('secondBase') || '2塁' },
+            { value: 'third', label: i18n.t('thirdBase') || '3塁' },
+            { value: 'home', label: i18n.t('home') || '本塁' },
+            { value: 'out', label: i18n.t('batterOut') || 'アウト' }
+        ];
+
+        const getDefaultDestination = (participant) => {
+            if (participant.key === obstructedRunnerBase) {
+                if (participant.currentBase === 0) return 'first';
+                if (participant.currentBase === 1) return 'second';
+                if (participant.currentBase === 2) return 'third';
+                return 'home';
+            }
+            if (participant.key === 'batter') return 'none';
+            return 'stay';
+        };
+
+        const rows = participants.map(participant => `
+            <div class="runner-advancement-row">
+                <label for="obstructionDest_${participant.key}">
+                    ${participant.label}: ${this.escapeHtml(participant.name || '')}
+                    ${participant.key === obstructedRunnerBase ? ` <strong>(${i18n.t('obstructed_runner') || '妨害された走者'})</strong>` : ''}
+                </label>
+                <select id="obstructionDest_${participant.key}" data-runner="${participant.key}">
+                    ${baseOptions
+                        .filter(option => participant.key !== 'batter' || option.value !== 'stay')
+                        .map(option => `<option value="${option.value}" ${option.value === getDefaultDestination(participant) ? 'selected' : ''}>${option.label}</option>`)
+                        .join('')}
+                </select>
+            </div>
+        `).join('');
+
+        const defaultAtBatStatus = obstructedRunnerBase === 'batter' ? 'complete' : 'continue';
 
         modal.innerHTML = `
             <div class="modal-content">
                 <h3>${i18n.t('runner_advancement_obstruction')}</h3>
-                <p>${i18n.t('minimum_one_base')}</p>
-                <p>妨害された走者: ${i18n.t(obstructedRunnerBase + '_base')}</p>
-                <div class="base-buttons">
-                    ${bases.map(base => `
-                        <button class="base-btn" data-base="${base}">
-                            ${base === 4 ? i18n.t('home') : i18n.t('base_' + base)}
-                        </button>
-                    `).join('')}
+                <p>${i18n.t('obstructionAwardHelp') || '審判判断に従い、各走者が妨害がなければ到達していた塁を選択してください。'}</p>
+                <div class="input-group">
+                    <label for="obstructionBallDeadType">${i18n.t('obstructionBallDeadType') || '判定タイプ'}</label>
+                    <select id="obstructionBallDeadType">
+                        <option value="immediate">${i18n.t('obstructionImmediateDead') || '即ボールデッド'}</option>
+                        <option value="delayed">${i18n.t('obstructionDelayedDead') || 'プレー継続後に補正'}</option>
+                    </select>
                 </div>
-                <button class="secondary-btn" id="cancelAdvancement">${i18n.t('cancel')}</button>
+                <div class="input-group">
+                    <label for="obstructionAtBatStatus">${i18n.t('obstructionRestart') || '再開方法'}</label>
+                    <select id="obstructionAtBatStatus">
+                        <option value="complete" ${defaultAtBatStatus === 'complete' ? 'selected' : ''}>${i18n.t('restartNextBatter') || '打席完了・次打者へ'}</option>
+                        <option value="continue" ${defaultAtBatStatus === 'continue' ? 'selected' : ''}>${i18n.t('restartSameBatter') || '打席継続・同じ打者で再開'}</option>
+                    </select>
+                </div>
+                <div class="runner-advancement-list">
+                    ${rows}
+                </div>
+                <div class="modal-actions">
+                    <button class="primary-btn" id="confirmObstructionAdvancement">${i18n.t('confirm') || '確定'}</button>
+                    <button class="secondary-btn" id="cancelAdvancement">${i18n.t('cancel')}</button>
+                </div>
             </div>
         `;
 
         document.body.appendChild(modal);
 
-        // 進塁先選択
-        modal.querySelectorAll('.base-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const targetBase = parseInt(btn.dataset.base);
-                modal.remove();
-                this.processObstruction(obstructedRunnerBase, obstructingFielder, targetBase);
+        document.getElementById('confirmObstructionAdvancement').addEventListener('click', () => {
+            const destinations = {};
+            modal.querySelectorAll('[data-runner]').forEach(select => {
+                destinations[select.dataset.runner] = select.value;
+            });
+            const ballDeadType = document.getElementById('obstructionBallDeadType').value;
+            const atBatStatus = document.getElementById('obstructionAtBatStatus').value;
+            if (atBatStatus === 'complete' && (destinations.batter === 'none' || !destinations.batter)) {
+                this.showError(i18n.t('obstructionBatterRequiredForNext') || '次打者へ進むには、打者走者がアウトまたは1塁以上に到達している必要があります。');
+                return;
+            }
+            modal.remove();
+            this.processObstruction(obstructedRunnerBase, obstructingFielder, {
+                destinations,
+                ballDeadType,
+                atBatStatus
             });
         });
 
@@ -3688,51 +4840,98 @@ class BaseballApp {
         });
     }
 
-    async processObstruction(obstructedRunnerBase, obstructingFielder, targetBase) {
+    async processObstruction(obstructedRunnerBase, obstructingFielder, obstructionData) {
         const game = gameManager.currentGame;
-        const atBat = game.currentAtBat;
+        const batter = gameManager.getCurrentBatter();
+
+        if (!gameManager.currentAtBat) {
+            await gameManager.startAtBat(batter?.id || batter?.name || 'batter', batter?.battingOrder || 1);
+        }
+
+        const atBat = gameManager.currentAtBat;
+        const originalRunners = {
+            first: game.runnersOnBase.first ? { ...game.runnersOnBase.first } : null,
+            second: game.runnersOnBase.second ? { ...game.runnersOnBase.second } : null,
+            third: game.runnersOnBase.third ? { ...game.runnersOnBase.third } : null
+        };
+        const originalEarned = { ...(game.runnersEarnedStatus || { first: true, second: true, third: true }) };
+        const originalResponsible = { ...(game.runnersResponsiblePitcher || { first: null, second: null, third: null }) };
+        const batterRunner = {
+            name: batter?.name || `${batter?.battingOrder || ''}`,
+            battingOrder: batter?.battingOrder || atBat.battingOrder,
+            playerId: batter?.id || batter?.playerId || atBat.playerId
+        };
+        const participants = {
+            batter: {
+                runner: batterRunner,
+                earned: false,
+                responsiblePitcher: gameManager.getCurrentPitcherId?.() || null
+            },
+            first: {
+                runner: originalRunners.first,
+                earned: originalEarned.first ?? true,
+                responsiblePitcher: originalResponsible.first ?? null
+            },
+            second: {
+                runner: originalRunners.second,
+                earned: originalEarned.second ?? true,
+                responsiblePitcher: originalResponsible.second ?? null
+            },
+            third: {
+                runner: originalRunners.third,
+                earned: originalEarned.third ?? true,
+                responsiblePitcher: originalResponsible.third ?? null
+            }
+        };
+        const destinations = obstructionData.destinations || {};
 
         // 走塁妨害を記録
         atBat.result = 'obstruction';
-        atBat.resultDetail = `${i18n.t('obstruction')} - ${i18n.t(obstructedRunnerBase + '_base')}走者が妨害`;
+        atBat.resultDetail = `${i18n.t('obstruction')} - ${obstructedRunnerBase === 'batter' ? (i18n.t('batterRunner') || '打者走者') : this.getBaseLabel(obstructedRunnerBase)} ${i18n.t('obstructed_runner') || '妨害された走者'}`;
+        atBat.obstructionDetails = {
+            obstructedRunner: obstructedRunnerBase,
+            obstructingFielder,
+            ballDeadType: obstructionData.ballDeadType,
+            atBatStatus: obstructionData.atBatStatus,
+            destinations
+        };
 
         // エラーを記録
         atBat.errorPosition = obstructingFielder;
 
         // 打数にカウントしない
         atBat.isAtBat = false;
+        atBat.runs = 0;
+        atBat.rbis = 0;
 
-        // 妨害された走者の進塁を記録
-        const runner = game.runnersOnBase[obstructedRunnerBase];
-        if (runner) {
-            if (targetBase === 4) {
-                // ホームへ進塁（得点）
+        game.runnersOnBase = { first: null, second: null, third: null };
+        game.runnersEarnedStatus = { first: true, second: true, third: true };
+        game.runnersResponsiblePitcher = { first: null, second: null, third: null };
+
+        Object.entries(destinations).forEach(([source, destination]) => {
+            const participant = participants[source];
+            if (!participant?.runner || destination === 'none') return;
+
+            const finalBase = destination === 'stay' ? source : destination;
+            if (finalBase === 'home') {
                 atBat.runs++;
-                atBat.rbis++; // 打点は記録員判断だが、ここでは仮に加算
-                game.runnersOnBase[obstructedRunnerBase] = null;
-
                 if (game.isTopHalf) {
                     game.awayScore++;
                 } else {
                     game.homeScore++;
                 }
-            } else {
-                // 塁間移動
-                game.runnersOnBase[obstructedRunnerBase] = null;
-                const newBase = targetBase === 1 ? 'first' : targetBase === 2 ? 'second' : 'third';
-                game.runnersOnBase[newBase] = runner;
+                return;
             }
-        }
-
-        // 打者は1塁へ進塁（押し出しの可能性）
-        // ここでは簡略化し、打者を1塁に配置
-        if (!game.runnersOnBase.first) {
-            game.runnersOnBase.first = {
-                name: game.currentBatter.name,
-                battingOrder: game.currentBatter.battingOrder,
-                playerId: game.currentBatter.playerId
-            };
-        }
+            if (finalBase === 'out') {
+                game.outs++;
+                return;
+            }
+            if (['first', 'second', 'third'].includes(finalBase)) {
+                game.runnersOnBase[finalBase] = { ...participant.runner };
+                game.runnersEarnedStatus[finalBase] = participant.earned;
+                game.runnersResponsiblePitcher[finalBase] = participant.responsiblePitcher;
+            }
+        });
 
         atBat.runnersAfterPlay = {
             first: game.runnersOnBase.first ? {...game.runnersOnBase.first} : null,
@@ -3740,25 +4939,48 @@ class BaseballApp {
             third: game.runnersOnBase.third ? {...game.runnersOnBase.third} : null
         };
 
-        // 打席を完了
-        atBat.endTime = new Date().toISOString();
-        gameManager.currentGame.completedAtBats.push(atBat);
-        gameManager.currentGame.currentAtBat = null;
+        if (obstructionData.atBatStatus === 'continue') {
+            if (!Array.isArray(atBat.obstructionEvents)) atBat.obstructionEvents = [];
+            atBat.obstructionEvents.push(atBat.obstructionDetails);
+            game.balls = 0;
+            game.strikes = 0;
+            if (game.outs >= 3) {
+                game.batterContinuesNextInning = true;
+            }
+        } else {
+            // 打席を完了
+            atBat.endTime = new Date().toISOString();
+            if (!Array.isArray(gameManager.currentGame.completedAtBats)) {
+                gameManager.currentGame.completedAtBats = [];
+            }
+            gameManager.currentGame.completedAtBats.push(atBat);
+            gameManager.currentAtBat = null;
+            gameManager.currentGame.currentAtBat = null;
 
-        // 統計更新
-        gameManager.updatePlayerStats(atBat);
+            // 統計更新
+            gameManager.updatePlayerStats(atBat);
 
-        // 次の打者へ
-        gameManager.advanceToNextBatter();
+            // 次の打者へ
+            gameManager.advanceBattingOrder();
+        }
 
         // 保存
         await gameManager.saveGame();
+
+        if (obstructionData.atBatStatus === 'continue' && game.outs >= 3) {
+            await gameManager.endHalfInning();
+            this.updateCurrentInningDisplay();
+            this.loadInningHistory();
+            this.updateGameDisplay();
+            this.showSuccess(`${i18n.t('obstruction')}：${i18n.t('restartSameBatter') || '打席継続・同じ打者で再開'}`);
+            return;
+        }
 
         // UI更新
         this.updateGameDisplay();
         this.clearBatterForm();
 
-        this.showSuccess(`${i18n.t('obstruction')}：${i18n.t(obstructedRunnerBase + '_base')}走者が進塁、野手${obstructingFielder}にエラー記録`);
+        this.showSuccess(`${i18n.t('obstruction')}：${i18n.t('pos_' + obstructingFielder) || obstructingFielder}、${obstructionData.atBatStatus === 'continue' ? (i18n.t('restartSameBatter') || '打席継続・同じ打者で再開') : (i18n.t('restartNextBatter') || '打席完了・次打者へ')}`);
     }
 
     // ===== エラータイプ選択処理 =====
@@ -3801,15 +5023,22 @@ class BaseballApp {
                 else if (errorType === 'pickoff_throwing_error') {
                     this.showPickoffErrorModal();
                 }
+                // 野手による走塁妨害の場合
+                else if (errorType === 'fielders_obstruction') {
+                    this.showObstructionModal();
+                }
                 // 通常のエラー（捕球・送球・落球）
                 else if (errorType === 'fielding_error' || errorType === 'throwing_error' || errorType === 'foul_fly_drop') {
                     this.showRegularErrorModal(errorType);
                 }
                 // その他のエラー処理
                 else {
-                    this.showInfo('このエラータイプの処理は今後実装予定です');
+                    const config = errorTypes[errorType];
+                    const label = i18n.t(config?.label) || config?.label || errorType;
+                    this.recordUnsupportedPlay(errorType, label, { area: 'error_type' });
+                    this.showInfo(i18n.t('unsupportedErrorTypeMessage') || '未対応エラータイプを検出しました。操作ログに記録しました。');
                     this.currentResultView = 'top';
-                    this.showAtBatResult();
+                    this.updateResultButtons();
                 }
             });
         });
@@ -3818,7 +5047,7 @@ class BaseballApp {
         document.getElementById('cancelErrorType').addEventListener('click', () => {
             modal.remove();
             this.currentResultView = 'top';
-            this.showAtBatResult();
+            this.updateResultButtons();
         });
     }
 
@@ -3953,9 +5182,9 @@ class BaseballApp {
         modal.id = 'stealModal';
 
         const runners = [];
-        if (game.runnersOnBase.first) runners.push({ base: 'first', name: game.runnersOnBase.first.name });
-        if (game.runnersOnBase.second) runners.push({ base: 'second', name: game.runnersOnBase.second.name });
-        if (game.runnersOnBase.third) runners.push({ base: 'third', name: game.runnersOnBase.third.name });
+        if (game.runnersOnBase.first) runners.push({ base: 'first', name: this.getRunnerDisplayName(game.runnersOnBase.first) });
+        if (game.runnersOnBase.second) runners.push({ base: 'second', name: this.getRunnerDisplayName(game.runnersOnBase.second) });
+        if (game.runnersOnBase.third) runners.push({ base: 'third', name: this.getRunnerDisplayName(game.runnersOnBase.third) });
 
         modal.innerHTML = `
             <div class="modal-content">
@@ -3964,7 +5193,7 @@ class BaseballApp {
                 <div class="runner-selection-buttons">
                     ${runners.map(runner => `
                         <button class="runner-btn" data-base="${runner.base}">
-                            ${i18n.t(runner.base + '_base')}: ${runner.name}
+                            ${this.getBaseLabel(runner.base)}: ${runner.name}
                         </button>
                     `).join('')}
                 </div>
@@ -4000,7 +5229,7 @@ class BaseballApp {
         modal.innerHTML = `
             <div class="modal-content">
                 <h3>盗塁の結果</h3>
-                <p>${i18n.t(fromBase + '_base')}走者 → ${toBase}</p>
+                <p>${this.getBaseLabel(fromBase)}走者 → ${toBase}</p>
                 <div class="steal-result-buttons">
                     <button class="steal-result-btn success-btn" data-result="success">
                         ${i18n.t('steal_success')}
@@ -4052,7 +5281,7 @@ class BaseballApp {
 
             await gameManager.saveGame();
             this.updateGameDisplay();
-            this.showSuccess(`盗塁死：${i18n.t(fromBase + '_base')}走者アウト（${game.outs}アウト）`);
+            this.showSuccess(`盗塁死：${this.getBaseLabel(fromBase)}走者アウト（${game.outs}アウト）`);
 
             // 3アウトチェック
             if (game.outs >= 3) {
@@ -4075,7 +5304,7 @@ class BaseballApp {
         modal.innerHTML = `
             <div class="modal-content">
                 <h3>盗塁成功 - エラーで追加進塁？</h3>
-                <p>${i18n.t(fromBase + '_base')}走者 → ${normalBaseName}</p>
+                <p>${this.getBaseLabel(fromBase)}走者 → ${normalBaseName}</p>
                 <div class="steal-error-buttons">
                     <button class="btn btn-primary" id="noErrorBtn">
                         エラーなし（${normalBaseName}で止まる）
@@ -4218,7 +5447,7 @@ class BaseballApp {
 
             await gameManager.saveGame();
             this.updateGameDisplay();
-            this.showSuccess(`盗塁成功：${i18n.t(fromBase + '_base')}走者が進塁`);
+            this.showSuccess(`盗塁成功：${this.getBaseLabel(fromBase)}走者が進塁`);
         }
         // エラーがある場合
         else {
@@ -4248,7 +5477,7 @@ class BaseballApp {
             const positionName = i18n.t(BASEBALL_CONFIG.POSITIONS[errorPosition].label);
             const normalBaseName = normalBase === 'second' ? '2塁' : normalBase === 'third' ? '3塁' : 'ホーム';
             const finalBaseName = finalBase === 'second' ? '2塁' : finalBase === 'third' ? '3塁' : 'ホーム';
-            this.showSuccess(`盗塁成功 + エラー（${positionName}）：${i18n.t(fromBase + '_base')}走者 ${normalBaseName} → ${finalBaseName}${runs > 0 ? '、得点' : ''}`);
+            this.showSuccess(`盗塁成功 + エラー（${positionName}）：${this.getBaseLabel(fromBase)}走者 ${normalBaseName} → ${finalBaseName}${runs > 0 ? '、得点' : ''}`);
         }
     }
 
@@ -4266,9 +5495,9 @@ class BaseballApp {
         modal.id = 'pickoffModal';
 
         const runners = [];
-        if (game.runnersOnBase.first) runners.push({ base: 'first', name: game.runnersOnBase.first.name });
-        if (game.runnersOnBase.second) runners.push({ base: 'second', name: game.runnersOnBase.second.name });
-        if (game.runnersOnBase.third) runners.push({ base: 'third', name: game.runnersOnBase.third.name });
+        if (game.runnersOnBase.first) runners.push({ base: 'first', name: this.getRunnerDisplayName(game.runnersOnBase.first) });
+        if (game.runnersOnBase.second) runners.push({ base: 'second', name: this.getRunnerDisplayName(game.runnersOnBase.second) });
+        if (game.runnersOnBase.third) runners.push({ base: 'third', name: this.getRunnerDisplayName(game.runnersOnBase.third) });
 
         modal.innerHTML = `
             <div class="modal-content">
@@ -4277,7 +5506,7 @@ class BaseballApp {
                 <div class="runner-selection-buttons">
                     ${runners.map(runner => `
                         <button class="runner-btn" data-base="${runner.base}">
-                            ${i18n.t(runner.base + '_base')}: ${runner.name}
+                            ${this.getBaseLabel(runner.base)}: ${runner.name}
                         </button>
                     `).join('')}
                 </div>
@@ -4310,7 +5539,7 @@ class BaseballApp {
         modal.innerHTML = `
             <div class="modal-content">
                 <h3>牽制の結果</h3>
-                <p>${i18n.t(base + '_base')}走者への牽制</p>
+                <p>${this.getBaseLabel(base)}走者への牽制</p>
                 <div class="pickoff-result-buttons">
                     <button class="pickoff-result-btn safe-btn" data-result="safe">
                         ${i18n.t('pickoff_safe')}（セーフ）
@@ -4356,7 +5585,7 @@ class BaseballApp {
 
             await gameManager.saveGame();
             this.updateGameDisplay();
-            this.showSuccess(`牽制死：${i18n.t(base + '_base')}走者アウト（${game.outs}アウト）`);
+            this.showSuccess(`牽制死：${this.getBaseLabel(base)}走者アウト（${game.outs}アウト）`);
 
             // 3アウトチェック
             if (game.outs >= 3) {
@@ -4375,10 +5604,10 @@ class BaseballApp {
         modal.innerHTML = `
             <div class="modal-content">
                 <h3>牽制セーフ - エラーで追加進塁？</h3>
-                <p>${i18n.t(base + '_base')}走者</p>
+                <p>${this.getBaseLabel(base)}走者</p>
                 <div class="pickoff-error-buttons">
                     <button class="btn btn-primary" id="noPickoffErrorBtn">
-                        エラーなし（${i18n.t(base + '_base')}に留まる）
+                        エラーなし（${this.getBaseLabel(base)}に留まる）
                     </button>
                     <button class="btn btn-warning" id="withPickoffErrorBtn">
                         エラーあり（さらに進塁）
@@ -4394,7 +5623,7 @@ class BaseballApp {
             modal.remove();
             await gameManager.saveGame();
             this.updateGameDisplay();
-            this.showSuccess(`牽制セーフ：${i18n.t(base + '_base')}走者`);
+            this.showSuccess(`牽制セーフ：${this.getBaseLabel(base)}走者`);
         });
 
         // エラーありボタン
@@ -4497,6 +5726,8 @@ class BaseballApp {
     async completePickoffSafeWithError(fromBase, runner, errorPosition, finalBase) {
         const game = gameManager.currentGame;
         let runs = 0;
+        let earnedRuns = 0;
+        const virtualOuts = (gameManager.currentInning && gameManager.currentInning.virtualOuts) || 0;
 
         // 元の塁から走者を削除
         game.runnersOnBase[fromBase] = null;
@@ -4504,10 +5735,17 @@ class BaseballApp {
         // 最終進塁先に配置
         if (finalBase === 'second') {
             game.runnersOnBase.second = runner;
+            gameManager.moveRunnerEarnedStatus(fromBase, 'second');
+            gameManager.moveRunnerResponsiblePitcher(fromBase, 'second');
         } else if (finalBase === 'third') {
             game.runnersOnBase.third = runner;
+            gameManager.moveRunnerEarnedStatus(fromBase, 'third');
+            gameManager.moveRunnerResponsiblePitcher(fromBase, 'third');
         } else if (finalBase === 'home') {
             runs++;
+            const wasEarned = gameManager.moveRunnerEarnedStatus(fromBase, null);
+            gameManager.moveRunnerResponsiblePitcher(fromBase, null);
+            if (wasEarned && virtualOuts < 3) earnedRuns++;
             if (game.isTopHalf) {
                 game.awayScore++;
             } else {
@@ -4515,19 +5753,22 @@ class BaseballApp {
             }
         }
 
-        // エラー記録を保存（チーム統計に反映）
-        if (game.isTopHalf) {
-            game.teamStats.home.errors++;
-        } else {
-            game.teamStats.away.errors++;
+        // 牽制悪送球による得点は、責任走者の状態に応じて自責点にも反映する
+        if (runs > 0 && gameManager.currentInning) {
+            gameManager.currentInning.runs = (gameManager.currentInning.runs || 0) + runs;
+            gameManager.currentInning.earnedRuns = Math.min(
+                gameManager.currentInning.runs,
+                (gameManager.currentInning.earnedRuns || 0) + earnedRuns
+            );
         }
+        gameManager.addError();
 
         await gameManager.saveGame();
         this.updateGameDisplay();
 
         const positionName = i18n.t(BASEBALL_CONFIG.POSITIONS[errorPosition].label);
         const finalBaseName = finalBase === 'second' ? '2塁' : finalBase === 'third' ? '3塁' : 'ホーム';
-        this.showSuccess(`牽制セーフ + エラー（${positionName}）：${i18n.t(fromBase + '_base')}走者 → ${finalBaseName}${runs > 0 ? '、得点' : ''}`);
+        this.showSuccess(`牽制セーフ + エラー（${positionName}）：${this.getBaseLabel(fromBase)}走者 → ${finalBaseName}${runs > 0 ? '、得点' : ''}`);
     }
 
     // ===== 暴投・捕逸・牽制悪送球の実装 =====
@@ -5117,12 +6358,17 @@ class BaseballApp {
     async processPickoffError(position, advancements) {
         const game = gameManager.currentGame;
         let runs = 0;
+        let earnedRuns = 0;
         const messages = [];
+        const virtualOuts = (gameManager.currentInning && gameManager.currentInning.virtualOuts) || 0;
 
         // 3塁走者から処理
         if (advancements.third) {
             if (advancements.third === 'home') {
                 runs++;
+                const wasEarned = gameManager.moveRunnerEarnedStatus('third', null);
+                gameManager.moveRunnerResponsiblePitcher('third', null);
+                if (wasEarned && virtualOuts < 3) earnedRuns++;
                 if (game.isTopHalf) {
                     game.awayScore++;
                 } else {
@@ -5138,9 +6384,14 @@ class BaseballApp {
             if (advancements.second === 'third') {
                 game.runnersOnBase.third = game.runnersOnBase.second;
                 game.runnersOnBase.second = null;
+                gameManager.moveRunnerEarnedStatus('second', 'third');
+                gameManager.moveRunnerResponsiblePitcher('second', 'third');
                 messages.push('2塁走者3塁へ');
             } else if (advancements.second === 'home') {
                 runs++;
+                const wasEarned = gameManager.moveRunnerEarnedStatus('second', null);
+                gameManager.moveRunnerResponsiblePitcher('second', null);
+                if (wasEarned && virtualOuts < 3) earnedRuns++;
                 if (game.isTopHalf) {
                     game.awayScore++;
                 } else {
@@ -5156,13 +6407,20 @@ class BaseballApp {
             if (advancements.first === 'second') {
                 game.runnersOnBase.second = game.runnersOnBase.first;
                 game.runnersOnBase.first = null;
+                gameManager.moveRunnerEarnedStatus('first', 'second');
+                gameManager.moveRunnerResponsiblePitcher('first', 'second');
                 messages.push('1塁走者2塁へ');
             } else if (advancements.first === 'third') {
                 game.runnersOnBase.third = game.runnersOnBase.first;
                 game.runnersOnBase.first = null;
+                gameManager.moveRunnerEarnedStatus('first', 'third');
+                gameManager.moveRunnerResponsiblePitcher('first', 'third');
                 messages.push('1塁走者3塁へ');
             } else if (advancements.first === 'home') {
                 runs++;
+                const wasEarned = gameManager.moveRunnerEarnedStatus('first', null);
+                gameManager.moveRunnerResponsiblePitcher('first', null);
+                if (wasEarned && virtualOuts < 3) earnedRuns++;
                 if (game.isTopHalf) {
                     game.awayScore++;
                 } else {
@@ -5173,12 +6431,15 @@ class BaseballApp {
             }
         }
 
-        // エラー記録を保存（チーム統計に反映）
-        if (game.isTopHalf) {
-            game.teamStats.home.errors++;
-        } else {
-            game.teamStats.away.errors++;
+        // 牽制悪送球による得点は、責任走者の状態に応じて自責点にも反映する
+        if (runs > 0 && gameManager.currentInning) {
+            gameManager.currentInning.runs = (gameManager.currentInning.runs || 0) + runs;
+            gameManager.currentInning.earnedRuns = Math.min(
+                gameManager.currentInning.runs,
+                (gameManager.currentInning.earnedRuns || 0) + earnedRuns
+            );
         }
+        gameManager.addError();
 
         await gameManager.saveGame();
         this.updateGameDisplay();
@@ -7348,7 +8609,7 @@ class BaseballApp {
         const availableResults = gameManager.getAvailableAtBatResults();
 
         container.innerHTML = availableResults.map(result => {
-            const label = BASEBALL_CONFIG.AT_BAT_RESULTS[result] || result;
+            const label = this.formatAtBatResult(result);
             return `<button class="at-bat-result-btn" data-result="${result}">${label}</button>`;
         }).join('');
 
@@ -9997,30 +11258,12 @@ class BaseballApp {
         const batter = gameManager.getCurrentBatter();
         const resultDetail = document.getElementById('atBatResultDetail').value;
 
-        // 打者をアウト、アウトカウント+1
-        game.outs++;
-
         // 走者を更新
         game.runnersOnBase = finalRunners;
 
-        // 得点を更新
-        const battingTeam = game.isTopHalf ? 'away' : 'home';
-        if (game.isTopHalf) {
-            game.awayScore += finalRuns;
-        } else {
-            game.homeScore += finalRuns;
-        }
-
-        // 打者の犠打数を+1
-        if (batter) {
-            batter.stats.sacrificeBunts++;
-        }
-
         // 打席結果を記録
         await gameManager.recordAtBatResult('sacrifice_bunt', resultDetail, finalRuns, 0);
-
-        // 投手統計を更新
-        gameManager.updatePitcherStats('sacrifice_bunt');
+        gameManager.advanceBattingOrder();
 
         await gameManager.saveGame();
 
@@ -10169,9 +11412,7 @@ class BaseballApp {
         // 打席結果を記録
         const finalResult = batterStatus === 'out' ? 'groundout' : 'fielders_choice';
         await gameManager.recordAtBatResult(finalResult, resultDetail + ' (送りバント失敗)', 0, 0);
-
-        // 投手統計を更新
-        gameManager.updatePitcherStats(finalResult);
+        gameManager.advanceBattingOrder();
 
         await gameManager.saveGame();
 
@@ -10434,14 +11675,6 @@ class BaseballApp {
         // 走者を更新
         game.runnersOnBase = finalRunners;
 
-        // 得点を更新
-        const battingTeam = game.isTopHalf ? 'away' : 'home';
-        if (game.isTopHalf) {
-            game.awayScore += finalRuns;
-        } else {
-            game.homeScore += finalRuns;
-        }
-
         // 主要な結果タイプを決定（安打があれば安打、なければ最初の結果）
         const hitResult = selectedResults.find(r => ['single', 'double', 'triple'].includes(r.type));
         const primaryResult = hitResult ? hitResult.type : selectedResults[0].type;
@@ -10452,25 +11685,13 @@ class BaseballApp {
             game.teamStats[fieldingTeam].errors++;
         }
 
-        // 打者統計更新
-        if (batter) {
-            if (hitResult) {
-                batter.stats.hits++;
-                batter.stats.atBats++;
-                if (primaryResult === 'single') batter.stats.singles++;
-                else if (primaryResult === 'double') batter.stats.doubles++;
-                else if (primaryResult === 'triple') batter.stats.triples++;
-            } else {
-                batter.stats.atBats++;
-            }
-        }
-
         // 結果ラベルを作成
         const resultsLabel = selectedResults.map(r => r.label).join('+');
         const detailWithResults = resultDetail ? `${resultDetail} (${resultsLabel})` : resultsLabel;
 
         // 打席結果を記録
         await gameManager.recordAtBatResult(primaryResult, detailWithResults, finalRuns, 0);
+        gameManager.advanceBattingOrder();
 
         // 投手統計は更新しない（アウトではないため）
 
@@ -10587,7 +11808,7 @@ class BaseballApp {
 
         // 許可された結果のみ表示
         container.innerHTML = allowedResults.map(result => {
-            let label = BASEBALL_CONFIG.AT_BAT_RESULTS[result] || result;
+            let label = this.formatAtBatResult(result);
 
             // 犠打の場合、3塁走者がいれば「犠打（スクイズ含む）」と表示
             if (result === 'sacrifice_bunt' && hasThirdRunner) {
@@ -11282,14 +12503,124 @@ class BaseballApp {
 
     async confirmGame() {
         try {
-            const finalStatus = await gameManager.confirmGame();
-            if (!finalStatus) return;
-            this.showSuccess(i18n.t('gameConfirmed') || '試合を確定しました');
-            this.showScreen('welcomeScreen');
+            const game = gameManager.currentGame;
+            const candidates = gameManager.getPitchingDecisionCandidates?.();
+            if (game && !game.pitchingDecisions && candidates?.requiresSelection) {
+                this.showPitchingDecisionModal(candidates);
+                return;
+            }
+
+            await this.finalizeGameConfirmation();
         } catch (err) {
             console.error('試合確定エラー:', err);
             this.showError(err.message || '試合の確定に失敗しました');
         }
+    }
+
+    async finalizeGameConfirmation() {
+        const finalStatus = await gameManager.confirmGame();
+        if (!finalStatus) return;
+        this.showSuccess(i18n.t('gameConfirmed') || '試合を確定しました');
+        this.showScreen('welcomeScreen');
+    }
+
+    showPitchingDecisionModal(candidates) {
+        const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+        const optionHtml = (pitchers, includeNone = false) => {
+            const none = includeNone ? `<option value="">${escapeHtml(i18n.t('pitchingDecisionNone') || 'なし')}</option>` : '';
+            return none + pitchers.map(p => {
+                const ip = typeof formatInningsPitched === 'function'
+                    ? formatInningsPitched(p.inningsPitched)
+                    : `${Math.floor((p.inningsPitched || 0) / 3)}.${(p.inningsPitched || 0) % 3}`;
+                const label = `${p.name} (${p.teamName} / ${ip} IP, ${p.runsAllowed} R)`;
+                return `<option value="${escapeHtml(p.id)}">${escapeHtml(label)}</option>`;
+            }).join('');
+        };
+        const checkboxHtml = candidates.holdPitchers.map(p => `
+            <label class="checkbox-label">
+                <input type="checkbox" class="hold-pitcher-checkbox" value="${escapeHtml(p.id)}">
+                ${escapeHtml(`${p.name} (${p.teamName})`)}
+            </label>
+        `).join('') || `<p class="muted">${escapeHtml(i18n.t('pitchingDecisionNoCandidates') || '候補がありません')}</p>`;
+
+        const modal = document.createElement('div');
+        modal.className = 'modal pitching-decision-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${escapeHtml(i18n.t('pitchingDecisionTitle') || '投手勝敗の確認')}</h3>
+                <p class="modal-description">${escapeHtml(i18n.t('pitchingDecisionHelp') || '候補から公式記録として保存する投手を選択してください。')}</p>
+                <div class="form-group">
+                    <label>${escapeHtml(i18n.t('winningPitcher') || '勝利投手')}</label>
+                    <select id="winningPitcherSelect">
+                        ${optionHtml(candidates.winningPitchers)}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>${escapeHtml(i18n.t('losingPitcher') || '敗戦投手')}</label>
+                    <select id="losingPitcherSelect">
+                        ${optionHtml(candidates.losingPitchers)}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>${escapeHtml(i18n.t('savePitcher') || 'セーブ')}</label>
+                    <select id="savePitcherSelect">
+                        ${optionHtml(candidates.savePitchers, true)}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>${escapeHtml(i18n.t('holdPitchers') || 'ホールド')}</label>
+                    <div class="checkbox-list">${checkboxHtml}</div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="pitchingDecisionCancelBtn" class="btn-secondary">${escapeHtml(i18n.t('cancel') || 'キャンセル')}</button>
+                    <button type="button" id="pitchingDecisionConfirmBtn" class="btn-primary">${escapeHtml(i18n.t('confirmGame') || '試合を確定する')}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const winningSelect = modal.querySelector('#winningPitcherSelect');
+        const losingSelect = modal.querySelector('#losingPitcherSelect');
+        const saveSelect = modal.querySelector('#savePitcherSelect');
+
+        const syncExcludedChoices = () => {
+            const winId = winningSelect.value;
+            const saveId = saveSelect.value;
+            saveSelect.querySelectorAll('option').forEach(option => {
+                option.disabled = option.value !== '' && option.value === winId;
+            });
+            if (saveSelect.value === winId) saveSelect.value = '';
+            modal.querySelectorAll('.hold-pitcher-checkbox').forEach(box => {
+                box.disabled = box.value === winId || box.value === saveId;
+                if (box.disabled) box.checked = false;
+            });
+        };
+        winningSelect.addEventListener('change', syncExcludedChoices);
+        saveSelect.addEventListener('change', syncExcludedChoices);
+        syncExcludedChoices();
+
+        modal.querySelector('#pitchingDecisionCancelBtn').addEventListener('click', () => modal.remove());
+        modal.querySelector('#pitchingDecisionConfirmBtn').addEventListener('click', async () => {
+            try {
+                await gameManager.savePitchingDecisions({
+                    winningPitcherId: winningSelect.value,
+                    losingPitcherId: losingSelect.value,
+                    savePitcherId: saveSelect.value,
+                    holdPitcherIds: Array.from(modal.querySelectorAll('.hold-pitcher-checkbox:checked')).map(box => box.value)
+                });
+                modal.remove();
+                await this.finalizeGameConfirmation();
+            } catch (err) {
+                console.error('投手勝敗保存エラー:', err);
+                this.showError(err.message || (i18n.t('pitchingDecisionSaveError') || '投手勝敗の保存に失敗しました'));
+            }
+        });
     }
 
     async undoFromGameEnd() {
@@ -11408,15 +12739,26 @@ class BaseballApp {
     }
 
     getRunnerDisplayName(runnerId) {
-        // 後で選手名データベースから取得する予定
-        // 現在は簡易表示
-        console.log('getRunnerDisplayName called with:', runnerId);
-
-        if (runnerId === 'batter') return i18n.t('batter');
+        if (!runnerId) return '';
+        if (typeof runnerId === 'object') {
+            return runnerId.name || runnerId.playerName || runnerId.id || String(runnerId);
+        }
+        if (runnerId === 'batter') {
+            const batter = gameManager.getCurrentBatter?.();
+            return batter?.name || i18n.t('batter');
+        }
         if (runnerId === 'first') return i18n.t('firstBaseRunner');
         if (runnerId === 'second') return i18n.t('secondBaseRunner');
         if (runnerId === 'third') return i18n.t('thirdBaseRunner');
-        return runnerId.length > 8 ? runnerId.substring(0, 8) + '...' : runnerId;
+
+        const value = String(runnerId);
+        const game = gameManager.currentGame;
+        const player = ['home', 'away']
+            .flatMap(team => game?.players?.[team] || [])
+            .find(candidate => candidate.id === value || candidate.name === value);
+        if (player?.name) return player.name;
+
+        return value.length > 8 ? value.substring(0, 8) + '...' : value;
     }
 
     async nextInning() {
@@ -11660,26 +13002,79 @@ class BaseballApp {
         const statusClass = s => ({ active:'active', completed:'completed', draw:'draw', no_game:'no-game', called:'called' }[s] || 'completed');
         const statusLabel = s => i18n.t({ active:'statusActive', completed:'statusCompleted', draw:'drawGame', no_game:'noGame', called:'statusCalled' }[s] || 'statusCompleted');
         const levelLabel = l => i18n.t({ inning:'recordingLevelInningShort', batter:'recordingLevelBatterShort', pitch:'recordingLevelPitchShort' }[l] || 'recordingLevelInningShort');
+        const categoryOptions = this.getGameCategoryOptions();
+        const buildCategoryOptions = (selected, includeAll = false) => {
+            const allOption = includeAll
+                ? `<option value="">${this.escapeHtml(i18n.t('gameCategoryAll'))}</option>`
+                : '';
+            return allOption + categoryOptions.map(option => {
+                const value = this.escapeHtml(option.value);
+                const selectedAttr = option.value === selected ? ' selected' : '';
+                return `<option value="${value}"${selectedAttr}>${this.escapeHtml(i18n.t(option.labelKey))}</option>`;
+            }).join('');
+        };
+        const folderEntries = this.getSavedGameFolderEntries(games);
+        const buildFolderOptions = (selectedCategory = '', selectedFolder = '', includeEmpty = true) => {
+            const filtered = folderEntries.filter(entry => !selectedCategory || entry.category === selectedCategory);
+            const emptyOption = includeEmpty
+                ? `<option value="">${this.escapeHtml(i18n.t('selectFolderToRename'))}</option>`
+                : '';
+            return emptyOption + filtered.map(entry => {
+                const selectedAttr = entry.folderName === selectedFolder ? ' selected' : '';
+                const label = `${this.getGameCategoryLabel(entry.category)} / ${entry.folderName} (${entry.count})`;
+                return `<option value="${this.escapeHtml(entry.folderName)}" data-category="${this.escapeHtml(entry.category)}"${selectedAttr}>${this.escapeHtml(label)}</option>`;
+            }).join('');
+        };
+        const buildFolderDatalistOptions = () => folderEntries
+            .map(entry => `<option value="${this.escapeHtml(entry.folderName)}"></option>`)
+            .join('');
 
         const buildItem = (game) => {
             const sc = statusClass(game.status);
             const isActive = game.status === 'active';
+            const classification = this.normalizeGameClassification(game.classification);
+            const tagsText = classification.tags.join(', ');
+            const categoryLabel = this.getGameCategoryLabel(classification.category);
+            const folderLabel = classification.folderName
+                ? `${categoryLabel} / ${classification.folderName}`
+                : categoryLabel;
             const progressHtml = isActive
                 ? `<div class="game-item-progress">${game.currentInning}回${game.isTopHalf ? '表' : '裏'} ${game.outs}アウト</div>`
                 : '';
-            return `<div class="game-item game-item--${sc}" data-away="${(game.awayTeam||'').toLowerCase()}" data-home="${(game.homeTeam||'').toLowerCase()}">
+            return `<div class="game-item game-item--${sc}" data-away="${this.escapeHtml((game.awayTeam||'').toLowerCase())}" data-home="${this.escapeHtml((game.homeTeam||'').toLowerCase())}" data-category="${this.escapeHtml(classification.category)}" data-folder="${this.escapeHtml((classification.folderName || '').toLowerCase())}">
                 <div class="game-item-header">
                     <span class="status-badge status-badge--${sc}">${statusLabel(game.status)}</span>
                     <span class="game-level-badge">${levelLabel(game.recordingLevel)}</span>
+                    <span class="game-category-badge">${this.escapeHtml(folderLabel)}</span>
                     <span class="game-date">${new Date(game.date).toLocaleDateString()}</span>
                 </div>
                 <div class="game-teams">
-                    <strong>${game.awayTeam || '?'} ${game.awayScore ?? '0'} - ${game.homeScore ?? '0'} ${game.homeTeam || '?'}</strong>
+                    <strong>${this.escapeHtml(game.awayTeam || '?')} ${game.awayScore ?? '0'} - ${game.homeScore ?? '0'} ${this.escapeHtml(game.homeTeam || '?')}</strong>
                 </div>
                 ${progressHtml}
+                <div class="game-classification-editor">
+                    <label>
+                        <span>${this.escapeHtml(i18n.t('gameCategoryLabel'))}</span>
+                        <select class="game-category-select">${buildCategoryOptions(classification.category)}</select>
+                    </label>
+                    <label>
+                        <span>${this.escapeHtml(i18n.t('gameFolderLabel'))}</span>
+                        <input type="text" class="game-folder-input" list="savedGameFolderNames" value="${this.escapeHtml(classification.folderName)}" placeholder="${this.escapeHtml(i18n.t('gameFolderPlaceholder'))}">
+                    </label>
+                    <label>
+                        <span>${this.escapeHtml(i18n.t('gameTagsLabel'))}</span>
+                        <input type="text" class="game-tags-input" value="${this.escapeHtml(tagsText)}" placeholder="${this.escapeHtml(i18n.t('gameTagsPlaceholder'))}">
+                    </label>
+                    <label class="game-memo-field">
+                        <span>${this.escapeHtml(i18n.t('gameMemoLabel'))}</span>
+                        <input type="text" class="game-memo-input" value="${this.escapeHtml(classification.memo)}" placeholder="${this.escapeHtml(i18n.t('gameMemoPlaceholder'))}">
+                    </label>
+                    <button type="button" class="secondary-btn save-classification-btn" data-game-id="${game.id}">${this.escapeHtml(i18n.t('moveOrSaveGameFolder'))}</button>
+                </div>
                 <div class="game-item-actions">
                     ${isActive ? `<button type="button" class="primary-btn load-game-btn" data-game-id="${game.id}">${i18n.t('resumeGame')}</button>` : ''}
                     <button type="button" class="secondary-btn view-game-btn" data-game-id="${game.id}">${i18n.t('viewGame')}</button>
+                    <button type="button" class="secondary-btn share-game-btn" data-game-id="${game.id}">${i18n.t('shareGame')}</button>
                     <button type="button" class="danger-btn delete-game-btn" data-game-id="${game.id}">${i18n.t('delete')}</button>
                 </div>
             </div>`;
@@ -11709,7 +13104,26 @@ class BaseballApp {
         modal.innerHTML = `
             <div class="modal-content games-list-modal-content">
                 <h3>${i18n.t('savedGamesTitle')}</h3>
-                <input type="search" class="games-search-box" placeholder="${i18n.t('searchGamesPlaceholder')}">
+                <div class="games-filter-row">
+                    <input type="search" class="games-search-box" placeholder="${this.escapeHtml(i18n.t('searchGamesPlaceholder'))}">
+                    <select class="games-category-filter" aria-label="${this.escapeHtml(i18n.t('filterByCategory'))}">
+                        ${buildCategoryOptions('', true)}
+                    </select>
+                    <input type="search" class="games-folder-filter" placeholder="${this.escapeHtml(i18n.t('filterByFolder'))}">
+                </div>
+                <datalist id="savedGameFolderNames">${buildFolderDatalistOptions()}</datalist>
+                ${folderEntries.length > 0 ? `
+                <div class="folder-management-panel">
+                    <div class="folder-management-title">${this.escapeHtml(i18n.t('folderManagementTitle'))}</div>
+                    <select class="rename-folder-category" aria-label="${this.escapeHtml(i18n.t('gameCategoryLabel'))}">
+                        ${buildCategoryOptions('', true)}
+                    </select>
+                    <select class="rename-folder-from" aria-label="${this.escapeHtml(i18n.t('selectFolderToRename'))}">
+                        ${buildFolderOptions('', '')}
+                    </select>
+                    <input type="text" class="rename-folder-to" placeholder="${this.escapeHtml(i18n.t('renameFolderPlaceholder'))}">
+                    <button type="button" class="secondary-btn rename-folder-btn">${this.escapeHtml(i18n.t('renameFolder'))}</button>
+                </div>` : ''}
                 <div class="games-list">${listHtml}</div>
                 <button type="button" class="secondary-btn close-modal">${i18n.t('cancel')}</button>
             </div>`;
@@ -11717,18 +13131,23 @@ class BaseballApp {
         document.body.appendChild(modal);
 
         // 検索フィルター
-        const searchBox = modal.querySelector('.games-search-box');
-        searchBox.addEventListener('input', () => {
+        const applyFilters = () => {
+            const searchBox = modal.querySelector('.games-search-box');
+            const categoryFilter = modal.querySelector('.games-category-filter');
+            const folderFilter = modal.querySelector('.games-folder-filter');
             const q = searchBox.value.toLowerCase().trim();
+            const selectedCategory = categoryFilter.value;
+            const folderQuery = folderFilter.value.toLowerCase().trim();
             modal.querySelectorAll('.game-item').forEach(item => {
-                const match = !q || item.dataset.away.includes(q) || item.dataset.home.includes(q);
+                const matchSearch = !q || item.dataset.away.includes(q) || item.dataset.home.includes(q);
+                const matchCategory = !selectedCategory || item.dataset.category === selectedCategory;
+                const matchFolder = !folderQuery || item.dataset.folder.includes(folderQuery);
+                const match = matchSearch && matchCategory && matchFolder;
                 item.style.display = match ? '' : 'none';
             });
             // セクション見出しの表示制御
             modal.querySelectorAll('.games-section-title').forEach(title => {
-                const next = title.nextElementSibling;
                 const hasVisible = [...title.parentNode.querySelectorAll('.game-item')].some(el => {
-                    const elTitle = el.previousElementSibling;
                     // この見出しに属するアイテムかチェック
                     let cursor = el.previousElementSibling;
                     while (cursor && !cursor.classList.contains('games-section-title')) {
@@ -11738,6 +13157,54 @@ class BaseballApp {
                 });
                 title.style.display = hasVisible ? '' : 'none';
             });
+        };
+        const searchBox = modal.querySelector('.games-search-box');
+        const categoryFilter = modal.querySelector('.games-category-filter');
+        const folderFilter = modal.querySelector('.games-folder-filter');
+        searchBox.addEventListener('input', applyFilters);
+        categoryFilter.addEventListener('change', applyFilters);
+        folderFilter.addEventListener('input', applyFilters);
+
+        const renameCategory = modal.querySelector('.rename-folder-category');
+        const renameFrom = modal.querySelector('.rename-folder-from');
+        const renameTo = modal.querySelector('.rename-folder-to');
+        const renameButton = modal.querySelector('.rename-folder-btn');
+        const refreshRenameFolderOptions = () => {
+            if (!renameFrom || !renameCategory) return;
+            renameFrom.innerHTML = buildFolderOptions(renameCategory.value, '');
+        };
+        renameCategory?.addEventListener('change', refreshRenameFolderOptions);
+        renameButton?.addEventListener('click', async () => {
+            const category = renameCategory.value || renameFrom.selectedOptions[0]?.dataset.category || '';
+            const oldFolderName = renameFrom.value;
+            const newFolderName = renameTo.value.trim();
+            if (!category || !oldFolderName || !newFolderName) {
+                this.showError(i18n.t('renameFolderRequired'));
+                return;
+            }
+            try {
+                const allGames = await storage.getAllGames();
+                let updatedCount = 0;
+                for (const game of allGames) {
+                    const classification = this.normalizeGameClassification(game.classification);
+                    if (classification.category !== category || classification.folderName !== oldFolderName) continue;
+                    game.classification = { ...classification, folderName: newFolderName };
+                    await storage.saveGame(game);
+                    updatedCount += 1;
+                }
+                if (gameManager.currentGame) {
+                    const currentClassification = this.normalizeGameClassification(gameManager.currentGame.classification);
+                    if (currentClassification.category === category && currentClassification.folderName === oldFolderName) {
+                        gameManager.currentGame.classification = { ...currentClassification, folderName: newFolderName };
+                    }
+                }
+                this.showSuccess(i18n.t('folderRenamed').replace('{count}', updatedCount));
+                document.body.removeChild(modal);
+                this.showGamesModal(await storage.getAllGames());
+            } catch (err) {
+                console.error('フォルダ名変更エラー:', err);
+                this.showError(i18n.t('renameFolderError'));
+            }
         });
 
         modal.querySelector('.close-modal').addEventListener('click', () => document.body.removeChild(modal));
@@ -11752,6 +13219,47 @@ class BaseballApp {
             container.querySelectorAll('.view-game-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     await this.showGameDetail(parseInt(e.target.dataset.gameId));
+                });
+            });
+            container.querySelectorAll('.share-game-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    await this.shareSavedGame(parseInt(e.target.dataset.gameId));
+                });
+            });
+            container.querySelectorAll('.save-classification-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const button = e.target;
+                    const gameId = parseInt(button.dataset.gameId);
+                    const item = button.closest('.game-item');
+                    const classification = {
+                        category: item.querySelector('.game-category-select').value || 'uncategorized',
+                        folderName: item.querySelector('.game-folder-input').value.trim(),
+                        tags: item.querySelector('.game-tags-input').value
+                            .split(',')
+                            .map(tag => tag.trim())
+                            .filter(Boolean),
+                        memo: item.querySelector('.game-memo-input').value.trim()
+                    };
+                    try {
+                        const game = await storage.loadGame(gameId);
+                        if (!game) throw new Error('Game not found');
+                        game.classification = this.normalizeGameClassification(classification);
+                        await storage.saveGame(game);
+                        if (gameManager.currentGame?.id === gameId) {
+                            gameManager.currentGame.classification = game.classification;
+                        }
+                        item.dataset.category = game.classification.category;
+                        item.dataset.folder = (game.classification.folderName || '').toLowerCase();
+                        const categoryLabel = this.getGameCategoryLabel(game.classification.category);
+                        item.querySelector('.game-category-badge').textContent = game.classification.folderName
+                            ? `${categoryLabel} / ${game.classification.folderName}`
+                            : categoryLabel;
+                        this.showSuccess(i18n.t('classificationSaved'));
+                        applyFilters();
+                    } catch (err) {
+                        console.error('分類保存エラー:', err);
+                        this.showError(i18n.t('classificationSaveError'));
+                    }
                 });
             });
             container.querySelectorAll('.delete-game-btn').forEach(btn => {
@@ -11806,6 +13314,7 @@ class BaseballApp {
                 this._buildGameDetailHTML(game, allInnings, atBatsByInningId, pitchesByAtBatId, playerMap);
             document.getElementById('gameDetailTitle').textContent =
                 `${game.awayTeam || '?'} vs ${game.homeTeam || '?'}  ${new Date(game.date).toLocaleDateString()}`;
+            document.getElementById('gameDetailShareBtn').dataset.gameId = gameId;
             document.getElementById('gameDetailModal').classList.remove('modal--hidden');
         } catch (err) {
             console.error('試合詳細取得エラー:', err);
@@ -12428,7 +13937,7 @@ class BaseballApp {
     showRunnerAdvancementModal(result, resultDetail, advancement, batter) {
         const currentRunners = gameManager.currentGame.runnersOnBase;
         const outs = gameManager.currentGame.outs;
-        const resultLabel = i18n.t(result) || BASEBALL_CONFIG.AT_BAT_RESULTS[result] || result;
+        const resultLabel = this.formatAtBatResult(result);
         const isHit = ['single', 'double', 'triple', 'homerun'].includes(result);
 
         const modal = document.createElement('div');
@@ -12512,6 +14021,7 @@ class BaseballApp {
                 this.updateCalculatedResult(modal);
             });
         });
+        this.updateCalculatedResult(modal);
 
         modal.querySelector('.apply-advancement').addEventListener('click', async () => {
             const customAdvancement = this.getCustomAdvancement(modal, advancement);
@@ -12627,6 +14137,9 @@ class BaseballApp {
 
     generateGenericRunnerSelections(result, currentRunners, advancement) {
         let html = '';
+        const fieldersChoiceDefaultOut = result === 'fielders_choice'
+            ? (currentRunners.first ? 'first' : currentRunners.second ? 'second' : currentRunners.third ? 'third' : null)
+            : null;
 
         // 三塁走者
         if (currentRunners.third) {
@@ -12635,8 +14148,8 @@ class BaseballApp {
                     <label>3塁走者:</label>
                     <select id="third-runner-result">
                         <option value="home" ${advancement.runsScored > 0 ? 'selected' : ''}>本塁生還</option>
-                        <option value="third" ${advancement.newRunners.third ? 'selected' : ''}>3塁残留</option>
-                        <option value="out">本塁憤死(アウト)</option>
+                        <option value="third" ${advancement.newRunners.third === currentRunners.third ? 'selected' : ''}>3塁残留</option>
+                        <option value="out" ${fieldersChoiceDefaultOut === 'third' ? 'selected' : ''}>本塁憤死(アウト)</option>
                     </select>
                 </div>
             `;
@@ -12649,9 +14162,9 @@ class BaseballApp {
                     <label>2塁走者:</label>
                     <select id="second-runner-result">
                         <option value="home">本塁生還</option>
-                        <option value="third" ${advancement.newRunners.third ? 'selected' : ''}>3塁進塁</option>
-                        <option value="second" ${advancement.newRunners.second ? 'selected' : ''}>2塁残留</option>
-                        <option value="out">憤死(アウト)</option>
+                        <option value="third" ${advancement.newRunners.third === currentRunners.second ? 'selected' : ''}>3塁進塁</option>
+                        <option value="second" ${advancement.newRunners.second === currentRunners.second ? 'selected' : ''}>2塁残留</option>
+                        <option value="out" ${fieldersChoiceDefaultOut === 'second' ? 'selected' : ''}>憤死(アウト)</option>
                     </select>
                 </div>
             `;
@@ -12664,10 +14177,10 @@ class BaseballApp {
                     <label>1塁走者:</label>
                     <select id="first-runner-result">
                         <option value="home">本塁生還</option>
-                        <option value="third">3塁進塁</option>
-                        <option value="second" ${advancement.newRunners.second ? 'selected' : ''}>2塁進塁</option>
-                        <option value="first" ${advancement.newRunners.first ? 'selected' : ''}>1塁残留</option>
-                        <option value="out">憤死(アウト)</option>
+                        <option value="third" ${advancement.newRunners.third === currentRunners.first ? 'selected' : ''}>3塁進塁</option>
+                        <option value="second" ${advancement.newRunners.second === currentRunners.first ? 'selected' : ''}>2塁進塁</option>
+                        <option value="first" ${advancement.newRunners.first === currentRunners.first ? 'selected' : ''}>1塁残留</option>
+                        <option value="out" ${fieldersChoiceDefaultOut === 'first' ? 'selected' : ''}>憤死(アウト)</option>
                     </select>
                 </div>
             `;
@@ -12906,7 +14419,7 @@ class BaseballApp {
 
         // 各走者の結果を確認（安打形式の値も処理）
         ['third', 'second', 'first', 'batter'].forEach(runnerId => {
-            const select = modal.querySelector(`#${runnerId}-runner-result`);
+            const select = modal.querySelector(runnerId === 'batter' ? '#batter-result, #batter-runner-result' : `#${runnerId}-runner-result`);
             if (select) {
                 const result = select.value;
 
@@ -12959,7 +14472,7 @@ class BaseballApp {
 
         // 各走者の結果を確認（安打形式の値も処理）
         ['third', 'second', 'first', 'batter'].forEach(runnerId => {
-            const select = modal.querySelector(`#${runnerId}-runner-result`);
+            const select = modal.querySelector(runnerId === 'batter' ? '#batter-result, #batter-runner-result' : `#${runnerId}-runner-result`);
             if (select) {
                 const result = select.value;
 
@@ -12999,17 +14512,8 @@ class BaseballApp {
         const playerDetailSelect = document.getElementById('playerDetailLevel');
         const options = playerDetailSelect.options;
 
-        if (recordingLevel === 'pitch') {
-            for (let option of options) {
-                option.disabled = option.value === 'basic';
-            }
-            if (playerDetailSelect.value === 'basic') {
-                playerDetailSelect.value = 'standard';
-            }
-        } else {
-            for (let option of options) {
-                option.disabled = false;
-            }
+        for (let option of options) {
+            option.disabled = false;
         }
     }
 

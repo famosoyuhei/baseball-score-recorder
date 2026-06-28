@@ -1,0 +1,17 @@
+# Keep high-volume generated or binary content out of routine Codex context.
+node_modules/
+dist/
+test-results/
+portfolio_output/
+
+# Binary assets are available on disk, but should be opened only when needed.
+*.png
+*.ico
+*.xlsx
+
+# OS/editor noise.
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

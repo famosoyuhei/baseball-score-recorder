@@ -742,6 +742,13 @@ class GameManager {
         }
         this.currentInning.runs += runs;
         if (runs > 0) {
+            if (this.currentGame.isTopHalf) {
+                this.currentGame.awayScore += runs;
+            } else {
+                this.currentGame.homeScore += runs;
+            }
+        }
+        if (runs > 0) {
             if (this.currentInning.earnedRuns === undefined) this.currentInning.earnedRuns = 0;
             this.currentInning.earnedRuns = Math.min(
                 this.currentInning.runs,
@@ -755,7 +762,18 @@ class GameManager {
         const player = this.currentGame.players[team].find(p => p.id === playerId);
 
         if (player) {
-            player.stats.atBats++;
+            if (!player.stats) player.stats = {};
+            const nonAtBatResults = [
+                'walk',
+                'intentional_walk',
+                'hit_by_pitch',
+                'sacrifice_bunt',
+                'sacrifice_fly',
+                'catcher_interference'
+            ];
+            if (!nonAtBatResults.includes(result)) {
+                player.stats.atBats = (player.stats.atBats || 0) + 1;
+            }
             if (this.isHitResult(result)) {
                 player.stats.hits++;
 
@@ -769,6 +787,12 @@ class GameManager {
             player.stats.rbis += rbis;
             if (result === 'walk') {
                 player.stats.walks++;
+            }
+            if (result === 'sacrifice_bunt') {
+                player.stats.sacrificeBunts = (player.stats.sacrificeBunts || 0) + 1;
+            }
+            if (result === 'sacrifice_fly') {
+                player.stats.sacrificeFlies = (player.stats.sacrificeFlies || 0) + 1;
             }
             if (result === 'strikeout') {
                 player.stats.strikeouts++;
@@ -1260,6 +1284,84 @@ class GameManager {
         await this.saveGame();
     }
 
+    getPitchingDecisionCandidates() {
+        const game = this.currentGame;
+        if (!game || game.status !== 'pending_confirm') return null;
+
+        const finalStatus = game.pendingFinalStatus ||
+            (game.homeScore === game.awayScore ? 'draw' : 'completed');
+        if (finalStatus !== 'completed') {
+            return { finalStatus, requiresSelection: false };
+        }
+
+        const winningTeam = game.homeScore > game.awayScore ? 'home' : 'away';
+        const losingTeam = winningTeam === 'home' ? 'away' : 'home';
+        const teamLabel = team => team === 'home' ? game.homeTeam : game.awayTeam;
+        const pitcherIdsByTeam = { home: new Set(), away: new Set() };
+
+        for (const inning of game.innings || []) {
+            const pitchingTeam = inning.isTopHalf ? 'home' : 'away';
+            if (inning.pitcherId) pitcherIdsByTeam[pitchingTeam].add(String(inning.pitcherId));
+            for (const stint of inning.pitcherStints || []) {
+                if (stint.pitcherId) pitcherIdsByTeam[pitchingTeam].add(String(stint.pitcherId));
+            }
+        }
+
+        const getPitchers = team => {
+            const ids = pitcherIdsByTeam[team];
+            const players = game.players?.[team] || [];
+            return players
+                .filter(player => {
+                    const stats = player.stats || {};
+                    return player.position === 'P' ||
+                        ids.has(String(player.id)) ||
+                        (stats.inningsPitched || 0) > 0 ||
+                        (stats.runsAllowed || 0) > 0;
+                })
+                .map(player => ({
+                    id: player.id,
+                    name: player.name || `${teamLabel(team)} ${player.battingOrder || ''}`.trim(),
+                    team,
+                    teamName: teamLabel(team),
+                    battingOrder: player.battingOrder,
+                    inningsPitched: player.stats?.inningsPitched || 0,
+                    runsAllowed: player.stats?.runsAllowed || 0,
+                    earnedRuns: player.stats?.earnedRuns || 0
+                }));
+        };
+
+        const winningPitchers = getPitchers(winningTeam);
+        const losingPitchers = getPitchers(losingTeam);
+        const lossCandidates = losingPitchers.filter(p => p.runsAllowed > 0);
+
+        return {
+            finalStatus,
+            winningTeam,
+            losingTeam,
+            winningTeamName: teamLabel(winningTeam),
+            losingTeamName: teamLabel(losingTeam),
+            winningPitchers,
+            losingPitchers: lossCandidates.length ? lossCandidates : losingPitchers,
+            savePitchers: winningPitchers,
+            holdPitchers: winningPitchers,
+            requiresSelection: winningPitchers.length > 0 || losingPitchers.length > 0
+        };
+    }
+
+    async savePitchingDecisions(decisions) {
+        if (!this.currentGame) return null;
+        this.currentGame.pitchingDecisions = {
+            winningPitcherId: decisions.winningPitcherId || null,
+            losingPitcherId: decisions.losingPitcherId || null,
+            savePitcherId: decisions.savePitcherId || null,
+            holdPitcherIds: decisions.holdPitcherIds || [],
+            confirmedAt: new Date().toISOString(),
+            method: 'manual-confirmation'
+        };
+        await this.saveGame();
+        return this.currentGame.pitchingDecisions;
+    }
+
     /**
      * pending_confirm 状態の試合を確定する。スコアから勝敗を判定し、
      * 'completed' または 'draw' に設定して保存する。
@@ -1537,6 +1639,9 @@ class GameManager {
         results.push('single_error', 'double_error', 'triple_error');
         results.push('walk', 'hit_by_pitch', 'sacrifice_bunt', 'sacrifice_fly');
         results.push('strikeout', 'groundout', 'flyout', 'lineout');
+        if (hasRunners) {
+            results.push('fielders_choice');
+        }
 
         // 三振+振り逃げ（無死/一死 + 1塁走者ありの場合は非表示）
         if (!(outs < 2 && runners.first)) {
@@ -1680,6 +1785,14 @@ class GameManager {
                 batterResult = 'out';
                 break;
 
+            case 'fielders_choice':
+                // 野選：打者走者は通常1塁到達、アウト/進塁した走者は手動調整で指定する
+                newRunners.first = 'batter';
+                newRunners.second = currentRunners.second;
+                newRunners.third = currentRunners.third;
+                batterResult = 1;
+                break;
+
             default:
                 // その他のアウト系：進塁なし
                 newRunners.first = currentRunners.first;
@@ -1720,7 +1833,7 @@ class GameManager {
         }
 
         // 凡退系（ゴロ・フライ・ライナー・三振）は走者がいれば常に手動選択
-        if (['groundout', 'flyout', 'lineout', 'strikeout'].includes(atBatResult)) {
+        if (['groundout', 'flyout', 'lineout', 'strikeout', 'fielders_choice'].includes(atBatResult)) {
             const hasRunners = currentRunners.first || currentRunners.second || currentRunners.third;
             return hasRunners;
         }

@@ -205,7 +205,8 @@ main {
     margin-bottom: 1.5rem;
 }
 
-.form-group label {
+.form-group label,
+.form-group .form-label {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 500;
@@ -683,6 +684,332 @@ main {
     gap: 1rem;
     justify-content: center;
     z-index: 100;
+}
+
+.youtube-setup-group .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.youtube-api-key-box {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid #d8e2ef;
+    border-radius: 8px;
+    background: #f8fbff;
+}
+
+.youtube-api-key-box.compact {
+    margin-top: 0;
+}
+
+.youtube-api-key-box label {
+    font-weight: 700;
+    color: #263238;
+    font-size: 0.9rem;
+}
+
+.youtube-api-key-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.youtube-api-key-row input {
+    flex: 1;
+    min-width: 0;
+}
+
+.youtube-api-key-status {
+    min-height: 1rem;
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.youtube-api-key-status.saved {
+    color: #2e7d32;
+    font-weight: 700;
+}
+
+.youtube-api-key-row input.has-unsaved-value {
+    border-color: #1976d2;
+}
+
+.youtube-api-actions,
+.youtube-search-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.iframe-api-note {
+    color: #5f6b7a;
+    font-size: 0.85rem;
+}
+
+.youtube-search-box {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border: 1px solid #d8e2ef;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.youtube-search-box label {
+    font-weight: 700;
+    color: #263238;
+    font-size: 0.9rem;
+}
+
+.youtube-search-row input {
+    flex: 1;
+    min-width: 220px;
+}
+
+.youtube-search-results {
+    display: grid;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.youtube-search-message,
+.youtube-search-result {
+    border: 1px solid #d8e2ef;
+    border-radius: 8px;
+    padding: 0.6rem;
+    background: #f8fbff;
+}
+
+.youtube-search-message.error {
+    color: #c62828;
+    border-color: #ef9a9a;
+    background: #fff5f5;
+}
+
+.youtube-search-result {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 0.75rem;
+}
+
+.youtube-search-result img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.youtube-search-result-body {
+    display: grid;
+    gap: 0.35rem;
+    align-content: start;
+}
+
+.youtube-search-result-body span {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.app-settings-modal-content {
+    max-width: 560px;
+    width: 92%;
+}
+
+.app-settings-modal-content .help-text {
+    margin: 0 0 1rem;
+    color: #5f6b7a;
+    font-size: 0.9rem;
+}
+
+.youtube-simulation-panel {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #d8e2ef;
+}
+
+.youtube-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.youtube-panel-header h4 {
+    margin: 0 0 0.25rem;
+    color: #1976d2;
+}
+
+.youtube-panel-header p {
+    margin: 0;
+    color: #5f6b7a;
+    font-size: 0.9rem;
+}
+
+.youtube-panel-body {
+    display: grid;
+    grid-template-columns: minmax(280px, 1.35fr) minmax(260px, 1fr);
+    gap: 1rem;
+}
+
+.youtube-player-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #0b1220;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.youtube-player-frame iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.youtube-simulation-tools {
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+}
+
+.youtube-time-controls,
+.youtube-note-row,
+.youtube-link-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.youtube-time-controls input,
+.youtube-note-row input {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (max-width: 768px) {
+    .youtube-api-key-row {
+        flex-wrap: wrap;
+    }
+
+    .youtube-api-key-row input {
+        flex-basis: 100%;
+    }
+
+    .youtube-search-result {
+        grid-template-columns: 1fr;
+    }
+}
+
+.youtube-timestamp-list {
+    display: grid;
+    gap: 0.5rem;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.youtube-density-report {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.youtube-density-empty,
+.density-summary {
+    border: 1px solid #d8e2ef;
+    border-radius: 8px;
+    padding: 0.75rem;
+    background: #f8fbff;
+}
+
+.density-summary {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.unsupported-play-summary {
+    border-color: #ef9a9a;
+    background: #fff5f5;
+}
+
+.density-main {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.density-main strong {
+    color: #1976d2;
+}
+
+.density-verdict {
+    font-weight: 700;
+}
+
+.density-ok .density-verdict {
+    color: #2e7d32;
+}
+
+.density-caution .density-verdict {
+    color: #ef6c00;
+}
+
+.density-hard .density-verdict,
+.density-critical .density-verdict {
+    color: #c62828;
+}
+
+.density-total {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.density-summary ul {
+    margin: 0;
+    padding-left: 1.25rem;
+    color: #334155;
+    font-size: 0.9rem;
+}
+
+.youtube-timestamp-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25rem 0.75rem;
+    text-align: left;
+    padding: 0.6rem;
+    border: 1px solid #d8e2ef;
+    border-radius: 8px;
+    background: #f8fbff;
+    color: #172033;
+    cursor: pointer;
+}
+
+.youtube-timestamp-time {
+    font-weight: 700;
+    color: #1976d2;
+}
+
+.youtube-timestamp-label {
+    font-weight: 600;
+}
+
+.youtube-timestamp-score,
+.youtube-timestamp-empty {
+    grid-column: 1 / -1;
+    color: #64748b;
+    font-size: 0.85rem;
 }
 
 /* 半イニングごと記録インターフェース */
@@ -2172,7 +2499,8 @@ main {
     }
 
     .play-timeline,
-    .detailed-scoreboard {
+    .detailed-scoreboard,
+    .youtube-simulation-panel {
         grid-column: 1 / -1;
     }
 
@@ -2216,12 +2544,39 @@ main {
         max-height: 400px;
     }
 
+    .youtube-simulation-active .youtube-simulation-panel {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .youtube-simulation-active .detailed-scoreboard,
+    .youtube-simulation-active #gameContent,
+    .youtube-simulation-active .play-timeline {
+        grid-row: 3;
+    }
+
     .game-controls {
         position: relative;
         bottom: auto;
         left: auto;
         right: auto;
         grid-column: 2;
+    }
+}
+
+@media (max-width: 768px) {
+    .youtube-panel-header,
+    .youtube-panel-body,
+    .youtube-time-controls,
+    .youtube-note-row,
+    .youtube-link-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .youtube-simulation-panel {
+        margin: 0.5rem 0;
+        padding: 0.75rem;
     }
 }
 
@@ -5223,7 +5578,23 @@ main {
 }
 
 /* モーダル共通非表示クラス */
+.hidden {
+    display: none !important;
+}
+
 .modal--hidden {
+    display: none;
+}
+
+.modal.modal--hidden {
+    display: none !important;
+}
+
+.modal:target {
+    display: flex !important;
+}
+
+#gameScreen.screen:not(.active) {
     display: none;
 }
 
@@ -5673,6 +6044,68 @@ main {
     border-color: #1976d2;
 }
 
+.games-filter-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(140px, 190px) minmax(140px, 190px);
+    gap: 0.6rem;
+    align-items: center;
+    margin-bottom: 0.6rem;
+}
+
+.games-category-filter,
+.games-folder-filter {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #1e293b;
+    font-size: 0.9rem;
+}
+
+.games-category-filter:focus,
+.games-folder-filter:focus {
+    border-color: #1976d2;
+    outline: none;
+}
+
+.folder-management-panel {
+    display: grid;
+    grid-template-columns: auto minmax(130px, 170px) minmax(180px, 1fr) minmax(160px, 1fr) auto;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding: 0.65rem;
+    border: 1px solid #dbeafe;
+    border-radius: 6px;
+    background: #f8fbff;
+}
+
+.folder-management-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #1d4ed8;
+    white-space: nowrap;
+}
+
+.folder-management-panel select,
+.folder-management-panel input {
+    min-width: 0;
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    background: #fff;
+    color: #1e293b;
+    font-size: 0.82rem;
+}
+
+.folder-management-panel select:focus,
+.folder-management-panel input:focus {
+    border-color: #1976d2;
+    outline: none;
+}
+
 .games-section-title {
     font-size: 0.75rem;
     font-weight: 700;
@@ -5776,6 +6209,15 @@ main {
     white-space: nowrap;
 }
 
+.game-category-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    white-space: nowrap;
+}
+
 .game-date {
     font-size: 0.8rem;
     color: #64748b;
@@ -5799,6 +6241,52 @@ main {
     border-radius: 4px;
     padding: 0.15rem 0.55rem;
     margin-bottom: 0.4rem;
+}
+
+.game-classification-editor {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.8fr) minmax(160px, 1fr) minmax(150px, 1fr) minmax(180px, 1.2fr) auto;
+    gap: 0.45rem;
+    align-items: end;
+    margin-top: 0.45rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.game-classification-editor label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.game-classification-editor label span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.game-classification-editor select,
+.game-classification-editor input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    background: #fff;
+    color: #1e293b;
+    font-size: 0.8rem;
+}
+
+.game-classification-editor select:focus,
+.game-classification-editor input:focus {
+    border-color: #1976d2;
+    outline: none;
+}
+
+.game-classification-editor .save-classification-btn {
+    white-space: nowrap;
+    padding: 0.36rem 0.75rem;
 }
 
 .game-item-progress::before {
@@ -5832,6 +6320,22 @@ main {
     text-align: center;
     color: #94a3b8;
     padding: 1.5rem 0;
+}
+
+@media (max-width: 720px) {
+    .games-filter-row,
+    .folder-management-panel,
+    .game-classification-editor {
+        grid-template-columns: 1fr;
+    }
+
+    .folder-management-title {
+        white-space: normal;
+    }
+
+    .game-classification-editor .save-classification-btn {
+        width: 100%;
+    }
 }
 
 /* ===== 試合詳細閲覧モーダル ===== */

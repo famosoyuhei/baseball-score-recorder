@@ -4,10 +4,13 @@
   "private": true,
   "description": "野球スコア記録アプリ - ビルドツール (minify用)。アプリ本体はビルド不要のバニラPWA。",
   "scripts": {
-    "build": "node scripts/build.js"
+    "start": "node scripts/serve-static.mjs",
+    "build": "node scripts/build.js",
+    "test:ai-matrix": "node scripts/ai-employee-mode-matrix.mjs"
   },
   "devDependencies": {
-    "terser": "^5.31.0",
-    "clean-css": "^5.3.3"
+    "clean-css": "^5.3.3",
+    "playwright": "^1.60.0",
+    "terser": "^5.31.0"
   }
 }
