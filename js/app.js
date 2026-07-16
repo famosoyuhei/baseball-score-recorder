@@ -97,6 +97,10 @@ class BaseballApp {
             const gameId = parseInt(document.getElementById('gameDetailExportImageBtn').dataset.gameId, 10);
             if (gameId) this.exportSavedGameImage(gameId);
         });
+        document.getElementById('gameDetailPrintBtn').addEventListener('click', () => {
+            const gameId = parseInt(document.getElementById('gameDetailPrintBtn').dataset.gameId, 10);
+            if (gameId) this.printSavedGameScoreSheet(gameId);
+        });
         document.getElementById('gameDetailExportCsvBtn').addEventListener('click', () => {
             const gameId = parseInt(document.getElementById('gameDetailExportCsvBtn').dataset.gameId, 10);
             if (gameId) this.exportSavedGameCsv(gameId);
@@ -1429,6 +1433,159 @@ class BaseballApp {
         return this.canvasToBlob(canvas, 'image/png');
     }
 
+    buildSavedGamePrintHtml(bundle) {
+        const game = bundle.game || {};
+        const innings = [...(bundle.innings || [])].sort((a, b) =>
+            a.inning !== b.inning ? a.inning - b.inning : (a.isTopHalf ? -1 : 1)
+        );
+        const atBats = [...(bundle.atBats || [])].sort((a, b) =>
+            (a.inningId || 0) - (b.inningId || 0) || (a.createdAt || a.id || 0) - (b.createdAt || b.id || 0)
+        );
+        const inningById = new Map(innings.map(inning => [inning.id, inning]));
+        const score = this.getLineScoreData(game, innings);
+        const classification = this.normalizeGameClassification(game.classification);
+        const title = `${game.awayTeam || '?'} ${score.awayScore} - ${score.homeScore} ${game.homeTeam || '?'}`;
+        const dateText = game.date ? new Date(game.date).toLocaleDateString() : '';
+        const escapedTitle = this.escapeHtml(title);
+        const scoreHeaders = score.headers
+            .map(header => `<th>${this.escapeHtml(header)}</th>`)
+            .join('');
+        const scoreRow = (team, runs, total, hits, errors) => `
+            <tr>
+                <th class="team-name">${this.escapeHtml(team || '?')}</th>
+                ${runs.map(run => `<td>${this.escapeHtml(run)}</td>`).join('')}
+                <td class="total">${this.escapeHtml(total)}</td>
+                <td>${this.escapeHtml(hits)}</td>
+                <td>${this.escapeHtml(errors)}</td>
+            </tr>`;
+        const atBatRows = atBats.map((atBat, index) => {
+            const inning = inningById.get(atBat.inningId);
+            const half = inning ? (inning.isTopHalf ? i18n.t('top') : i18n.t('bottom')) : '';
+            const team = inning ? (inning.isTopHalf ? game.awayTeam : game.homeTeam) : '';
+            const result = this.formatAtBatResult(atBat.result);
+            const detail = atBat.resultDetail ? ` / ${atBat.resultDetail}` : '';
+            return `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${inning ? `${inning.inning} ${half}` : ''}</td>
+                    <td>${this.escapeHtml(team || '')}</td>
+                    <td>${this.escapeHtml(atBat.battingOrder || '')}</td>
+                    <td>${this.escapeHtml(`${result}${detail}`)}</td>
+                    <td>${this.escapeHtml(atBat.runsScored || 0)}</td>
+                    <td>${this.escapeHtml(atBat.rbi || 0)}</td>
+                    <td>${this.escapeHtml(atBat.outs || 0)}</td>
+                </tr>`;
+        }).join('') || `<tr><td colspan="8" class="empty">${this.escapeHtml(i18n.t('noAtBatsYet'))}</td></tr>`;
+        const metaItems = [
+            [i18n.t('printDate'), dateText],
+            [i18n.t('gameCategoryLabel'), this.getGameCategoryLabel(classification.category)],
+            [i18n.t('gameFolderLabel'), classification.folderName || '-'],
+            [i18n.t('gameTagsLabel'), classification.tags.join(', ') || '-'],
+            [i18n.t('recordingLevel'), game.recordingLevel || '-'],
+            [i18n.t('printGeneratedAt'), new Date(bundle.exportedAt || Date.now()).toLocaleString()]
+        ];
+        return `<!doctype html>
+<html lang="${this.escapeHtml(i18n.currentLanguage || 'ja')}">
+<head>
+<meta charset="utf-8">
+<title>${escapedTitle}</title>
+<style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; color: #111827; font-family: Arial, sans-serif; background: #ffffff; }
+    .sheet { max-width: 1100px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; border-bottom: 3px solid #16a34a; padding-bottom: 16px; margin-bottom: 18px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .brand { color: #475569; font-size: 13px; }
+    .score { font-size: 34px; font-weight: 800; white-space: nowrap; }
+    .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 16px; margin: 16px 0 22px; font-size: 12px; }
+    .meta div { border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
+    .meta span { display: block; color: #64748b; font-size: 10px; text-transform: uppercase; }
+    h2 { font-size: 16px; margin: 22px 0 8px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; page-break-inside: auto; }
+    th, td { border: 1px solid #d1d5db; padding: 7px 6px; text-align: center; font-size: 12px; overflow-wrap: anywhere; }
+    thead th { background: #e0f2fe; color: #075985; font-weight: 700; }
+    .scoreboard .team-name { text-align: left; width: 180px; }
+    .scoreboard .total { font-weight: 800; background: #f8fafc; }
+    .at-bats th:nth-child(1), .at-bats td:nth-child(1) { width: 44px; }
+    .at-bats th:nth-child(2), .at-bats td:nth-child(2) { width: 76px; }
+    .at-bats th:nth-child(4), .at-bats td:nth-child(4),
+    .at-bats th:nth-child(6), .at-bats td:nth-child(6),
+    .at-bats th:nth-child(7), .at-bats td:nth-child(7),
+    .at-bats th:nth-child(8), .at-bats td:nth-child(8) { width: 56px; }
+    .at-bats td:nth-child(5) { text-align: left; }
+    .empty { color: #64748b; padding: 20px; }
+    .memo { margin-top: 16px; min-height: 56px; border: 1px solid #d1d5db; padding: 10px; font-size: 12px; white-space: pre-wrap; }
+    .hint { margin-top: 18px; color: #64748b; font-size: 11px; }
+    @media print {
+        body { padding: 0; }
+        .sheet { max-width: none; }
+        .no-print { display: none; }
+        h2 { page-break-after: avoid; }
+        tr { page-break-inside: avoid; }
+    }
+</style>
+</head>
+<body>
+<main class="sheet">
+    <section class="header">
+        <div>
+            <h1>${this.escapeHtml(i18n.t('printScoreSheet'))}</h1>
+            <div class="brand">Baseball Score Recorder</div>
+        </div>
+        <div class="score">${escapedTitle}</div>
+    </section>
+    <section class="meta">
+        ${metaItems.map(([label, value]) => `<div><span>${this.escapeHtml(label)}</span>${this.escapeHtml(value)}</div>`).join('')}
+    </section>
+    <h2>${this.escapeHtml(i18n.t('gameDetailScoreboard'))}</h2>
+    <table class="scoreboard">
+        <thead>
+            <tr><th></th>${scoreHeaders}<th>R</th><th>H</th><th>E</th></tr>
+        </thead>
+        <tbody>
+            ${scoreRow(game.awayTeam, score.awayRuns, score.awayScore, score.awayHits, score.awayErrors)}
+            ${scoreRow(game.homeTeam, score.homeRuns, score.homeScore, score.homeHits, score.homeErrors)}
+        </tbody>
+    </table>
+    <h2>${this.escapeHtml(i18n.t('printAtBats'))}</h2>
+    <table class="at-bats">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>${this.escapeHtml(i18n.t('innings'))}</th>
+                <th>${this.escapeHtml(i18n.t('printTeam'))}</th>
+                <th>${this.escapeHtml(i18n.t('battingOrder'))}</th>
+                <th>${this.escapeHtml(i18n.t('result'))}</th>
+                <th>${this.escapeHtml(i18n.t('runsScored'))}</th>
+                <th>RBI</th>
+                <th>${this.escapeHtml(i18n.t('outs'))}</th>
+            </tr>
+        </thead>
+        <tbody>${atBatRows}</tbody>
+    </table>
+    <h2>${this.escapeHtml(i18n.t('gameMemoLabel'))}</h2>
+    <div class="memo">${this.escapeHtml(classification.memo || '')}</div>
+    <p class="hint">${this.escapeHtml(i18n.t('printScoreSheetHelp'))}</p>
+</main>
+<script>
+    window.addEventListener('load', () => {
+        setTimeout(() => window.print(), 250);
+    });
+</script>
+</body>
+</html>`;
+    }
+
+    openPrintDocument(html) {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return false;
+        printWindow.opener = null;
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        return true;
+    }
+
     csvValue(value) {
         if (value === null || value === undefined) return '';
         const text = String(value).replace(/\r?\n/g, ' ');
@@ -1563,6 +1720,21 @@ class BaseballApp {
         } catch (error) {
             if (error?.name === 'AbortError') return;
             console.error('画像出力エラー:', error);
+            this.showError(i18n.t('exportGameError'));
+        }
+    }
+
+    async printSavedGameScoreSheet(gameId) {
+        try {
+            const bundle = await this.buildSavedGameExportBundle(gameId);
+            const html = this.buildSavedGamePrintHtml(bundle);
+            if (!this.openPrintDocument(html)) {
+                this.showError(i18n.t('printScoreSheetBlocked'));
+                return;
+            }
+            this.showSuccess(i18n.t('printScoreSheetOpened'));
+        } catch (error) {
+            console.error('印刷用スコアシート作成エラー:', error);
             this.showError(i18n.t('exportGameError'));
         }
     }
@@ -13504,6 +13676,7 @@ class BaseballApp {
                     <button type="button" class="secondary-btn view-game-btn" data-game-id="${game.id}">${i18n.t('viewGame')}</button>
                     <button type="button" class="secondary-btn share-game-btn" data-game-id="${game.id}">${i18n.t('shareGame')}</button>
                     <button type="button" class="secondary-btn export-image-btn" data-game-id="${game.id}">${i18n.t('exportImage')}</button>
+                    <button type="button" class="secondary-btn print-game-btn" data-game-id="${game.id}">${i18n.t('printScoreSheet')}</button>
                     <button type="button" class="secondary-btn export-csv-btn" data-game-id="${game.id}">${i18n.t('exportCsv')}</button>
                     <button type="button" class="secondary-btn export-backup-btn" data-game-id="${game.id}">${i18n.t('exportBackupGame')}</button>
                     <button type="button" class="danger-btn delete-game-btn" data-game-id="${game.id}">${i18n.t('delete')}</button>
@@ -13682,6 +13855,11 @@ class BaseballApp {
                     await this.exportSavedGameImage(parseInt(e.target.dataset.gameId));
                 });
             });
+            container.querySelectorAll('.print-game-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    await this.printSavedGameScoreSheet(parseInt(e.target.dataset.gameId));
+                });
+            });
             container.querySelectorAll('.export-csv-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     await this.exportSavedGameCsv(parseInt(e.target.dataset.gameId));
@@ -13782,6 +13960,7 @@ class BaseballApp {
                 `${game.awayTeam || '?'} vs ${game.homeTeam || '?'}  ${new Date(game.date).toLocaleDateString()}`;
             document.getElementById('gameDetailShareBtn').dataset.gameId = gameId;
             document.getElementById('gameDetailExportImageBtn').dataset.gameId = gameId;
+            document.getElementById('gameDetailPrintBtn').dataset.gameId = gameId;
             document.getElementById('gameDetailExportCsvBtn').dataset.gameId = gameId;
             document.getElementById('gameDetailExportBackupBtn').dataset.gameId = gameId;
             document.getElementById('gameDetailModal').classList.remove('modal--hidden');
