@@ -41,6 +41,102 @@
         .modal--hidden, .modal.modal--hidden { display: none !important; }
     </style>
     <link rel="stylesheet" href="./css/style.css">
+    <style>
+        .games-list-modal-content {
+            max-width: min(860px, calc(100vw - 2rem)) !important;
+            width: 94% !important;
+            min-width: 0 !important;
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #1e293b !important;
+            box-shadow: 0 18px 54px rgba(15, 23, 42, 0.28) !important;
+        }
+        .games-list-modal-content h3 {
+            color: #0f172a !important;
+            text-shadow: none !important;
+        }
+        .games-import-row {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0.65rem !important;
+            flex-wrap: wrap !important;
+            margin-bottom: 0.75rem !important;
+        }
+        .games-import-row .import-backup-btn {
+            flex: 0 0 auto !important;
+        }
+        .games-import-help {
+            flex: 1 1 260px !important;
+            min-width: 0 !important;
+            color: #475569 !important;
+            font-size: 0.86rem !important;
+            line-height: 1.45 !important;
+            overflow-wrap: anywhere !important;
+        }
+        .games-list-modal-content > .close-modal {
+            width: auto !important;
+            height: auto !important;
+            line-height: 1.2 !important;
+            padding: 0.45rem 0.9rem !important;
+            font-size: 0.95rem !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 7px !important;
+        }
+        .games-list-modal-content .secondary-btn {
+            background: #f8fafc !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+            text-shadow: none !important;
+        }
+        .games-list-modal-content .secondary-btn:hover {
+            background: #e0f2fe !important;
+            border-color: #38bdf8 !important;
+        }
+        .games-list-modal-content .primary-btn,
+        .games-list-modal-content .danger-btn {
+            text-shadow: none !important;
+        }
+        .games-list-modal-content .danger-btn {
+            color: #ffffff !important;
+        }
+        .games-list-modal-content input,
+        .games-list-modal-content select {
+            background: #ffffff !important;
+            color: #1e293b !important;
+            box-shadow: none !important;
+        }
+        @media (max-width: 900px) {
+            .folder-management-panel,
+            .game-classification-editor {
+                grid-template-columns: 1fr !important;
+            }
+            .folder-management-title {
+                white-space: normal !important;
+            }
+            .rename-folder-btn,
+            .game-classification-editor .save-classification-btn {
+                width: 100% !important;
+                min-width: 0 !important;
+                white-space: normal !important;
+            }
+        }
+        @media (max-width: 720px) {
+            .games-list-modal-content {
+                width: calc(100vw - 1rem) !important;
+                max-width: calc(100vw - 1rem) !important;
+                padding-left: 0.9rem !important;
+                padding-right: 0.9rem !important;
+            }
+            .games-import-row {
+                display: grid !important;
+                grid-template-columns: 1fr !important;
+                align-items: stretch !important;
+            }
+            .games-import-row .import-backup-btn {
+                width: 100% !important;
+            }
+        }
+    </style>
 
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#2196F3">
