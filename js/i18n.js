@@ -265,6 +265,8 @@ class I18n {
                 // メッセージ
                 gameStarted: '試合を開始しました',
                 gameSaved: '試合を保存しました',
+                gameSaveError: '試合の保存に失敗しました',
+                savedGameOfflineShareHint: '球場で通信が弱い場合は、保存しておけば後ほどオンライン環境で共有できます。',
                 gameEnded: '試合を終了しました',
                 gameConfirmed: '試合を確定しました',
                 gameEndPendingConfirm: '試合終了（確定待ち）',
@@ -294,6 +296,7 @@ class I18n {
 
                 // 保存試合一覧・閲覧
                 savedGamesTitle: '保存された試合',
+                savedGamesOfflineShareHelp: '試合中はオフラインで保存し、あとでオンライン環境から共有・CSV・バックアップを実行できます。',
                 noSavedGames: '保存された試合はありません',
                 statusActive: '進行中',
                 statusCompleted: '終了',
@@ -1080,6 +1083,8 @@ class I18n {
                 // メッセージ
                 gameStarted: 'Game started',
                 gameSaved: 'Game saved',
+                gameSaveError: 'Failed to save game',
+                savedGameOfflineShareHint: 'If the field has weak connectivity, save the game and share it later when you are online.',
                 gameEnded: 'Game ended',
                 gameConfirmed: 'Game confirmed',
                 gameEndPendingConfirm: 'Game Over (Pending Confirmation)',
@@ -1109,6 +1114,7 @@ class I18n {
 
                 // Saved games list & viewer
                 savedGamesTitle: 'Saved Games',
+                savedGamesOfflineShareHelp: 'During the game, save offline. Later, when you are online, you can share, export CSV, or create a backup.',
                 noSavedGames: 'No saved games',
                 statusActive: 'In Progress',
                 statusCompleted: 'Final',
@@ -1896,6 +1902,8 @@ class I18n {
                 // メッセージ
                 gameStarted: 'Juego iniciado',
                 gameSaved: 'Juego guardado',
+                gameSaveError: 'Error al guardar el juego',
+                savedGameOfflineShareHint: 'Si la conexión en el campo es débil, guarda el partido y compártelo después cuando estés en línea.',
                 gameEnded: 'Juego terminado',
                 gameConfirmed: 'Juego confirmado',
                 gameEndPendingConfirm: 'Fin de juego (pendiente de confirmación)',
@@ -1925,6 +1933,7 @@ class I18n {
 
                 // Lista de partidos guardados y visor
                 savedGamesTitle: 'Partidos Guardados',
+                savedGamesOfflineShareHelp: 'Durante el partido, guarda sin conexión. Después, cuando estés en línea, puedes compartir, exportar CSV o crear una copia.',
                 noSavedGames: 'No hay partidos guardados',
                 statusActive: 'En Curso',
                 statusCompleted: 'Finalizado',
@@ -2709,6 +2718,8 @@ class I18n {
                 // メッセージ
                 gameStarted: 'Jogo iniciado',
                 gameSaved: 'Jogo salvo',
+                gameSaveError: 'Falha ao salvar o jogo',
+                savedGameOfflineShareHint: 'Se a conexão no campo estiver fraca, salve o jogo e compartilhe depois quando estiver online.',
                 gameEnded: 'Jogo terminado',
                 gameConfirmed: 'Jogo confirmado',
                 gameEndPendingConfirm: 'Fim de jogo (aguardando confirmação)',
@@ -2738,6 +2749,7 @@ class I18n {
 
                 // Lista de jogos salvos e visualizador
                 savedGamesTitle: 'Jogos Salvos',
+                savedGamesOfflineShareHelp: 'Durante o jogo, salve offline. Depois, quando estiver online, voce pode compartilhar, exportar CSV ou criar um backup.',
                 noSavedGames: 'Nenhum jogo salvo',
                 statusActive: 'Em Andamento',
                 statusCompleted: 'Encerrado',

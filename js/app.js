@@ -13051,10 +13051,10 @@ class BaseballApp {
     async saveCurrentGame() {
         try {
             await gameManager.saveGame();
-            this.showSuccess('試合を保存しました');
+            this.showSuccess(`${i18n.t('gameSaved')}\n${i18n.t('savedGameOfflineShareHint')}`);
         } catch (error) {
             console.error('保存エラー:', error);
-            this.showError('試合の保存に失敗しました');
+            this.showError(i18n.t('gameSaveError'));
         }
     }
 
@@ -13388,6 +13388,7 @@ class BaseballApp {
                     <input type="file" class="import-backup-input" accept="application/json,.json" hidden>
                     <span class="games-import-help">${this.escapeHtml(i18n.t('importBackupHelp'))}</span>
                 </div>
+                <div class="games-offline-share-help">${this.escapeHtml(i18n.t('savedGamesOfflineShareHelp'))}</div>
                 <div class="games-filter-row">
                     <input type="search" class="games-search-box" placeholder="${this.escapeHtml(i18n.t('searchGamesPlaceholder'))}">
                     <select class="games-category-filter" aria-label="${this.escapeHtml(i18n.t('filterByCategory'))}">

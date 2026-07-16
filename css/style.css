@@ -6069,6 +6069,17 @@ main {
     outline: none;
 }
 
+.games-offline-share-help {
+    margin: 0 0 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    background: #eff6ff;
+    color: #1e40af;
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
 .folder-management-panel {
     display: grid;
     grid-template-columns: auto minmax(130px, 170px) minmax(180px, 1fr) minmax(160px, 1fr) auto;
