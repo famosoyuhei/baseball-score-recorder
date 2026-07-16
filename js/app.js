@@ -93,6 +93,10 @@ class BaseballApp {
             const gameId = parseInt(document.getElementById('gameDetailShareBtn').dataset.gameId, 10);
             if (gameId) this.shareSavedGame(gameId);
         });
+        document.getElementById('gameDetailExportImageBtn').addEventListener('click', () => {
+            const gameId = parseInt(document.getElementById('gameDetailExportImageBtn').dataset.gameId, 10);
+            if (gameId) this.exportSavedGameImage(gameId);
+        });
         document.getElementById('gameDetailExportCsvBtn').addEventListener('click', () => {
             const gameId = parseInt(document.getElementById('gameDetailExportCsvBtn').dataset.gameId, 10);
             if (gameId) this.exportSavedGameCsv(gameId);
@@ -1247,6 +1251,12 @@ class BaseballApp {
         return `${date}_${teams}.csv`;
     }
 
+    getSavedGameImageFileName(game) {
+        const date = game?.date ? new Date(game.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const teams = this.slugifyFileName(`${game?.awayTeam || 'away'}-vs-${game?.homeTeam || 'home'}`);
+        return `${date}_${teams}.png`;
+    }
+
     downloadBlob(blob, fileName) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1301,6 +1311,122 @@ class BaseballApp {
         ];
         if (appUrl) lines.push(appUrl);
         return lines.join('\n');
+    }
+
+    getLineScoreData(game, innings) {
+        const sortedInnings = [...(innings || [])].sort((a, b) =>
+            a.inning !== b.inning ? a.inning - b.inning : (a.isTopHalf ? -1 : 1)
+        );
+        const reg = game?.gameRules?.regulationInnings || 9;
+        const maxInning = Math.max(reg, ...sortedInnings.map(i => i.inning || 0), 1);
+        const inningMap = {};
+        sortedInnings.forEach(inning => {
+            inningMap[`${inning.inning}-${inning.isTopHalf ? 'top' : 'bottom'}`] = inning;
+        });
+        const inningRuns = (isTop) => Array.from({ length: maxInning }, (_, index) => {
+            const inning = inningMap[`${index + 1}-${isTop ? 'top' : 'bottom'}`];
+            if (!inning) return '-';
+            const runs = Number.isFinite(Number(inning.runs)) ? Number(inning.runs) : 0;
+            return inning.incomplete ? `${runs}x` : String(runs);
+        });
+        const statSum = (isTop, key) => sortedInnings
+            .filter(inning => inning.isTopHalf === isTop)
+            .reduce((sum, inning) => sum + (Number(inning[key]) || 0), 0);
+        return {
+            maxInning,
+            headers: Array.from({ length: maxInning }, (_, index) => String(index + 1)),
+            awayRuns: inningRuns(true),
+            homeRuns: inningRuns(false),
+            awayScore: Number.isFinite(Number(game?.awayScore)) ? Number(game.awayScore) : statSum(true, 'runs'),
+            homeScore: Number.isFinite(Number(game?.homeScore)) ? Number(game.homeScore) : statSum(false, 'runs'),
+            awayHits: statSum(true, 'hits'),
+            homeHits: statSum(false, 'hits'),
+            awayErrors: statSum(true, 'errors'),
+            homeErrors: statSum(false, 'errors')
+        };
+    }
+
+    canvasToBlob(canvas, type = 'image/png') {
+        return new Promise((resolve, reject) => {
+            canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Canvas export failed')), type);
+        });
+    }
+
+    drawFittedText(ctx, text, x, y, maxWidth, fontSize, weight = '400', color = '#0f172a', align = 'left') {
+        let size = fontSize;
+        ctx.textAlign = align;
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = color;
+        do {
+            ctx.font = `${weight} ${size}px Arial, sans-serif`;
+            if (ctx.measureText(String(text)).width <= maxWidth || size <= 14) break;
+            size -= 1;
+        } while (size > 14);
+        ctx.fillText(String(text), x, y);
+    }
+
+    async buildSavedGameImageBlob(game, innings) {
+        const score = this.getLineScoreData(game, innings);
+        const width = 1200;
+        const height = 675;
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, width, 120);
+        ctx.fillStyle = '#16a34a';
+        ctx.fillRect(0, 120, width, 8);
+
+        const dateText = game?.date ? new Date(game.date).toLocaleDateString() : '';
+        this.drawFittedText(ctx, i18n.t('shareGameResultTitle'), 60, 48, 360, 34, '700', '#ffffff');
+        this.drawFittedText(ctx, dateText, width - 60, 48, 320, 24, '400', '#cbd5e1', 'right');
+        this.drawFittedText(ctx, 'Baseball Score Recorder', 60, 90, 460, 20, '400', '#cbd5e1');
+
+        this.drawFittedText(ctx, game?.awayTeam || '?', 82, 210, 380, 42, '700');
+        this.drawFittedText(ctx, String(score.awayScore), 500, 210, 110, 62, '700', '#2563eb', 'center');
+        this.drawFittedText(ctx, '-', 600, 210, 60, 44, '700', '#64748b', 'center');
+        this.drawFittedText(ctx, String(score.homeScore), 700, 210, 110, 62, '700', '#dc2626', 'center');
+        this.drawFittedText(ctx, game?.homeTeam || '?', width - 82, 210, 380, 42, '700', '#0f172a', 'right');
+
+        const tableX = 70;
+        const tableY = 300;
+        const tableW = width - 140;
+        const rowH = 74;
+        const teamW = 260;
+        const statW = 62;
+        const inningW = Math.max(28, Math.min(58, (tableW - teamW - statW * 3) / Math.max(score.headers.length, 1)));
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(tableX, tableY, tableW, 1);
+        ctx.fillRect(tableX, tableY + rowH, tableW, 1);
+        ctx.fillRect(tableX, tableY + rowH * 2, tableW, 1);
+        ctx.fillRect(tableX, tableY + rowH * 3, tableW, 1);
+        ctx.fillStyle = '#e0f2fe';
+        ctx.fillRect(tableX, tableY, tableW, rowH);
+
+        const drawCell = (text, colX, rowY, w, weight = '600', color = '#0f172a') => {
+            this.drawFittedText(ctx, text, colX + w / 2, rowY + rowH / 2, w - 10, 25, weight, color, 'center');
+        };
+        this.drawFittedText(ctx, i18n.t('gameDetailScoreboard'), tableX + 18, tableY + rowH / 2, teamW - 26, 24, '700', '#075985');
+        score.headers.forEach((header, index) => drawCell(header, tableX + teamW + inningW * index, tableY, inningW, '700', '#075985'));
+        const statStart = tableX + teamW + inningW * score.headers.length;
+        ['R', 'H', 'E'].forEach((label, index) => drawCell(label, statStart + statW * index, tableY, statW, '700', '#075985'));
+
+        const drawTeamRow = (rowIndex, team, runs, total, hits, errors, color) => {
+            const y = tableY + rowH * rowIndex;
+            this.drawFittedText(ctx, team || '?', tableX + 18, y + rowH / 2, teamW - 30, 26, '700', color);
+            runs.forEach((run, index) => drawCell(run, tableX + teamW + inningW * index, y, inningW));
+            drawCell(total, statStart, y, statW, '800', color);
+            drawCell(hits, statStart + statW, y, statW);
+            drawCell(errors, statStart + statW * 2, y, statW);
+        };
+        drawTeamRow(1, game?.awayTeam, score.awayRuns, score.awayScore, score.awayHits, score.awayErrors, '#2563eb');
+        drawTeamRow(2, game?.homeTeam, score.homeRuns, score.homeScore, score.homeHits, score.homeErrors, '#dc2626');
+
+        this.drawFittedText(ctx, i18n.t('savedGameOfflineShareHint'), 70, 595, width - 140, 22, '400', '#475569');
+        return this.canvasToBlob(canvas, 'image/png');
     }
 
     csvValue(value) {
@@ -1412,6 +1538,31 @@ class BaseballApp {
             this.showSuccess(i18n.t('exportCsvDownloaded'));
         } catch (error) {
             console.error('CSV出力エラー:', error);
+            this.showError(i18n.t('exportGameError'));
+        }
+    }
+
+    async exportSavedGameImage(gameId) {
+        try {
+            const bundle = await this.buildSavedGameExportBundle(gameId);
+            const blob = await this.buildSavedGameImageBlob(bundle.game, bundle.innings);
+            const fileName = this.getSavedGameImageFileName(bundle.game);
+            const title = `${bundle.game.awayTeam || '?'} vs ${bundle.game.homeTeam || '?'}`;
+
+            if (typeof navigator.share === 'function' && typeof File !== 'undefined') {
+                const file = new File([blob], fileName, { type: 'image/png' });
+                if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+                    await navigator.share({ title, files: [file] });
+                    this.showSuccess(i18n.t('exportImageShared'));
+                    return;
+                }
+            }
+
+            this.downloadBlob(blob, fileName);
+            this.showSuccess(i18n.t('exportImageDownloaded'));
+        } catch (error) {
+            if (error?.name === 'AbortError') return;
+            console.error('画像出力エラー:', error);
             this.showError(i18n.t('exportGameError'));
         }
     }
@@ -13352,6 +13503,7 @@ class BaseballApp {
                     ${isActive ? `<button type="button" class="primary-btn load-game-btn" data-game-id="${game.id}">${i18n.t('resumeGame')}</button>` : ''}
                     <button type="button" class="secondary-btn view-game-btn" data-game-id="${game.id}">${i18n.t('viewGame')}</button>
                     <button type="button" class="secondary-btn share-game-btn" data-game-id="${game.id}">${i18n.t('shareGame')}</button>
+                    <button type="button" class="secondary-btn export-image-btn" data-game-id="${game.id}">${i18n.t('exportImage')}</button>
                     <button type="button" class="secondary-btn export-csv-btn" data-game-id="${game.id}">${i18n.t('exportCsv')}</button>
                     <button type="button" class="secondary-btn export-backup-btn" data-game-id="${game.id}">${i18n.t('exportBackupGame')}</button>
                     <button type="button" class="danger-btn delete-game-btn" data-game-id="${game.id}">${i18n.t('delete')}</button>
@@ -13525,6 +13677,11 @@ class BaseballApp {
                     await this.shareSavedGame(parseInt(e.target.dataset.gameId));
                 });
             });
+            container.querySelectorAll('.export-image-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    await this.exportSavedGameImage(parseInt(e.target.dataset.gameId));
+                });
+            });
             container.querySelectorAll('.export-csv-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     await this.exportSavedGameCsv(parseInt(e.target.dataset.gameId));
@@ -13624,6 +13781,7 @@ class BaseballApp {
             document.getElementById('gameDetailTitle').textContent =
                 `${game.awayTeam || '?'} vs ${game.homeTeam || '?'}  ${new Date(game.date).toLocaleDateString()}`;
             document.getElementById('gameDetailShareBtn').dataset.gameId = gameId;
+            document.getElementById('gameDetailExportImageBtn').dataset.gameId = gameId;
             document.getElementById('gameDetailExportCsvBtn').dataset.gameId = gameId;
             document.getElementById('gameDetailExportBackupBtn').dataset.gameId = gameId;
             document.getElementById('gameDetailModal').classList.remove('modal--hidden');
