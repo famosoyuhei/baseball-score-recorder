@@ -76,6 +76,8 @@ Marcacao rapida de beisebol para tecnicos, anotadores e organizadores de torneio
 
 - `docs/product/monitor-program.md`: 実戦モニター募集とフィードバック収集の設計
 - `docs/product/distribution-readiness.md`: PWA配布準備と将来のアプリ化判断
+- `docs/product/monitor-launch-kit.md`: 募集投稿、フォーム、WhatsApp導線の実行キット
+- `docs/product/tokyo-qualifier-field-test.md`: 東東京予選でのセルフ実戦テスト手順
 - `docs/product/south-america-nikkei-gtm.md`: 南米日系人向けの初期GTM戦略
 - `docs/product/notion-manus-posting-ops.md`: Notion投稿管理とManus最小運用の設計
 - `docs/product/competitor-swot.md`: 競合アプリ・代替手段とのSWOT分析
