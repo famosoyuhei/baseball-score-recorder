@@ -1227,6 +1227,12 @@ class BaseballApp {
         return `${date}_${teams}.baseball-game.json`;
     }
 
+    getSavedGameShareTextFileName(game) {
+        const date = game?.date ? new Date(game.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const teams = this.slugifyFileName(`${game?.awayTeam || 'away'}-vs-${game?.homeTeam || 'home'}`);
+        return `${date}_${teams}.txt`;
+    }
+
     downloadBlob(blob, fileName) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1238,28 +1244,73 @@ class BaseballApp {
         URL.revokeObjectURL(url);
     }
 
+    buildLineScoreShareText(game, innings) {
+        const sortedInnings = [...(innings || [])].sort((a, b) =>
+            a.inning !== b.inning ? a.inning - b.inning : (a.isTopHalf ? -1 : 1)
+        );
+        const reg = game?.gameRules?.regulationInnings || 9;
+        const maxInning = Math.max(reg, ...sortedInnings.map(i => i.inning || 0), 1);
+        const inningMap = {};
+        sortedInnings.forEach(inning => {
+            inningMap[`${inning.inning}-${inning.isTopHalf ? 'top' : 'bottom'}`] = inning;
+        });
+
+        const inningRuns = (isTop) => Array.from({ length: maxInning }, (_, index) => {
+            const inning = inningMap[`${index + 1}-${isTop ? 'top' : 'bottom'}`];
+            if (!inning) return '-';
+            const runs = Number.isFinite(Number(inning.runs)) ? Number(inning.runs) : 0;
+            return inning.incomplete ? `${runs}x` : String(runs);
+        });
+        const statSum = (isTop, key) => sortedInnings
+            .filter(inning => inning.isTopHalf === isTop)
+            .reduce((sum, inning) => sum + (Number(inning[key]) || 0), 0);
+        const teamLabel = (name) => String(name || '?').slice(0, 12);
+        const pad = (value, width) => String(value).padEnd(width, ' ');
+        const headers = Array.from({ length: maxInning }, (_, index) => String(index + 1));
+        const awayRuns = inningRuns(true);
+        const homeRuns = inningRuns(false);
+        const score = {
+            away: Number.isFinite(Number(game?.awayScore)) ? Number(game.awayScore) : statSum(true, 'runs'),
+            home: Number.isFinite(Number(game?.homeScore)) ? Number(game.homeScore) : statSum(false, 'runs')
+        };
+        const appUrl = window.location ? window.location.href.split('#')[0] : '';
+        const lines = [
+            i18n.t('shareGameResultTitle'),
+            '',
+            `${game?.awayTeam || '?'} ${score.away} - ${score.home} ${game?.homeTeam || '?'}`,
+            '',
+            `${pad('', 13)}${headers.join(' ')} | R H E`,
+            `${pad(teamLabel(game?.awayTeam), 13)}${awayRuns.join(' ')} | ${score.away} ${statSum(true, 'hits')} ${statSum(true, 'errors')}`,
+            `${pad(teamLabel(game?.homeTeam), 13)}${homeRuns.join(' ')} | ${score.home} ${statSum(false, 'hits')} ${statSum(false, 'errors')}`,
+            '',
+            `${i18n.t('shareGameRecordedWith')}: Baseball Score Recorder`
+        ];
+        if (appUrl) lines.push(appUrl);
+        return lines.join('\n');
+    }
+
     async shareSavedGame(gameId) {
         try {
             const bundle = await this.buildSavedGameExportBundle(gameId);
-            const fileName = this.getSavedGameExportFileName(bundle.game);
-            const json = JSON.stringify(bundle, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
+            const fileName = this.getSavedGameShareTextFileName(bundle.game);
             const title = `${bundle.game.awayTeam || '?'} vs ${bundle.game.homeTeam || '?'}`;
-            const text = i18n.t('shareGameText')
-                .replace('{away}', bundle.game.awayTeam || '?')
-                .replace('{home}', bundle.game.homeTeam || '?');
+            const text = this.buildLineScoreShareText(bundle.game, bundle.innings);
 
-            if (typeof navigator.share === 'function' && typeof File !== 'undefined') {
-                const file = new File([blob], fileName, { type: 'application/json' });
-                if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-                    await navigator.share({ title, text, files: [file] });
-                    this.showSuccess(i18n.t('shareGameReady'));
-                    return;
-                }
+            if (typeof navigator.share === 'function') {
+                await navigator.share({ title, text });
+                this.showSuccess(i18n.t('shareGameReady'));
+                return;
             }
 
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                await navigator.clipboard.writeText(text);
+                this.showSuccess(i18n.t('shareGameCopied'));
+                return;
+            }
+
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
             this.downloadBlob(blob, fileName);
-            this.showSuccess(i18n.t('shareGameDownloaded'));
+            this.showSuccess(i18n.t('shareGameTextDownloaded'));
         } catch (error) {
             console.error('試合共有エラー:', error);
             this.showError(i18n.t('shareGameError'));
