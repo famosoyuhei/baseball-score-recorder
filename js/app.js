@@ -1315,6 +1315,7 @@ class BaseballApp {
 
     buildSavedGameCsvText(bundle) {
         const game = bundle.game || {};
+        const classification = this.normalizeGameClassification(game.classification);
         const innings = [...(bundle.innings || [])].sort((a, b) =>
             a.inning !== b.inning ? a.inning - b.inning : (a.isTopHalf ? -1 : 1)
         );
@@ -1336,7 +1337,12 @@ class BaseballApp {
             ['status', game.status],
             ['recordingLevel', game.recordingLevel],
             ['recordingMode', game.recordingMode],
-            ['playerDetailLevel', game.playerDetailLevel]
+            ['playerDetailLevel', game.playerDetailLevel],
+            ['category', classification.category],
+            ['categoryLabel', this.getGameCategoryLabel(classification.category)],
+            ['folderName', classification.folderName],
+            ['tags', classification.tags.join(', ')],
+            ['memo', classification.memo]
         ].forEach(row => lines.push(this.csvRow(row)));
 
         lines.push('');
