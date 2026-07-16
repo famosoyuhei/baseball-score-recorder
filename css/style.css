@@ -6024,8 +6024,30 @@ main {
 
 /* ===== 保存試合一覧 ===== */
 .games-list-modal-content {
-    max-width: 560px;
-    width: 92%;
+    max-width: min(860px, calc(100vw - 2rem));
+    width: 94%;
+    min-width: 0;
+}
+
+.games-import-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.games-import-row .import-backup-btn {
+    flex: 0 0 auto;
+}
+
+.games-import-help {
+    flex: 1 1 260px;
+    min-width: 0;
+    color: #475569;
+    font-size: 0.86rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
 }
 
 .games-search-box {
@@ -6333,7 +6355,42 @@ main {
     padding: 1.5rem 0;
 }
 
+@media (max-width: 900px) {
+    .folder-management-panel,
+    .game-classification-editor {
+        grid-template-columns: 1fr;
+    }
+
+    .folder-management-title {
+        white-space: normal;
+    }
+
+    .rename-folder-btn,
+    .game-classification-editor .save-classification-btn {
+        width: 100%;
+        min-width: 0;
+        white-space: normal;
+    }
+}
+
 @media (max-width: 720px) {
+    .games-list-modal-content {
+        width: calc(100vw - 1rem);
+        max-width: calc(100vw - 1rem);
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+    }
+
+    .games-import-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .games-import-row .import-backup-btn {
+        width: 100%;
+    }
+
     .games-filter-row,
     .folder-management-panel,
     .game-classification-editor {
@@ -7206,4 +7263,54 @@ table,
     .modal-content {
         border-radius: 8px;
     }
+}
+
+.games-list-modal-content {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    box-shadow: 0 18px 54px rgba(15, 23, 42, 0.28);
+}
+
+.games-list-modal-content h3 {
+    color: #0f172a;
+    text-shadow: none;
+}
+
+.games-list-modal-content .secondary-btn,
+.games-list-modal-content .primary-btn,
+.games-list-modal-content .danger-btn {
+    text-shadow: none;
+}
+
+.games-list-modal-content > .close-modal {
+    width: auto;
+    height: auto;
+    line-height: 1.2;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.95rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+}
+
+.games-list-modal-content .secondary-btn {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+.games-list-modal-content .secondary-btn:hover {
+    background: #e0f2fe;
+    border-color: #38bdf8;
+}
+
+.games-list-modal-content .danger-btn {
+    color: #ffffff;
+}
+
+.games-list-modal-content input,
+.games-list-modal-content select {
+    background: #ffffff;
+    color: #1e293b;
+    box-shadow: none;
 }
