@@ -12,6 +12,7 @@
 
 - PWAなのでURLからすぐ試せる
 - オフライン利用を前提にできる
+- WhatsAppで問い合わせ、導入案内、試合結果共有までつなげやすい
 - `ja` / `en` / `es` / `pt` の4言語に対応
 - `inning` / `batter` / `pitch` で記録粒度を選べる
 - `bench` / `tv` で記録環境を選べる
@@ -63,6 +64,7 @@ Marcacao rapida de beisebol para tecnicos, anotadores e organizadores de torneio
 - モニター募集ページ
 - 1試合通し検証フォーム
 - WhatsApp Business の問い合わせリンク
+- WhatsApp共有用の試合結果テキスト
 - 英語のLP
 - スペイン語のLP
 - ポルトガル語のLP
@@ -78,6 +80,7 @@ Marcacao rapida de beisebol para tecnicos, anotadores e organizadores de torneio
 - `docs/product/distribution-readiness.md`: PWA配布準備と将来のアプリ化判断
 - `docs/product/monitor-launch-kit.md`: 募集投稿、フォーム、WhatsApp導線の実行キット
 - `docs/product/tokyo-qualifier-field-test.md`: 東東京予選でのセルフ実戦テスト手順
+- `docs/product/whatsapp-commerce-sharing-roadmap.md`: WhatsApp購入・共有導線と出力機能のロードマップ
 - `docs/product/south-america-nikkei-gtm.md`: 南米日系人向けの初期GTM戦略
 - `docs/product/notion-manus-posting-ops.md`: Notion投稿管理とManus最小運用の設計
 - `docs/product/competitor-swot.md`: 競合アプリ・代替手段とのSWOT分析
