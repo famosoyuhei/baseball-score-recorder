@@ -93,6 +93,14 @@ class BaseballApp {
             const gameId = parseInt(document.getElementById('gameDetailShareBtn').dataset.gameId, 10);
             if (gameId) this.shareSavedGame(gameId);
         });
+        document.getElementById('gameDetailExportCsvBtn').addEventListener('click', () => {
+            const gameId = parseInt(document.getElementById('gameDetailExportCsvBtn').dataset.gameId, 10);
+            if (gameId) this.exportSavedGameCsv(gameId);
+        });
+        document.getElementById('gameDetailExportBackupBtn').addEventListener('click', () => {
+            const gameId = parseInt(document.getElementById('gameDetailExportBackupBtn').dataset.gameId, 10);
+            if (gameId) this.exportSavedGameBackup(gameId);
+        });
 
         document.getElementById('appSettingsCloseBtn')?.addEventListener('click', () => {
             this.hideAppSettingsModal();
@@ -1233,6 +1241,12 @@ class BaseballApp {
         return `${date}_${teams}.txt`;
     }
 
+    getSavedGameCsvFileName(game) {
+        const date = game?.date ? new Date(game.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const teams = this.slugifyFileName(`${game?.awayTeam || 'away'}-vs-${game?.homeTeam || 'home'}`);
+        return `${date}_${teams}.csv`;
+    }
+
     downloadBlob(blob, fileName) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1287,6 +1301,113 @@ class BaseballApp {
         ];
         if (appUrl) lines.push(appUrl);
         return lines.join('\n');
+    }
+
+    csvValue(value) {
+        if (value === null || value === undefined) return '';
+        const text = String(value).replace(/\r?\n/g, ' ');
+        return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
+
+    csvRow(values) {
+        return values.map(value => this.csvValue(value)).join(',');
+    }
+
+    buildSavedGameCsvText(bundle) {
+        const game = bundle.game || {};
+        const innings = [...(bundle.innings || [])].sort((a, b) =>
+            a.inning !== b.inning ? a.inning - b.inning : (a.isTopHalf ? -1 : 1)
+        );
+        const atBats = [...(bundle.atBats || [])].sort((a, b) =>
+            (a.inningId || 0) - (b.inningId || 0) || (a.createdAt || a.id || 0) - (b.createdAt || b.id || 0)
+        );
+        const inningById = new Map(innings.map(inning => [inning.id, inning]));
+        const lines = [];
+
+        lines.push('game_summary');
+        lines.push(this.csvRow(['field', 'value']));
+        [
+            ['exportedAt', bundle.exportedAt],
+            ['date', game.date],
+            ['awayTeam', game.awayTeam],
+            ['homeTeam', game.homeTeam],
+            ['awayScore', game.awayScore],
+            ['homeScore', game.homeScore],
+            ['status', game.status],
+            ['recordingLevel', game.recordingLevel],
+            ['recordingMode', game.recordingMode],
+            ['playerDetailLevel', game.playerDetailLevel]
+        ].forEach(row => lines.push(this.csvRow(row)));
+
+        lines.push('');
+        lines.push('inning_linescore');
+        lines.push(this.csvRow(['inning', 'half', 'team', 'runs', 'hits', 'errors', 'incomplete']));
+        innings.forEach(inning => {
+            const isTop = inning.isTopHalf === true;
+            lines.push(this.csvRow([
+                inning.inning,
+                isTop ? 'top' : 'bottom',
+                isTop ? game.awayTeam : game.homeTeam,
+                inning.runs || 0,
+                inning.hits || 0,
+                inning.errors || 0,
+                inning.incomplete ? 'true' : 'false'
+            ]));
+        });
+
+        lines.push('');
+        lines.push('at_bats');
+        lines.push(this.csvRow([
+            'inning', 'half', 'team', 'battingOrder', 'playerId', 'result',
+            'resultDetail', 'runsScored', 'rbi', 'outs', 'createdAt'
+        ]));
+        atBats.forEach(atBat => {
+            const inning = inningById.get(atBat.inningId);
+            const isTop = inning?.isTopHalf === true;
+            lines.push(this.csvRow([
+                inning?.inning || '',
+                inning ? (isTop ? 'top' : 'bottom') : '',
+                inning ? (isTop ? game.awayTeam : game.homeTeam) : '',
+                atBat.battingOrder,
+                atBat.playerId,
+                atBat.result,
+                atBat.resultDetail,
+                atBat.runsScored || 0,
+                atBat.rbi || 0,
+                atBat.outs || 0,
+                atBat.createdAt || ''
+            ]));
+        });
+
+        return lines.join('\r\n');
+    }
+
+    async exportSavedGameBackup(gameId) {
+        try {
+            const bundle = await this.buildSavedGameExportBundle(gameId);
+            const fileName = this.getSavedGameExportFileName(bundle.game);
+            const json = JSON.stringify(bundle, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            this.downloadBlob(blob, fileName);
+            this.showSuccess(i18n.t('exportBackupDownloaded'));
+        } catch (error) {
+            console.error('JSONバックアップ出力エラー:', error);
+            this.showError(i18n.t('exportGameError'));
+        }
+    }
+
+    async exportSavedGameCsv(gameId) {
+        try {
+            const bundle = await this.buildSavedGameExportBundle(gameId);
+            const fileName = this.getSavedGameCsvFileName(bundle.game);
+            const csv = this.buildSavedGameCsvText(bundle);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            this.downloadBlob(blob, fileName);
+            this.showSuccess(i18n.t('exportCsvDownloaded'));
+        } catch (error) {
+            console.error('CSV出力エラー:', error);
+            this.showError(i18n.t('exportGameError'));
+        }
     }
 
     async shareSavedGame(gameId) {
@@ -13126,6 +13247,8 @@ class BaseballApp {
                     ${isActive ? `<button type="button" class="primary-btn load-game-btn" data-game-id="${game.id}">${i18n.t('resumeGame')}</button>` : ''}
                     <button type="button" class="secondary-btn view-game-btn" data-game-id="${game.id}">${i18n.t('viewGame')}</button>
                     <button type="button" class="secondary-btn share-game-btn" data-game-id="${game.id}">${i18n.t('shareGame')}</button>
+                    <button type="button" class="secondary-btn export-csv-btn" data-game-id="${game.id}">${i18n.t('exportCsv')}</button>
+                    <button type="button" class="secondary-btn export-backup-btn" data-game-id="${game.id}">${i18n.t('exportBackupGame')}</button>
                     <button type="button" class="danger-btn delete-game-btn" data-game-id="${game.id}">${i18n.t('delete')}</button>
                 </div>
             </div>`;
@@ -13277,6 +13400,16 @@ class BaseballApp {
                     await this.shareSavedGame(parseInt(e.target.dataset.gameId));
                 });
             });
+            container.querySelectorAll('.export-csv-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    await this.exportSavedGameCsv(parseInt(e.target.dataset.gameId));
+                });
+            });
+            container.querySelectorAll('.export-backup-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    await this.exportSavedGameBackup(parseInt(e.target.dataset.gameId));
+                });
+            });
             container.querySelectorAll('.save-classification-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const button = e.target;
@@ -13366,6 +13499,8 @@ class BaseballApp {
             document.getElementById('gameDetailTitle').textContent =
                 `${game.awayTeam || '?'} vs ${game.homeTeam || '?'}  ${new Date(game.date).toLocaleDateString()}`;
             document.getElementById('gameDetailShareBtn').dataset.gameId = gameId;
+            document.getElementById('gameDetailExportCsvBtn').dataset.gameId = gameId;
+            document.getElementById('gameDetailExportBackupBtn').dataset.gameId = gameId;
             document.getElementById('gameDetailModal').classList.remove('modal--hidden');
         } catch (err) {
             console.error('試合詳細取得エラー:', err);
