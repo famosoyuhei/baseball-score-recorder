@@ -60,6 +60,9 @@ Marcacao rapida de beisebol para tecnicos, anotadores e organizadores de torneio
 
 ## 販売前に必要な素材
 
+- モニター募集ページ
+- 1試合通し検証フォーム
+- WhatsApp Business の問い合わせリンク
 - 英語のLP
 - スペイン語のLP
 - ポルトガル語のLP
@@ -71,6 +74,8 @@ Marcacao rapida de beisebol para tecnicos, anotadores e organizadores de torneio
 
 ## 関連ドキュメント
 
+- `docs/product/monitor-program.md`: 実戦モニター募集とフィードバック収集の設計
+- `docs/product/distribution-readiness.md`: PWA配布準備と将来のアプリ化判断
 - `docs/product/south-america-nikkei-gtm.md`: 南米日系人向けの初期GTM戦略
 - `docs/product/notion-manus-posting-ops.md`: Notion投稿管理とManus最小運用の設計
 - `docs/product/competitor-swot.md`: 競合アプリ・代替手段とのSWOT分析
