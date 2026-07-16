@@ -6,6 +6,8 @@
 
 通信が不安定な現場でも使える、多言語対応の軽量な野球スコア記録PWA。
 
+初期販売検証では、米国本土の大型競合と正面衝突せず、南米の日系野球コミュニティを優先する。特にブラジル日系野球とペルー日系野球を最初の検証先とし、WhatsApp Business、Facebook、Instagram を中心に問い合わせ導線を作る。
+
 ## 主な差別化
 
 - PWAなのでURLからすぐ試せる
@@ -45,6 +47,9 @@ Marcacao rapida de beisebol para tecnicos, anotadores e organizadores de torneio
 
 ## 初期掲載先
 
+- 南米の日系野球チーム、日系会館、県人会、文化協会のFacebookページ/グループ
+- ブラジル、ペルーの日系野球コミュニティ向けInstagram
+- WhatsApp Business の問い合わせ導線
 - Apple App Store / Google Play への将来的な展開
 - PWAとしての公式LP
 - ABCAなどコーチ向けコミュニティ
@@ -66,5 +71,7 @@ Marcacao rapida de beisebol para tecnicos, anotadores e organizadores de torneio
 
 ## 関連ドキュメント
 
+- `docs/product/south-america-nikkei-gtm.md`: 南米日系人向けの初期GTM戦略
+- `docs/product/notion-manus-posting-ops.md`: Notion投稿管理とManus最小運用の設計
 - `docs/product/competitor-swot.md`: 競合アプリ・代替手段とのSWOT分析
 - `docs/product/target-users.md`: ターゲットユーザー別の訴求整理

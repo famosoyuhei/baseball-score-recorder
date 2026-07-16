@@ -61,6 +61,8 @@ PWAとして完成度を上げる際に、誰のための改善かを判断す�
 
 | 地域 | 主な訴求 | 注意点 |
 |---|---|---|
+| ブラジル日系野球 | pt-BR, comunidade nikkei, beisebol, WhatsApp, Facebook | 日本語メインにせず、ポルトガル語を主軸にする |
+| ペルー日系野球 | es-LATAM, comunidad nikkei, beisbol, WhatsApp, Facebook | 日系性は信頼補助に使い、実用価値を先に伝える |
 | 米国・カナダ | Fast scorekeeping, offline, coach-friendly | GameChangerとの差別化が必要 |
 | メキシコ・中米・カリブ | Espanol, uso rapido, sin instalacion obligatoria | スペイン語の野球用語統一 |
 | 南米スペイン語圏 | anotacion, marcador, beisbol amateur | 国ごとの用語差 |
