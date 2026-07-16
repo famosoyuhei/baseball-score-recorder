@@ -1416,6 +1416,105 @@ class BaseballApp {
         }
     }
 
+    cloneForImport(value) {
+        return JSON.parse(JSON.stringify(value || {}));
+    }
+
+    async importSavedGameBackupFile(file) {
+        try {
+            if (!file) return;
+            const text = await file.text();
+            const bundle = JSON.parse(text);
+            if (!bundle || bundle.format !== 'baseball-score-game-export' || !bundle.game) {
+                throw new Error('Invalid backup file');
+            }
+            const importedGameId = await this.importSavedGameBackupBundle(bundle);
+            this.showSuccess(i18n.t('importBackupDone'));
+            return importedGameId;
+        } catch (error) {
+            console.error('バックアップ復元エラー:', error);
+            this.showError(i18n.t('importBackupError'));
+            return null;
+        }
+    }
+
+    async importSavedGameBackupBundle(bundle) {
+        const game = this.cloneForImport(bundle.game);
+        const oldGameId = game.id;
+        delete game.id;
+        game.importedAt = new Date().toISOString();
+        game.importedFrom = {
+            format: bundle.format,
+            formatVersion: bundle.formatVersion || 1,
+            exportedAt: bundle.exportedAt || ''
+        };
+        game.date = game.date || new Date().toISOString();
+
+        const inningIdMap = new Map();
+        const atBatIdMap = new Map();
+        const newGameId = await storage.saveGame(game);
+
+        const sortedInnings = [...(bundle.innings || [])].sort((a, b) =>
+            a.inning !== b.inning ? a.inning - b.inning : (a.isTopHalf ? -1 : 1)
+        );
+        for (const originalInning of sortedInnings) {
+            const oldInningId = originalInning.id;
+            const inning = this.cloneForImport(originalInning);
+            delete inning.id;
+            inning.gameId = newGameId;
+            const newInningId = await storage.saveInning(inning);
+            if (oldInningId !== undefined && oldInningId !== null) {
+                inningIdMap.set(oldInningId, newInningId);
+            }
+        }
+
+        const sortedAtBats = [...(bundle.atBats || [])].sort((a, b) =>
+            (a.inningId || 0) - (b.inningId || 0) || (a.createdAt || a.id || 0) - (b.createdAt || b.id || 0)
+        );
+        for (const originalAtBat of sortedAtBats) {
+            const oldAtBatId = originalAtBat.id;
+            const atBat = this.cloneForImport(originalAtBat);
+            delete atBat.id;
+            atBat.gameId = newGameId;
+            if (inningIdMap.has(originalAtBat.inningId)) {
+                atBat.inningId = inningIdMap.get(originalAtBat.inningId);
+            }
+            const newAtBatId = await storage.saveAtBat(atBat);
+            if (oldAtBatId !== undefined && oldAtBatId !== null) {
+                atBatIdMap.set(oldAtBatId, newAtBatId);
+            }
+        }
+
+        const sortedPitches = [...(bundle.pitches || [])].sort((a, b) =>
+            (a.atBatId || 0) - (b.atBatId || 0) || (a.pitchNumber || a.id || 0) - (b.pitchNumber || b.id || 0)
+        );
+        for (const originalPitch of sortedPitches) {
+            const pitch = this.cloneForImport(originalPitch);
+            delete pitch.id;
+            pitch.gameId = newGameId;
+            if (atBatIdMap.has(originalPitch.atBatId)) {
+                pitch.atBatId = atBatIdMap.get(originalPitch.atBatId);
+            }
+            await storage.savePitch(pitch);
+        }
+
+        const savedGame = await storage.loadGame(newGameId);
+        if (Array.isArray(savedGame?.innings)) {
+            savedGame.innings = savedGame.innings.map(inning => {
+                const next = { ...inning, gameId: newGameId };
+                if (inningIdMap.has(inning.id)) next.id = inningIdMap.get(inning.id);
+                return next;
+            });
+            await storage.saveGame(savedGame);
+        }
+
+        if (oldGameId && gameManager.currentGame?.id === oldGameId) {
+            gameManager.currentGame.id = newGameId;
+        }
+
+        return newGameId;
+    }
+
     async shareSavedGame(gameId) {
         try {
             const bundle = await this.buildSavedGameExportBundle(gameId);
@@ -13284,6 +13383,11 @@ class BaseballApp {
         modal.innerHTML = `
             <div class="modal-content games-list-modal-content">
                 <h3>${i18n.t('savedGamesTitle')}</h3>
+                <div class="games-import-row">
+                    <button type="button" class="secondary-btn import-backup-btn">${this.escapeHtml(i18n.t('importBackupGame'))}</button>
+                    <input type="file" class="import-backup-input" accept="application/json,.json" hidden>
+                    <span class="games-import-help">${this.escapeHtml(i18n.t('importBackupHelp'))}</span>
+                </div>
                 <div class="games-filter-row">
                     <input type="search" class="games-search-box" placeholder="${this.escapeHtml(i18n.t('searchGamesPlaceholder'))}">
                     <select class="games-category-filter" aria-label="${this.escapeHtml(i18n.t('filterByCategory'))}">
@@ -13344,6 +13448,20 @@ class BaseballApp {
         searchBox.addEventListener('input', applyFilters);
         categoryFilter.addEventListener('change', applyFilters);
         folderFilter.addEventListener('input', applyFilters);
+
+        const importButton = modal.querySelector('.import-backup-btn');
+        const importInput = modal.querySelector('.import-backup-input');
+        importButton.addEventListener('click', () => {
+            importInput.value = '';
+            importInput.click();
+        });
+        importInput.addEventListener('change', async () => {
+            const importedGameId = await this.importSavedGameBackupFile(importInput.files?.[0]);
+            if (!importedGameId) return;
+            document.body.removeChild(modal);
+            this.showGamesModal(await storage.getAllGames());
+            this.loadActiveGamesOnWelcome();
+        });
 
         const renameCategory = modal.querySelector('.rename-folder-category');
         const renameFrom = modal.querySelector('.rename-folder-from');
