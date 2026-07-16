@@ -6416,6 +6416,20 @@ main {
     flex-direction: column;
 }
 
+.game-detail-modal-content .modal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.6rem;
+}
+
+.game-detail-modal-content .modal-footer button {
+    flex: 1 1 7.5rem;
+    min-width: 7.5rem;
+    max-width: 11rem;
+    white-space: normal;
+}
+
 .game-detail-header {
     display: flex;
     align-items: center;
