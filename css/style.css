@@ -7425,6 +7425,12 @@ button.disabled,
     transform: none !important;
 }
 
+.undo-btn.at-bat-undo-blocked {
+    opacity: 0.28;
+    outline: 2px dashed rgba(151, 169, 188, 0.24);
+    outline-offset: -5px;
+}
+
 .pitch-result-btn,
 .at-bat-result-btn,
 .baserunning-btn {

@@ -8951,6 +8951,7 @@ class BaseballApp {
 
         // 走者プレーセクション更新
         this.updateBaserunningSection();
+        this._updatePitchUndoBtn();
     }
 
     updateBaserunningSection() {
@@ -12950,6 +12951,12 @@ class BaseballApp {
 
     _updatePitchUndoBtn() {
         const btn = document.getElementById('undoLastPitch');
+        const atBatUndoBtn = document.getElementById('undoLastAtBatBtn');
+
+        if (atBatUndoBtn) {
+            this._updatePitchAtBatUndoBtn(atBatUndoBtn);
+        }
+
         if (!btn) return;
         const history = this.pitchActionHistory;
         if (!history?.length) {
@@ -12971,6 +12978,32 @@ class BaseballApp {
                 pickoff_safe: '牽制帰塁', pickoff_out: '牽制死', balk: 'ボーク'
             };
             btn.textContent = `取消: ${labelMap[last.playType] ?? last.playType}`;
+        }
+    }
+
+    async _updatePitchAtBatUndoBtn(btn = document.getElementById('undoLastAtBatBtn')) {
+        if (!btn) return;
+
+        const atBatInProgress = !!gameManager.currentAtBat;
+        if (atBatInProgress) {
+            btn.disabled = true;
+            btn.classList.add('at-bat-undo-blocked');
+            btn.setAttribute('aria-disabled', 'true');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.classList.add('at-bat-undo-blocked');
+        btn.setAttribute('aria-disabled', 'true');
+
+        try {
+            const atBats = await gameManager.getAllAtBats();
+            const canUndoAtBat = atBats.length > 0 && !gameManager.currentAtBat;
+            btn.disabled = !canUndoAtBat;
+            btn.classList.toggle('at-bat-undo-blocked', !canUndoAtBat);
+            btn.setAttribute('aria-disabled', canUndoAtBat ? 'false' : 'true');
+        } catch (error) {
+            console.warn('前打席に戻すボタン状態の更新に失敗:', error);
         }
     }
 
