@@ -676,14 +676,16 @@ main {
 }
 
 .game-controls {
-    position: fixed;
-    bottom: 1rem;
-    left: 1rem;
-    right: 1rem;
+    position: relative;
+    bottom: auto;
+    left: auto;
+    right: auto;
     display: flex;
+    flex-direction: column;
     gap: 1rem;
     justify-content: center;
-    z-index: 100;
+    z-index: 1;
+    margin: 1.5rem 0 0;
 }
 
 .youtube-setup-group .checkbox-label {
@@ -1780,9 +1782,9 @@ main {
     font-weight: bold;
 }
 
-.pitch-type-section,
 .pitch-input-section,
 .pitch-result-section,
+.baserunning-section,
 .pitch-history,
 .at-bat-completion {
     background: white;
@@ -1792,9 +1794,9 @@ main {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.pitch-type-section h4,
 .pitch-input-section h4,
 .pitch-result-section h4,
+.baserunning-section h4,
 .pitch-history h4,
 .at-bat-completion h4 {
     color: #1976d2;
@@ -1811,22 +1813,24 @@ main {
 .pitch-result-buttons,
 .at-bat-result-buttons {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
 }
 
 .pitch-result-btn,
 .at-bat-result-btn {
-    background-color: #f8f9fa;
-    border: 2px solid #e9ecef;
-    color: #495057;
-    padding: 0.75rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.9rem;
+    background: linear-gradient(180deg, #ffffff 0%, #edf4fb 100%);
+    border: 2px solid #b8c6d4;
+    color: #25313b;
+    padding: 0.9rem 0.75rem;
+    border-radius: 6px;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.2s;
     text-align: center;
-    font-weight: 500;
+    font-weight: 700;
+    min-height: 52px;
+    box-shadow: 0 4px 0 #94a3b8, inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 .pitch-result-btn:hover,
@@ -1834,14 +1838,17 @@ main {
     background-color: #e3f2fd;
     border-color: #1976d2;
     color: #1976d2;
+    transform: translateY(-1px);
 }
 
 .pitch-result-btn.selected,
 .at-bat-result-btn.selected {
-    background-color: #1976d2;
+    background: linear-gradient(180deg, #2196f3 0%, #1565c0 100%);
     border-color: #1976d2;
     color: white;
     font-weight: bold;
+    box-shadow: 0 2px 0 #0d47a1, inset 0 2px 5px rgba(0, 0, 0, 0.26);
+    transform: translateY(2px);
 }
 
 .optional-label {
@@ -1886,6 +1893,58 @@ main {
     gap: 1rem;
     justify-content: center;
     margin-bottom: 1rem;
+}
+
+.baserunning-section[hidden] {
+    display: none;
+}
+
+.baserunning-controls {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.runner-actions {
+    display: grid;
+    grid-template-columns: minmax(110px, auto) minmax(180px, 1fr);
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.runner-actions select {
+    min-height: 48px;
+    border: 2px solid #b8c6d4;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    background: #ffffff;
+    color: #25313b;
+}
+
+.baserunning-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 0.75rem;
+}
+
+.baserunning-btn {
+    min-height: 52px;
+    border: 2px solid #b8c6d4;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #ffffff 0%, #edf4fb 100%);
+    color: #25313b;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #94a3b8, inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.baserunning-btn.selected {
+    background: linear-gradient(180deg, #10b981 0%, #047857 100%);
+    border-color: #10b981;
+    color: #ffffff;
+    box-shadow: 0 2px 0 #065f46, inset 0 2px 5px rgba(0, 0, 0, 0.24);
+    transform: translateY(2px);
 }
 
 .pitch-history-list {
@@ -7327,4 +7386,115 @@ table,
     background: #ffffff;
     color: #1e293b;
     box-shadow: none;
+}
+
+/* Field-use hardening: keep controls in flow and make button states unmistakable. */
+.game-controls {
+    position: relative;
+    inset: auto;
+    z-index: 1;
+    margin: 1.5rem 0 0;
+    padding: 0.75rem;
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    border-radius: 8px;
+    background: rgba(2, 12, 24, 0.78);
+}
+
+.control-row {
+    align-items: stretch;
+}
+
+.control-row button,
+.pitch-controls button,
+.baserunning-controls button {
+    min-height: 48px;
+}
+
+button:disabled,
+button.disabled,
+.count-btn:disabled,
+.warning-btn:disabled,
+.warning-btn.disabled {
+    opacity: 0.42;
+    color: rgba(248, 252, 255, 0.55) !important;
+    border-color: rgba(151, 169, 188, 0.28) !important;
+    background: rgba(17, 24, 39, 0.7) !important;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.42) !important;
+    cursor: not-allowed !important;
+    filter: grayscale(0.8);
+    transform: none !important;
+}
+
+.pitch-result-btn,
+.at-bat-result-btn,
+.baserunning-btn {
+    color: #25313b;
+    text-shadow: none;
+}
+
+.current-batter-info,
+.pitch-count-display,
+.pitch-result-section,
+.baserunning-section,
+.pitch-history,
+.at-bat-completion {
+    color: #25313b;
+    text-shadow: none;
+}
+
+.pitch-result-section h4,
+.baserunning-section h4,
+.pitch-history h4,
+.at-bat-completion h4,
+.current-batter-info h4 {
+    color: #1565c0;
+    text-shadow: none;
+}
+
+.pitch-count-display label,
+.baserunning-section label,
+.at-bat-completion label {
+    color: #475569;
+    text-shadow: none;
+}
+
+.count-dot.ball.active {
+    color: var(--stadium-green);
+}
+
+.count-dot.strike.active {
+    color: var(--stadium-red);
+}
+
+.out-dot.active {
+    background: #ff9800;
+    border-color: #ffd180;
+    color: #ff9800;
+}
+
+@media (max-width: 900px) {
+    .game-controls {
+        padding: 0.5rem;
+    }
+
+    .control-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .control-row button {
+        width: 100%;
+        padding-inline: 0.5rem;
+    }
+}
+
+@media (max-width: 560px) {
+    .control-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .runner-actions {
+        grid-template-columns: 1fr;
+    }
 }

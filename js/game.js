@@ -294,7 +294,7 @@ class GameManager {
         }
     }
 
-    async recordAtBatResult(result, resultDetail = '', runs = 0, rbis = 0, earnedRuns = null) {
+    async recordAtBatResult(result, resultDetail = '', runs = 0, rbis = 0, earnedRuns = null, options = {}) {
         if (!this.currentAtBat) {
             throw new Error('打席が開始されていません');
         }
@@ -316,7 +316,7 @@ class GameManager {
         this.updatePlayerStats(this.currentAtBat.playerId, result, runs, rbis);
         this.updatePitcherStats(result);
 
-        if (this.isOutResult(result)) {
+        if (this.isOutResult(result) && !options.outsAlreadyApplied) {
             // アウトカウント増加
             if (result.includes('double_play')) {
                 this.currentGame.outs += 2;
@@ -1573,6 +1573,12 @@ class GameManager {
         if (!this.currentGame) return;
 
         const team = this.currentGame.isTopHalf ? 'away' : 'home';
+        this.advanceBattingOrderForTeam(team);
+    }
+
+    advanceBattingOrderForTeam(team) {
+        if (!this.currentGame || !['home', 'away'].includes(team)) return;
+
         this.currentBattingOrder[team] = (this.currentBattingOrder[team] % 9) + 1;
     }
 
