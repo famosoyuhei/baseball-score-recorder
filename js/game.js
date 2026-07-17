@@ -2037,8 +2037,13 @@ class GameManager {
 
         const allAtBats = [];
 
-        // 全イニングから打席を収集
-        for (const inning of this.currentGame.innings) {
+        // 全イニングから打席を収集。進行中の currentInning は innings 配列へ入る前なので含める。
+        const innings = [...(this.currentGame.innings || [])];
+        if (this.currentInning?.id && !innings.some(inning => inning.id === this.currentInning.id)) {
+            innings.push(this.currentInning);
+        }
+
+        for (const inning of innings) {
             if (inning.id) {
                 const atBats = await storage.getAtBatsByInning(inning.id);
 
