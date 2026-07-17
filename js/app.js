@@ -8787,21 +8787,6 @@ class BaseballApp {
                     </div>
                 </div>
 
-                <div class="pitch-type-section">
-                    <h4>球種<span class="optional-label">（任意）</span></h4>
-                    <div class="pitch-type-buttons">
-                        <button class="pitch-type-btn" data-type="直球">直球</button>
-                        <button class="pitch-type-btn" data-type="スライダー">スラ</button>
-                        <button class="pitch-type-btn" data-type="カーブ">カーブ</button>
-                        <button class="pitch-type-btn" data-type="フォーク">フォーク</button>
-                        <button class="pitch-type-btn" data-type="チェンジアップ">チェンジ</button>
-                        <button class="pitch-type-btn" data-type="カットボール">カット</button>
-                        <button class="pitch-type-btn" data-type="シュート">シュート</button>
-                        <button class="pitch-type-btn" data-type="ツーシーム">2シーム</button>
-                        <button class="pitch-type-btn" data-type="シンカー">シンカー</button>
-                    </div>
-                </div>
-
                 <div class="pitch-result-section">
                     <h4 data-i18n="pitchResult">投球結果</h4>
                     <div class="pitch-result-buttons">
@@ -8816,8 +8801,8 @@ class BaseballApp {
                     </div>
                 </div>
 
-                <div class="baserunning-section" id="baserunningSection" style="display: none;">
-                    <h4>走者プレー</h4>
+                <div class="baserunning-section" id="baserunningSection" hidden>
+                    <h4 data-i18n="runner_play_category">走者プレー</h4>
                     <div class="baserunning-controls">
                         <div class="runner-actions">
                             <label>走者を選択:</label>
@@ -8828,7 +8813,7 @@ class BaseballApp {
                         <div class="baserunning-buttons">
                             <button class="baserunning-btn" data-play="steal_success">盗塁成功</button>
                             <button class="baserunning-btn" data-play="steal_failure">盗塁死</button>
-                            <button class="baserunning-btn" data-play="pickoff_safe">牽制帰塁</button>
+                            <button class="baserunning-btn" data-play="pickoff_safe" data-i18n="pickoff_safe">牽制セーフ</button>
                             <button class="baserunning-btn" data-play="pickoff_out">牽制死</button>
                             <button class="baserunning-btn" data-play="balk">ボーク</button>
                         </div>
@@ -8978,7 +8963,7 @@ class BaseballApp {
         const hasRunners = runners.first || runners.second || runners.third;
 
         if (hasRunners) {
-            section.style.display = 'block';
+            section.hidden = false;
 
             // 走者選択肢を更新
             runnerSelect.innerHTML = `<option value="">${i18n.t('selectPlaceholder')}</option>`;
@@ -8993,7 +8978,7 @@ class BaseballApp {
                 runnerSelect.innerHTML += `<option value="third">${i18n.t('thirdBaseRunner')}</option>`;
             }
         } else {
-            section.style.display = 'none';
+            section.hidden = true;
         }
     }
 
@@ -9887,6 +9872,8 @@ class BaseballApp {
     }
 
     async finalizeAtBat(result, resultDetail, advancement, batter) {
+        const battingTeam = gameManager.currentGame.isTopHalf ? 'away' : 'home';
+
         // 自責点・責任走者計算のために進塁前の走者状態を保存
         const oldRunners = { ...gameManager.currentGame.runnersOnBase };
         const oldEarnedStatus = { ...(gameManager.currentGame.runnersEarnedStatus || { first: true, second: true, third: true }) };
@@ -9930,7 +9917,15 @@ class BaseballApp {
         }
 
         // 打席結果記録（自責点数を含む）
-        await gameManager.recordAtBatResult(result, finalResultDetail, advancement.runsScored, advancement.runsScored, earnedRunsScored);
+        const outsAppliedByAdvancement = Number(advancement.outsAdded || 0) > 0;
+        await gameManager.recordAtBatResult(
+            result,
+            finalResultDetail,
+            advancement.runsScored,
+            advancement.runsScored,
+            earnedRunsScored,
+            { outsAlreadyApplied: outsAppliedByAdvancement }
+        );
 
         // リアルタイムUI: プレー履歴に追加
         if (window.realtimeUI && batter) {
@@ -9951,13 +9946,15 @@ class BaseballApp {
             }
         }
 
-        // 3アウトチェック
-        if (gameManager.currentGame.outs >= 3) {
+        // 3アウトチェック。recordAtBatResult() がアウトを加算しない経路ではここで半イニングを閉じる。
+        if (outsAppliedByAdvancement &&
+            gameManager.currentGame.outs >= 3 &&
+            gameManager.currentGame.isTopHalf === (battingTeam === 'away')) {
             await gameManager.endHalfInning();
         }
 
-        // 打順進行
-        gameManager.advanceBattingOrder();
+        // 打順進行。半イニング終了後でも、打っていたチームだけを進める。
+        gameManager.advanceBattingOrderForTeam(battingTeam);
 
         // 表示更新
         this.updateGameDisplay();
