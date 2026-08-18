@@ -14663,7 +14663,7 @@ class BaseballApp {
                     ${isHit ? this.generateHitRunnerSelections(result, currentRunners) :
                       result === 'groundout' ? this.generateGroundoutRunnerSelections(currentRunners) :
                       (result === 'flyout' || result === 'lineout') ? this.generateTagUpRunnerSelections(currentRunners) :
-                      (result === 'strikeout' && this.selectedDroppedThird === 'yes') ? this.generateDroppedThirdStrikeSelections(currentRunners) :
+                      (result === 'strikeout_passed_ball' || (result === 'strikeout' && this.selectedDroppedThird === 'yes')) ? this.generateDroppedThirdStrikeSelections(currentRunners) :
                       this.generateGenericRunnerSelections(result, currentRunners, advancement)}
                 </div>
 

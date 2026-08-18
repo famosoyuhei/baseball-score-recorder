@@ -794,7 +794,7 @@ class GameManager {
             if (result === 'sacrifice_fly') {
                 player.stats.sacrificeFlies = (player.stats.sacrificeFlies || 0) + 1;
             }
-            if (result === 'strikeout') {
+            if (result === 'strikeout' || result === 'strikeout_passed_ball') {
                 player.stats.strikeouts++;
             }
             if (result === 'ground_double_play' || result === 'fly_double_play' || result === 'liner_double_play') {
@@ -827,7 +827,8 @@ class GameManager {
 
             // 奪三振
             if (result === 'strikeout' || result === 'strikeout_looking' ||
-                result === 'strikeout_swinging' || result === 'strikeout_bunt') {
+                result === 'strikeout_swinging' || result === 'strikeout_bunt' ||
+                result === 'strikeout_passed_ball') {
                 pitcher.stats.strikeoutsPitched++;
             }
 
@@ -931,7 +932,8 @@ class GameManager {
 
         // 奪三振
         if (result === 'strikeout' || result === 'strikeout_looking' ||
-            result === 'strikeout_swinging' || result === 'strikeout_bunt') {
+            result === 'strikeout_swinging' || result === 'strikeout_bunt' ||
+            result === 'strikeout_passed_ball') {
             pitcher.stats.strikeoutsPitched++;
         }
 
@@ -1791,6 +1793,19 @@ class GameManager {
                 batterResult = 'out';
                 break;
 
+            case 'strikeout_passed_ball':
+                // 三振+振り逃げ（捕逸・暴投）：他の走者は一旦そのまま、詳細はモーダルで手動調整
+                newRunners.first = currentRunners.first;
+                newRunners.second = currentRunners.second;
+                newRunners.third = currentRunners.third;
+                if (!currentRunners.first) {
+                    newRunners.first = 'batter';
+                    batterResult = 1;
+                } else {
+                    batterResult = 'out';
+                }
+                break;
+
             case 'fielders_choice':
                 // 野選：打者走者は通常1塁到達、アウト/進塁した走者は手動調整で指定する
                 newRunners.first = 'batter';
@@ -1820,6 +1835,11 @@ class GameManager {
     isComplexSituation(atBatResult, currentRunners) {
         // 安打は常に手動選択が必要
         if (['single', 'double', 'triple', 'homerun'].includes(atBatResult)) {
+            return true;
+        }
+
+        // 三振+振り逃げ：打者の生死・走者の進塁は毎回手動判断が必要
+        if (atBatResult === 'strikeout_passed_ball') {
             return true;
         }
 
@@ -2307,7 +2327,7 @@ class GameManager {
         }
 
         // 三振
-        if (result === 'strikeout') {
+        if (result === 'strikeout' || result === 'strikeout_passed_ball') {
             player.stats.strikeouts++;
         }
 
