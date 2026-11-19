@@ -4656,31 +4656,56 @@ class BaseballApp {
         // 盗塁・牽制の実行
         console.log(`Runner play: ${playKey} - ${runner} - ${result}`);
 
-        // アウトになる結果の場合、アウトカウントを増やす
-        if (result.includes('out')) {
-            const previousOuts = gameManager.currentGame.outs;
-            gameManager.currentGame.outs++;
+        const runners = gameManager.currentGame.runnersOnBase;
+        const runnerId = runners[runner];
+        const previousOuts = gameManager.currentGame.outs;
 
-            // 3アウトチェンジ判定
-            if (gameManager.currentGame.outs >= 3) {
-                // 打席継続フラグを立てる
-                gameManager.currentGame.batterContinuesNextInning = true;
-
-                await gameManager.saveGame();
-                this.updateGameDisplay();
-
-                this.showSuccess(`${i18n.t(result)} を記録しました（3アウトチェンジ、打席継続）`);
-
-                // イニング終了処理
-                await gameManager.endHalfInning();
-                this.updateCurrentInningDisplay();
-                this.loadInningHistory();
-                return;
+        // 結果に応じて塁状況とアウトを更新する
+        // （打席フロー側の processBaserunningPlay と同じ処理に統一、2026-11-19 修正）
+        if (result === 'steal_success') {
+            if (!runnerId) return;
+            runners[runner] = null;
+            if (runner === 'first') {
+                runners.second = runnerId;
+                gameManager.moveRunnerEarnedStatus('first', 'second');
+                gameManager.moveRunnerResponsiblePitcher('first', 'second');
+            } else if (runner === 'second') {
+                runners.third = runnerId;
+                gameManager.moveRunnerEarnedStatus('second', 'third');
+                gameManager.moveRunnerResponsiblePitcher('second', 'third');
+            } else if (runner === 'third') {
+                // ホームスチール（得点）
+                const wasEarned = gameManager.moveRunnerEarnedStatus('third', null);
+                gameManager.moveRunnerResponsiblePitcher('third', null);
+                const virtualOuts = (gameManager.currentInning && gameManager.currentInning.virtualOuts) || 0;
+                gameManager.addRuns(1, (wasEarned && virtualOuts < 3) ? 1 : 0);
             }
+        } else if (result === 'steal_failure' || result === 'pickoff_out') {
+            if (!runnerId) return;
+            runners[runner] = null;
+            gameManager.currentGame.outs++;
         }
+        // pickoff_safe は帰塁のみで状況変化なし
 
-        // 走者の塁を更新（成功の場合）
-        // TODO: 実際の走者進塁処理を実装
+        // 走者プレーをログに記録（打席フロー側と同様）
+        await this.recordBaserunningEvent(result, runner, runnerId);
+
+        // 3アウトチェンジ判定
+        if (gameManager.currentGame.outs >= 3 && previousOuts < 3) {
+            // 打席継続フラグを立てる
+            gameManager.currentGame.batterContinuesNextInning = true;
+
+            await gameManager.saveGame();
+            this.updateGameDisplay();
+
+            this.showSuccess(`${i18n.t(result)} を記録しました（3アウトチェンジ、打席継続）`);
+
+            // イニング終了処理
+            await gameManager.endHalfInning();
+            this.updateCurrentInningDisplay();
+            this.loadInningHistory();
+            return;
+        }
 
         await gameManager.saveGame();
         this.updateGameDisplay();
