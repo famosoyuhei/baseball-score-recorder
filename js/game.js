@@ -1443,6 +1443,99 @@ class GameManager {
     }
 
     /**
+     * 走者プレー（盗塁・牽制・ボーク等）の取り消し。
+     * プレー直前のスナップショット（recordBaserunningPlay で記録）から状態を復元する。
+     * プレーで3アウトチェンジした場合はイニング遷移ごと巻き戻し、
+     * 試合終了（pending_confirm）になった場合も試合状態を 'active' に戻す。
+     * （ビデオ判定で最終アウトが覆るケースに対応、2026-11-19 追加）
+     * @param {Object} snap - プレー直前の状態
+     * @returns {Promise<{crossedInning: boolean}>} イニング遷移を巻き戻したかどうか
+     */
+    async undoBaserunningPlay(snap) {
+        if (!this.currentGame || !snap) return { crossedInning: false };
+
+        const g = this.currentGame;
+        const finishedId = snap.inningId ?? null;
+        const currentId = this.currentInning?.id ?? null;
+        const crossed = !!finishedId && !!currentId && finishedId !== currentId;
+        const pendingEnd = !crossed && !!finishedId && currentId === finishedId &&
+            g.status === 'pending_confirm';
+
+        if (crossed || pendingEnd) {
+            // 終了したイニングを特定する
+            const finished = pendingEnd
+                ? this.currentInning
+                : g.innings.find(i => i.id === finishedId);
+            if (finished) {
+                // イニング最終値（投手統計の逆算用。endHalfInning が配分した値そのもの）
+                const finalStats = {
+                    runs: finished.runs ?? 0,
+                    earnedRuns: finished.earnedRuns ?? 0,
+                    hits: finished.hits ?? 0,
+                    errors: finished.errors ?? 0
+                };
+
+                if (crossed) {
+                    // 遷移先の空イニング（startInning が保存したもの）を破棄する
+                    if (this.currentInning && this.currentInning.id !== finishedId) {
+                        await storage.deleteData('innings', this.currentInning.id);
+                    }
+                    this.currentInning = finished;
+                }
+
+                // 投手統計の逆算・スコア・試合状態の巻き戻し（既存の仕組みを利用）
+                await this.undoEndHalfInning({
+                    runs: finalStats.runs,
+                    earnedRuns: finalStats.earnedRuns,
+                    hits: finalStats.hits,
+                    errors: finalStats.errors,
+                    homeScore: snap.homeScore,
+                    awayScore: snap.awayScore
+                });
+
+                // イニング統計はプレー直前の値に戻す
+                // （undoEndHalfInning は最終値で戻すため、ここで上書きして再保存）
+                this.currentInning.runs = snap.inningRuns ?? finalStats.runs;
+                this.currentInning.earnedRuns = snap.inningEarnedRuns ?? finalStats.earnedRuns;
+                this.currentInning.hits = snap.inningHits ?? finalStats.hits;
+                this.currentInning.errors = snap.inningErrors ?? finalStats.errors;
+                await storage.saveInning(this.currentInning.toJSON());
+            }
+        } else if (this.currentInning && snap.inningRuns !== undefined) {
+            // 同じイニング内の取り消し（従来動作）
+            this.currentInning.runs = snap.inningRuns;
+        }
+
+        // プレー直前の状態を復元
+        if (snap.runnersOnBase) {
+            g.runnersOnBase = JSON.parse(JSON.stringify(snap.runnersOnBase));
+        }
+        if (snap.runnersEarnedStatus) {
+            g.runnersEarnedStatus = JSON.parse(JSON.stringify(snap.runnersEarnedStatus));
+        }
+        if (snap.runnersResponsiblePitcher) {
+            g.runnersResponsiblePitcher = JSON.parse(JSON.stringify(snap.runnersResponsiblePitcher));
+        }
+        if (snap.outs !== undefined) g.outs = snap.outs;
+        if (snap.balls !== undefined) g.balls = snap.balls;
+        if (snap.strikes !== undefined) g.strikes = snap.strikes;
+        if (snap.inningNumber !== undefined) g.currentInning = snap.inningNumber;
+        if (snap.isTopHalf !== undefined) g.isTopHalf = snap.isTopHalf;
+        if (snap.batterContinuesNextInning !== undefined) {
+            g.batterContinuesNextInning = snap.batterContinuesNextInning;
+        }
+        if (!crossed && !pendingEnd) {
+            // 遷移をまたがない場合はスコアもスナップショットに戻す
+            // （遷移ケースは undoEndHalfInning が復元済み）
+            if (snap.homeScore !== undefined) g.homeScore = snap.homeScore;
+            if (snap.awayScore !== undefined) g.awayScore = snap.awayScore;
+        }
+
+        await this.saveGame();
+        return { crossedInning: crossed || pendingEnd };
+    }
+
+    /**
      * 途中コールド時に試合が成立しているか判定する
      * @returns {{ official: boolean, completedFullInnings: number }}
      */

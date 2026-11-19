@@ -9034,10 +9034,21 @@ class BaseballApp {
                 playType,
                 snapshot: {
                     runnersOnBase: JSON.parse(JSON.stringify(g.runnersOnBase)),
+                    runnersEarnedStatus: g.runnersEarnedStatus ? JSON.parse(JSON.stringify(g.runnersEarnedStatus)) : undefined,
+                    runnersResponsiblePitcher: g.runnersResponsiblePitcher ? JSON.parse(JSON.stringify(g.runnersResponsiblePitcher)) : undefined,
                     outs: g.outs,
+                    balls: g.balls,
+                    strikes: g.strikes,
                     homeScore: g.homeScore,
                     awayScore: g.awayScore,
-                    inningRuns: gameManager.currentInning?.runs ?? 0
+                    inningId: gameManager.currentInning?.id ?? null,
+                    inningNumber: g.currentInning,
+                    isTopHalf: g.isTopHalf,
+                    inningRuns: gameManager.currentInning?.runs ?? 0,
+                    inningEarnedRuns: gameManager.currentInning?.earnedRuns ?? 0,
+                    inningHits: gameManager.currentInning?.hits ?? 0,
+                    inningErrors: gameManager.currentInning?.errors ?? 0,
+                    batterContinuesNextInning: !!g.batterContinuesNextInning
                 }
             });
 
@@ -12952,13 +12963,9 @@ class BaseballApp {
 
             } else if (last.type === 'baserunning') {
                 // 走者プレー取り消し: スナップショットから状態を復元
-                const s = last.snapshot;
-                const g = gameManager.currentGame;
-                g.runnersOnBase = s.runnersOnBase;
-                g.outs = s.outs;
-                g.homeScore = s.homeScore;
-                g.awayScore = s.awayScore;
-                if (gameManager.currentInning) gameManager.currentInning.runs = s.inningRuns;
+                // （3アウトチェンジ・試合終了をまたぐ場合はイニング遷移ごと巻き戻す）
+                await gameManager.undoBaserunningPlay(last.snapshot);
+                this.updateCurrentInningDisplay();
                 const playLabel = last.playType.replace(/_/g, '');
                 this.showSuccess(`${playLabel} を取り消しました`);
             }
