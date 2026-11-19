@@ -4656,6 +4656,17 @@ class BaseballApp {
         // 盗塁・牽制の実行
         console.log(`Runner play: ${playKey} - ${runner} - ${result}`);
 
+        // 履歴ジャーナル: 直接代入を含む一式を複合操作として捕捉する
+        const journalToken = await gameManager.journalBegin({ type: 'baserunning', detail: result });
+        try {
+            return await this._executeRunnerPlayImpl(playKey, runner, result, journalToken);
+        } catch (error) {
+            gameManager.journalAbort(journalToken);
+            throw error;
+        }
+    }
+
+    async _executeRunnerPlayImpl(playKey, runner, result, journalToken) {
         const runners = gameManager.currentGame.runnersOnBase;
         const runnerId = runners[runner];
         const previousOuts = gameManager.currentGame.outs;
@@ -4663,7 +4674,7 @@ class BaseballApp {
         // 結果に応じて塁状況とアウトを更新する
         // （打席フロー側の processBaserunningPlay と同じ処理に統一、2026-11-19 修正）
         if (result === 'steal_success') {
-            if (!runnerId) return;
+            if (!runnerId) { gameManager.journalAbort(journalToken); return; }
             runners[runner] = null;
             if (runner === 'first') {
                 runners.second = runnerId;
@@ -4681,7 +4692,7 @@ class BaseballApp {
                 gameManager.addRuns(1, (wasEarned && virtualOuts < 3) ? 1 : 0);
             }
         } else if (result === 'steal_failure' || result === 'pickoff_out') {
-            if (!runnerId) return;
+            if (!runnerId) { gameManager.journalAbort(journalToken); return; }
             runners[runner] = null;
             gameManager.currentGame.outs++;
         }
@@ -4704,6 +4715,7 @@ class BaseballApp {
             await gameManager.endHalfInning();
             this.updateCurrentInningDisplay();
             this.loadInningHistory();
+            await gameManager.journalCommit(journalToken);
             return;
         }
 
@@ -4714,12 +4726,24 @@ class BaseballApp {
 
         this.showSuccess(`${i18n.t(result)} を記録しました`);
         // 打者はそのまま（batterUnchanged）
+        await gameManager.journalCommit(journalToken);
     }
 
     async executeRunnerPlayWithAdvancement(playKey, newOuts, newRunners, runs) {
         // 暴投・捕逸等の実行
         console.log(`Runner play: ${playKey} - outs: ${newOuts}, runners:`, newRunners, `runs: ${runs}`);
 
+        // 履歴ジャーナル: 直接代入を含む一式を複合操作として捕捉する
+        const journalToken = await gameManager.journalBegin({ type: 'baserunning', detail: playKey });
+        try {
+            return await this._executeRunnerPlayWithAdvancementImpl(playKey, newOuts, newRunners, runs, journalToken);
+        } catch (error) {
+            gameManager.journalAbort(journalToken);
+            throw error;
+        }
+    }
+
+    async _executeRunnerPlayWithAdvancementImpl(playKey, newOuts, newRunners, runs, journalToken) {
         const previousOuts = gameManager.currentGame.outs;
         gameManager.currentGame.outs = newOuts;
         gameManager.currentGame.runnersOnBase = newRunners;
@@ -4742,6 +4766,7 @@ class BaseballApp {
             await gameManager.endHalfInning();
             this.updateCurrentInningDisplay();
             this.loadInningHistory();
+            await gameManager.journalCommit(journalToken);
             return;
         }
 
@@ -4751,6 +4776,7 @@ class BaseballApp {
         this.updateRunnerPlaySection();
 
         this.showSuccess(`${i18n.t(BASEBALL_CONFIG.RUNNER_PLAY_CATEGORIES[playKey].label)} を記録しました`);
+        await gameManager.journalCommit(journalToken);
     }
 
     // ========== エラーシステム ==========
@@ -9022,9 +9048,13 @@ class BaseballApp {
             return;
         }
 
+        let journalToken = null;
         try {
             const playType = selectedPlay.dataset.play;
             const runnerBase = runnerSelect.value;
+
+            // 履歴ジャーナル: 走者プレー一式を複合操作として捕捉する
+            journalToken = await gameManager.journalBegin({ type: 'baserunning', detail: playType });
 
             // プレー実行前に状態を記録（undo用）
             if (!this.pitchActionHistory) this.pitchActionHistory = [];
@@ -9053,6 +9083,9 @@ class BaseballApp {
             });
 
             await this.processBaserunningPlay(playType, runnerBase);
+            await gameManager.journalCommit(journalToken);
+            const pushedBaserunningEntry = this.pitchActionHistory[this.pitchActionHistory.length - 1];
+            if (pushedBaserunningEntry) pushedBaserunningEntry.journalSeq = gameManager.journalTopSeq();
             this._updatePitchUndoBtn();
 
             // 表示更新
@@ -9066,6 +9099,7 @@ class BaseballApp {
             runnerSelect.value = '';
 
         } catch (error) {
+            gameManager.journalAbort(journalToken);
             console.error('走者プレー記録エラー:', error);
             this.showError('走者プレーの記録に失敗しました');
         }
@@ -9429,7 +9463,18 @@ class BaseballApp {
         if (!confirm(msg)) return;
 
         try {
-            const snap = await gameManager.undoLastAtBat();
+            // 履歴ジャーナルが使える場合はジャーナルで直前の打席開始境界まで戻る。
+            // ジャーナルが無い試合（既存データ）は従来方式にフォールバックする。
+            let snap = null;
+            if (typeof gameManager.journalCanUndo === 'function' && gameManager.journalCanUndo()) {
+                const res = await gameManager.journalUndoToPreviousAtBatStart();
+                if (res) {
+                    snap = { inningNumber: res.inningNumber, isTopHalf: res.isTopHalf };
+                }
+            }
+            if (!snap) {
+                snap = await gameManager.undoLastAtBat();
+            }
 
             // イニングが変わっている可能性があるため画面全体を更新
             this.updateGameDisplay();
@@ -11402,6 +11447,17 @@ class BaseballApp {
             return;
         }
 
+        const result = selectedResult.dataset.result;
+
+        const selectedTypeEl = document.querySelector('.pitch-type-btn.selected');
+        const selectedPitchType = selectedTypeEl ? selectedTypeEl.dataset.type : null;
+
+        // 履歴ジャーナル: 打席開始を伴う場合は複合として1エントリにまとめる。
+        // ファウルフライ落球はモーダル側の recordPitch が個別に捕捉するため対象外。
+        const journalToken = result !== 'foul_fly_dropped'
+            ? await gameManager.journalBegin({ type: 'pitch', detail: result }, { atBatStart: !gameManager.currentAtBat })
+            : null;
+
         try {
             // 打席が開始されていない場合は開始
             if (!gameManager.currentAtBat) {
@@ -11409,14 +11465,10 @@ class BaseballApp {
                 await gameManager.startAtBat(batter.name, batter.battingOrder);
             }
 
-            const result = selectedResult.dataset.result;
-
-            const selectedTypeEl = document.querySelector('.pitch-type-btn.selected');
-            const selectedPitchType = selectedTypeEl ? selectedTypeEl.dataset.type : null;
-
             // 死球の場合は特別処理（打席完了）
             if (result === 'hit_by_pitch') {
                 await this.processHitByPitch(selectedPitchType);
+                await gameManager.journalCommit(journalToken);
                 return;
             }
 
@@ -11438,6 +11490,9 @@ class BaseballApp {
             // アクション履歴に積む
             if (!this.pitchActionHistory) this.pitchActionHistory = [];
             this.pitchActionHistory.push({ type: 'pitch', result });
+            await gameManager.journalCommit(journalToken);
+            const pushedPitchEntry = this.pitchActionHistory[this.pitchActionHistory.length - 1];
+            if (pushedPitchEntry) pushedPitchEntry.journalSeq = gameManager.journalTopSeq();
             this._updatePitchUndoBtn();
 
             // 表示更新
@@ -11479,6 +11534,7 @@ class BaseballApp {
             }
 
         } catch (error) {
+            gameManager.journalAbort(journalToken);
             console.error('投球記録エラー:', error);
             this.showError('投球の記録に失敗しました');
         }
@@ -12960,6 +13016,42 @@ class BaseballApp {
         const last = history[history.length - 1];
 
         try {
+            // 履歴ジャーナルが使える場合はジャーナルで1ステップ戻る（対象範囲の操作のみ）。
+            // ジャーナルが無い試合や対象外の操作は従来方式にフォールバックする。
+            if (typeof gameManager.journalCanUndo === 'function' && gameManager.journalCanUndo()) {
+                let journalUsed = false;
+                if (last.type === 'baserunning' && last.journalSeq &&
+                    last.journalSeq === gameManager.journalTopSeq()) {
+                    journalUsed = await gameManager.journalUndo();
+                    if (journalUsed) {
+                        this.updateCurrentInningDisplay();
+                        const playLabel = last.playType.replace(/_/g, '');
+                        this.showSuccess(`${playLabel} を取り消しました`);
+                    }
+                } else if (last.type === 'pitch' && gameManager.currentAtBat?.pitches.length &&
+                    last.journalSeq && last.journalSeq === gameManager.journalTopSeq()) {
+                    journalUsed = await gameManager.journalUndo();
+                    if (journalUsed) {
+                        this.showSuccess('前球を取り消しました');
+                    }
+                } else if (last.type === 'pitch' && !gameManager.currentAtBat &&
+                    !history.some(h => h.type === 'baserunning')) {
+                    // 打席を完了させた最後の1球（結果エントリ＋投球エントリを戻す）
+                    journalUsed = await gameManager.journalUndoCompletedAtBatLastPitch();
+                    if (journalUsed) {
+                        this.updateCurrentInningDisplay();
+                        this.showSuccess('前球を取り消しました');
+                    }
+                }
+                if (journalUsed) {
+                    history.pop();
+                    this._updatePitchUndoBtn();
+                    this.updateGameDisplay();
+                    this.updatePitchDisplay();
+                    return;
+                }
+            }
+
             if (last.type === 'pitch') {
                 if (gameManager.currentAtBat?.pitches.length) {
                     // 打席継続中: 投球取り消し（currentAtBat.pitches の末尾を削除）

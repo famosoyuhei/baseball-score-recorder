@@ -5,6 +5,417 @@ class GameManager {
         this.currentAtBat = null;
         this.isRecording = false;
         this.currentBattingOrder = { home: 1, away: 1 };
+        // 履歴ジャーナル（戻る・進む）の状態
+        this._journal = { entries: [], redo: [], seq: 0 };
+        this._captureDepth = 0;
+        this._pendingEntry = null;
+        this._journalSuspended = 0;
+    }
+
+    // ===== 履歴ジャーナル（戻る・進む） =====
+    // 設計: docs/design/history-journal.md
+    // 各操作の直前に「集約状態のスナップショット＋ストレージ上の記録ID集合」を
+    // エントリとして保存し、戻る時は前状態を復元して ID 集合に無い記録を削除する。
+    // 操作の種類に依存しないため、複合操作でも同じ手順で往復できる。
+
+    _journalReset() {
+        this._journal = { entries: [], redo: [], seq: 0 };
+        this._captureDepth = 0;
+        this._pendingEntry = null;
+    }
+
+    _journalClone(value) {
+        return value === null || value === undefined
+            ? null
+            : JSON.parse(JSON.stringify(value));
+    }
+
+    _journalSerializeGame() {
+        if (!this.currentGame) return null;
+        const g = this.currentGame;
+        const json = typeof g.toJSON === 'function' ? g.toJSON() : { ...g };
+        // Game.toJSON に含まれないメモリ上の状態もスナップショットに含める
+        json.recordingMode = g.recordingMode ?? null;
+        json.runnersEarnedStatus = g.runnersEarnedStatus ?? null;
+        json.runnersResponsiblePitcher = g.runnersResponsiblePitcher ?? null;
+        json.batterContinuesNextInning = !!g.batterContinuesNextInning;
+        json.pendingFinalStatus = g.pendingFinalStatus ?? null;
+        json.endTime = g.endTime ?? null;
+        json.winner = g.winner ?? null;
+        return this._journalClone(json);
+    }
+
+    _journalSerializeAtBat() {
+        if (!this.currentAtBat) return null;
+        const ab = this.currentAtBat;
+        const json = typeof ab.toJSON === 'function' ? ab.toJSON() : { ...ab };
+        // AtBat.toJSON に含まれない投球配列も含める（復元時に打席途中の状態を再現するため）
+        json.pitches = (ab.pitches || []).map(p =>
+            typeof p.toJSON === 'function' ? p.toJSON() : { ...p });
+        return this._journalClone(json);
+    }
+
+    _journalSnapshotState() {
+        return {
+            game: this._journalSerializeGame(),
+            currentInning: this.currentInning
+                ? this._journalClone(typeof this.currentInning.toJSON === 'function'
+                    ? this.currentInning.toJSON() : { ...this.currentInning })
+                : null,
+            currentAtBat: this._journalSerializeAtBat(),
+            currentBattingOrder: this._journalClone(this.currentBattingOrder || { home: 1, away: 1 }),
+            isRecording: !!this.isRecording
+        };
+    }
+
+    _journalRestoreState(state) {
+        if (!state) return;
+
+        if (state.game) {
+            const game = Game.fromJSON(this._journalClone(state.game));
+            // fromJSON の正規化（classification への folderName 補完など）で
+            // スナップショットと異なる形にならないよう、そのままの値を戻す
+            if (state.game.classification) {
+                game.classification = this._journalClone(state.game.classification);
+            }
+            game.innings = (game.innings || []).map(i =>
+                i && typeof i === 'object' ? Inning.fromJSON(this._journalClone(i)) : i);
+            if (game.players) {
+                for (const team of ['home', 'away']) {
+                    game.players[team] = (game.players[team] || []).map(p =>
+                        p && typeof p === 'object' ? Player.fromJSON(this._journalClone(p)) : p);
+                }
+            }
+            this.currentGame = game;
+        } else {
+            this.currentGame = null;
+        }
+
+        this.currentInning = state.currentInning
+            ? Inning.fromJSON(this._journalClone(state.currentInning))
+            : null;
+
+        if (state.currentAtBat) {
+            const atBat = AtBat.fromJSON(this._journalClone(state.currentAtBat));
+            atBat.pitches = (state.currentAtBat.pitches || []).map(p =>
+                Pitch.fromJSON(this._journalClone(p)));
+            this.currentAtBat = atBat;
+        } else {
+            this.currentAtBat = null;
+        }
+
+        this.currentBattingOrder = this._journalClone(state.currentBattingOrder) || { home: 1, away: 1 };
+        this.isRecording = !!state.isRecording;
+    }
+
+    async _journalCollectRecordIds() {
+        const ids = { innings: [], atBats: [], pitches: [] };
+        const gameId = this.currentGame?.id;
+        if (gameId === null || gameId === undefined) return ids;
+
+        try {
+            ids.innings = (await storage.getInningsByGame(gameId)).map(r => r.id);
+        } catch (e) { /* 収集失敗時は空のまま（復元時の削除対象が減るだけ） */ }
+
+        if (typeof storage.getDataByIndex === 'function') {
+            try {
+                ids.atBats = (await storage.getDataByIndex('atBats', 'gameId', gameId)).map(r => r.id);
+            } catch (e) { /* noop */ }
+            try {
+                ids.pitches = (await storage.getDataByIndex('pitches', 'gameId', gameId)).map(r => r.id);
+            } catch (e) { /* noop */ }
+        }
+
+        if (!ids.atBats.length && ids.innings.length) {
+            // フォールバック: gameId インデックスが使えない環境ではイニング経由で収集
+            for (const inningId of ids.innings) {
+                try {
+                    const abs = await storage.getAtBatsByInning(inningId);
+                    for (const ab of abs) {
+                        ids.atBats.push(ab.id);
+                        try {
+                            const ps = await storage.getPitchesByAtBat(ab.id);
+                            for (const p of ps) {
+                                if (!ids.pitches.includes(p.id)) ids.pitches.push(p.id);
+                            }
+                        } catch (e) { /* noop */ }
+                    }
+                } catch (e) { /* noop */ }
+            }
+        }
+
+        return ids;
+    }
+
+    /**
+     * ジャーナル捕捉を開始する。既に捕捉中の場合は入れ子として外側のエントリに合流する。
+     * @param {{type: string, detail?: string}} label
+     * @param {{atBatStart?: boolean}} options
+     * @returns {Promise<{nested: boolean}|null>} commit/abort に渡すトークン。捕捉しない場合は null
+     */
+    async journalBegin(label = {}, options = {}) {
+        if (!this._journal) this._journalReset();
+        if (this._journalSuspended > 0 || !this.currentGame) return null;
+        if (this._captureDepth > 0) {
+            this._captureDepth++;
+            return { nested: true };
+        }
+
+        const before = this._journalSnapshotState();
+        const recordIds = await this._journalCollectRecordIds();
+        this._pendingEntry = {
+            gameId: this.currentGame.id,
+            seq: 0,
+            label: { type: label.type || 'unknown', detail: label.detail || '' },
+            createdAt: new Date().toISOString(),
+            before,
+            recordIds,
+            atBatStart: !!options.atBatStart ||
+                (before.currentAtBat === null &&
+                    (label.type === 'startAtBat' || label.type === 'recordAtBatQuick'))
+        };
+        this._captureDepth = 1;
+        return { nested: false };
+    }
+
+    /** 捕捉を確定する。成功した操作だけを呼ぶこと。新しい操作の確定で Redo は破棄される。 */
+    async journalCommit(token) {
+        if (!token) return;
+        if (token.nested) {
+            this._captureDepth = Math.max(0, this._captureDepth - 1);
+            return;
+        }
+        this._captureDepth = 0;
+        const entry = this._pendingEntry;
+        this._pendingEntry = null;
+        if (!entry) return;
+
+        entry.seq = ++this._journal.seq;
+        this._journal.entries.push(entry);
+        // 新しい操作を記録した瞬間に Redo スタックを破棄する（ブラウザ式、GameChanger と同じ）
+        this._journal.redo = [];
+        await this._journalPersistEntry(entry);
+    }
+
+    /** 捕捉を破棄する（操作が例外で失敗した場合）。 */
+    journalAbort(token) {
+        if (!token) return;
+        if (token.nested) {
+            this._captureDepth = Math.max(0, this._captureDepth - 1);
+            return;
+        }
+        this._captureDepth = 0;
+        this._pendingEntry = null;
+    }
+
+    async _journalPersistEntry(entry) {
+        if (typeof storage.saveHistoryEntry !== 'function') return;
+        try {
+            await storage.saveHistoryEntry({
+                gameId: entry.gameId,
+                seq: entry.seq,
+                label: entry.label,
+                createdAt: entry.createdAt,
+                before: entry.before,
+                recordIds: entry.recordIds,
+                atBatStart: !!entry.atBatStart
+            });
+        } catch (e) {
+            console.warn('履歴ジャーナルの保存に失敗:', e);
+        }
+    }
+
+    async _journalDeletePersisted(entry) {
+        if (typeof storage.deleteHistoryEntry !== 'function') return;
+        try {
+            await storage.deleteHistoryEntry(entry.gameId, entry.seq);
+        } catch (e) { /* noop */ }
+    }
+
+    async _journalLoadPersisted(gameId) {
+        this._journalReset();
+        if (typeof storage.getHistoryByGame !== 'function') return;
+        try {
+            const entries = await storage.getHistoryByGame(gameId);
+            this._journal.entries = (entries || []).map(e => ({
+                ...e,
+                label: e.label || { type: 'unknown', detail: '' }
+            }));
+            this._journal.seq = this._journal.entries.reduce(
+                (max, e) => Math.max(max, e.seq || 0), 0);
+        } catch (e) {
+            // ジャーナルが無い試合は空から開始する
+            this._journalReset();
+        }
+    }
+
+    async _journalDeleteRecordsNotIn(currentIds, keepIds) {
+        for (const store of ['innings', 'atBats', 'pitches']) {
+            const keep = new Set(keepIds?.[store] || []);
+            for (const id of currentIds?.[store] || []) {
+                if (!keep.has(id)) {
+                    try {
+                        await storage.deleteData(store, id);
+                    } catch (e) { /* noop */ }
+                }
+            }
+        }
+    }
+
+    async _journalSaveRestored() {
+        if (!this.currentGame) return;
+        await this.saveGame();
+    }
+
+    /** ジャーナルを1ステップ戻る。戻せた場合は true。 */
+    async journalUndo() {
+        if (!this._journal) this._journalReset();
+        const entry = this._journal.entries[this._journal.entries.length - 1];
+        if (!entry || !this.currentGame) return false;
+
+        // 離脱時の状態（Redo 用）と、削除される記録の実体を退避する
+        const leavingState = this._journalSnapshotState();
+        const leavingIds = await this._journalCollectRecordIds();
+        const keep = {
+            innings: new Set(entry.recordIds?.innings || []),
+            atBats: new Set(entry.recordIds?.atBats || []),
+            pitches: new Set(entry.recordIds?.pitches || [])
+        };
+        const stash = { innings: [], atBats: [], pitches: [] };
+        for (const store of ['innings', 'atBats', 'pitches']) {
+            for (const id of leavingIds[store] || []) {
+                if (!keep[store].has(id)) {
+                    try {
+                        const rec = await storage.getData(store, id);
+                        if (rec) stash[store].push(rec);
+                    } catch (e) { /* noop */ }
+                }
+            }
+        }
+
+        this._journalRestoreState(entry.before);
+        await this._journalDeleteRecordsNotIn(leavingIds, entry.recordIds);
+        await this._journalSaveRestored();
+
+        this._journal.entries.pop();
+        this._journal.redo.push({
+            label: entry.label,
+            before: leavingState,
+            recordIds: leavingIds,
+            records: stash,
+            atBatStart: !!entry.atBatStart
+        });
+        await this._journalDeletePersisted(entry);
+        return true;
+    }
+
+    /** ジャーナルを1ステップ進める（Redo）。進められた場合は true。 */
+    async journalRedo() {
+        if (!this._journal) this._journalReset();
+        const redoEntry = this._journal.redo[this._journal.redo.length - 1];
+        if (!redoEntry || !this.currentGame) return false;
+
+        const leavingState = this._journalSnapshotState();
+        const leavingIds = await this._journalCollectRecordIds();
+        const entry = {
+            gameId: this.currentGame.id,
+            seq: ++this._journal.seq,
+            label: redoEntry.label,
+            createdAt: new Date().toISOString(),
+            before: leavingState,
+            recordIds: leavingIds,
+            atBatStart: !!redoEntry.atBatStart
+        };
+
+        this._journalRestoreState(redoEntry.before);
+        await this._journalDeleteRecordsNotIn(leavingIds, redoEntry.recordIds);
+        // Undo 時に退避した記録を元の ID のまま復活させる
+        for (const store of ['innings', 'atBats', 'pitches']) {
+            for (const rec of redoEntry.records?.[store] || []) {
+                try {
+                    await storage.saveData(store, this._journalClone(rec));
+                } catch (e) { /* noop */ }
+            }
+        }
+        await this._journalSaveRestored();
+
+        this._journal.entries.push(entry);
+        await this._journalPersistEntry(entry);
+        this._journal.redo.pop();
+        return true;
+    }
+
+    journalCanUndo() {
+        return !!(this._journal?.entries?.length);
+    }
+
+    journalCanRedo() {
+        return !!(this._journal?.redo?.length);
+    }
+
+    journalTopSeq() {
+        const entries = this._journal?.entries;
+        return entries && entries.length ? entries[entries.length - 1].seq : 0;
+    }
+
+    journalTopLabelType() {
+        const entries = this._journal?.entries;
+        return entries && entries.length ? (entries[entries.length - 1].label?.type || null) : null;
+    }
+
+    /**
+     * 「前打席に戻す」用: 直前の打席開始境界までジャーナルを繰り返し戻る。
+     * @returns {Promise<{inningNumber, isTopHalf, undone}|null>}
+     */
+    async journalUndoToPreviousAtBatStart() {
+        if (!this.journalCanUndo()) return null;
+        let undone = 0;
+        while (this.journalCanUndo()) {
+            const top = this._journal.entries[this._journal.entries.length - 1];
+            const ok = await this.journalUndo();
+            if (!ok) break;
+            undone++;
+            if (top.atBatStart) break;
+            if (undone >= 1000) break;
+        }
+        if (!undone) return null;
+        return {
+            inningNumber: this.currentGame?.currentInning ?? null,
+            isTopHalf: this.currentGame?.isTopHalf ?? null,
+            undone
+        };
+    }
+
+    /**
+     * 打席を完了させた最後の1球の取り消し（ジャーナル版）。
+     * 完了エントリ（打席結果）と最後の投球エントリを戻し、打席途中の状態を復元する。
+     * ジャーナルで再現できない場合は false を返し、呼び出し側は従来方式にフォールバックする。
+     */
+    async journalUndoCompletedAtBatLastPitch() {
+        if (!this._journal) this._journalReset();
+        if (this.currentAtBat || !this.journalCanUndo()) return false;
+        const topType = this.journalTopLabelType();
+        if (topType !== 'recordAtBatResult' && topType !== 'recordAtBatQuick') return false;
+
+        const ok = await this.journalUndo();
+        if (!ok) return false;
+
+        // 最後の1球のエントリも戻す（投球が記録されていた打席のみ）
+        if (this.currentAtBat && (this.currentAtBat.pitches?.length || 0) > 0 &&
+            this.journalCanUndo() && this.journalTopLabelType() === 'pitch') {
+            await this.journalUndo();
+        }
+        return true;
+    }
+
+    /** 従来の取消機構の内部処理ではジャーナル捕捉を止めるためのラッパー */
+    async _withoutJournal(fn) {
+        this._journalSuspended = (this._journalSuspended || 0) + 1;
+        try {
+            return await fn();
+        } finally {
+            this._journalSuspended--;
+        }
     }
 
     async createNewGame(homeTeam, awayTeam, recordingLevel, playerDetailLevel, recordingMode = 'bench') {
@@ -21,6 +432,9 @@ class GameManager {
             console.log('Game saved with ID:', gameId);
 
             this.currentGame.id = gameId;
+
+            // 新規試合ではジャーナルを空から開始する
+            this._journalReset();
 
             await this.startInning(1, true);
             console.log('Initial inning started');
@@ -56,6 +470,9 @@ class GameManager {
             console.log('💾 Saving cleaned player data...');
             await this.saveGame();
         }
+
+        // 保存済みの履歴ジャーナルがあれば読み込む（無い試合は空から開始）
+        await this._journalLoadPersisted(gameId);
 
         return this.currentGame;
     }
@@ -167,6 +584,18 @@ class GameManager {
     }
 
     async startAtBat(playerId, battingOrder) {
+        const journalToken = await this.journalBegin({ type: 'startAtBat' }, { atBatStart: true });
+        try {
+            const result = await this._startAtBatImpl(playerId, battingOrder);
+            await this.journalCommit(journalToken);
+            return result;
+        } catch (error) {
+            this.journalAbort(journalToken);
+            throw error;
+        }
+    }
+
+    async _startAtBatImpl(playerId, battingOrder) {
         if (!this.currentInning) {
             throw new Error('イニングが開始されていません');
         }
@@ -209,6 +638,18 @@ class GameManager {
     }
 
     async recordPitch(pitchData) {
+        const journalToken = await this.journalBegin({ type: 'pitch', detail: pitchData?.result || '' });
+        try {
+            const result = await this._recordPitchImpl(pitchData);
+            await this.journalCommit(journalToken);
+            return result;
+        } catch (error) {
+            this.journalAbort(journalToken);
+            throw error;
+        }
+    }
+
+    async _recordPitchImpl(pitchData) {
         if (!this.currentAtBat) {
             throw new Error('打席が開始されていません');
         }
@@ -295,6 +736,18 @@ class GameManager {
     }
 
     async recordAtBatResult(result, resultDetail = '', runs = 0, rbis = 0, earnedRuns = null, options = {}) {
+        const journalToken = await this.journalBegin({ type: 'recordAtBatResult', detail: result || '' });
+        try {
+            const value = await this._recordAtBatResultImpl(result, resultDetail, runs, rbis, earnedRuns, options);
+            await this.journalCommit(journalToken);
+            return value;
+        } catch (error) {
+            this.journalAbort(journalToken);
+            throw error;
+        }
+    }
+
+    async _recordAtBatResultImpl(result, resultDetail = '', runs = 0, rbis = 0, earnedRuns = null, options = {}) {
         if (!this.currentAtBat) {
             throw new Error('打席が開始されていません');
         }
@@ -1487,6 +1940,11 @@ class GameManager {
      * @returns {Promise<Object|null>} 復元した場合は { pitchesReapplied }、対象が無い場合は null
      */
     async undoCompletedAtBatLastPitch() {
+        // 従来方式の取消はジャーナル捕捉の対象外（内部で recordPitch 等を再適用するため）
+        return this._withoutJournal(() => this._undoCompletedAtBatLastPitchImpl());
+    }
+
+    async _undoCompletedAtBatLastPitchImpl() {
         if (!this.currentGame || this.currentAtBat) return null;
 
         const allAtBats = await this.getAllAtBats();
@@ -2565,6 +3023,11 @@ class GameManager {
      * @returns {Object} 復元後のスナップショット（UI更新用）
      */
     async undoLastAtBat() {
+        // 従来方式の取消はジャーナル捕捉の対象外（フォールバック経路として残す）
+        return this._withoutJournal(() => this._undoLastAtBatImpl());
+    }
+
+    async _undoLastAtBatImpl() {
         if (!this.currentGame) throw new Error('試合が読み込まれていません');
 
         // 確定済みの試合は変更不可
@@ -2658,6 +3121,7 @@ class GameManager {
      * @param {Object} options - オプション情報
      */
     async recordAtBatQuick(result, options = {}) {
+        const journalToken = await this.journalBegin({ type: 'recordAtBatQuick', detail: result || '' });
         try {
             // 打席が開始されていない場合は開始
             if (!this.currentAtBat) {
@@ -2710,8 +3174,10 @@ class GameManager {
             this.currentAtBat = null;
             await this.saveGame();
 
+            await this.journalCommit(journalToken);
             return true;
         } catch (error) {
+            this.journalAbort(journalToken);
             console.error('クイック記録エラー:', error);
             throw error;
         }

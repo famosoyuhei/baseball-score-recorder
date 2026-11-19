@@ -1,7 +1,7 @@
 class BaseballStorage {
     constructor() {
         this.dbName = 'BaseballScoreDB';
-        this.dbVersion = 1;
+        this.dbVersion = 2;
         this.db = null;
     }
 
@@ -58,6 +58,13 @@ class BaseballStorage {
             const pitchStore = this.db.createObjectStore('pitches', { keyPath: 'id', autoIncrement: true });
             pitchStore.createIndex('gameId', 'gameId', { unique: false });
             pitchStore.createIndex('atBatId', 'atBatId', { unique: false });
+        }
+
+        // 履歴ジャーナル（戻る・進む）用ストア。キーは (gameId, seq) の複合キー。
+        if (!this.db.objectStoreNames.contains('history')) {
+            const historyStore = this.db.createObjectStore('history', { keyPath: ['gameId', 'seq'] });
+            historyStore.createIndex('gameId', 'gameId', { unique: false });
+            historyStore.createIndex('seq', 'seq', { unique: false });
         }
 
         console.log('オブジェクトストア作成完了');
@@ -184,6 +191,55 @@ class BaseballStorage {
         });
     }
 
+    // ===== 履歴ジャーナル（history ストア） =====
+
+    async saveHistoryEntry(entry) {
+        if (!this.db) {
+            throw new Error('Database not initialized');
+        }
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['history'], 'readwrite');
+            const store = transaction.objectStore('history');
+            const request = store.put({ ...entry });
+
+            request.onsuccess = () => {
+                resolve(request.result);
+            };
+
+            request.onerror = () => {
+                reject(request.error);
+            };
+        });
+    }
+
+    async getHistoryByGame(gameId) {
+        const entries = await this.getDataByIndex('history', 'gameId', gameId);
+        return entries.sort((a, b) => a.seq - b.seq);
+    }
+
+    async deleteHistoryEntry(gameId, seq) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['history'], 'readwrite');
+            const store = transaction.objectStore('history');
+            const request = store.delete([gameId, seq]);
+
+            request.onsuccess = () => {
+                resolve();
+            };
+
+            request.onerror = () => {
+                reject(request.error);
+            };
+        });
+    }
+
+    async clearHistory(gameId) {
+        const entries = await this.getHistoryByGame(gameId);
+        for (const entry of entries) {
+            await this.deleteHistoryEntry(entry.gameId, entry.seq);
+        }
+    }
+
     async deleteGame(gameId) {
         const transaction = this.db.transaction(['games', 'innings', 'atBats', 'pitches'], 'readwrite');
 
@@ -202,6 +258,11 @@ class BaseballStorage {
                     await this.deleteData('pitches', pitch.id);
                 }
             }
+        }
+
+        // 履歴ジャーナルも試合と同寿命のため一緒に削除する
+        if (this.db && this.db.objectStoreNames.contains('history')) {
+            await this.clearHistory(gameId);
         }
     }
 
