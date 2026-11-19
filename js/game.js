@@ -1443,6 +1443,94 @@ class GameManager {
     }
 
     /**
+     * ハーフイニング終了の取り消し（イニング単位記録用、2026-11-19 追加）。
+     * endHalfInning で次のハーフへ遷移済みの場合も、遷移先のイニングに
+     * 打席が記録されていなければ遷移ごと巻き戻す。
+     * 試合終了（pending_confirm）で遷移していない場合は従来どおり undoEndHalfInning で戻す。
+     * @param {Object} snap - 終了直前の状態（runs/earnedRuns/hits/errors/homeScore/awayScore/inningId/newInningId）
+     * @returns {Promise<boolean>} 取り消せたかどうか
+     */
+    async reopenHalfInning(snap) {
+        if (!this.currentGame || !snap?.inningId || !this.currentInning) return false;
+
+        if (this.currentInning.id === snap.inningId) {
+            // 遷移していない（試合終了の確定待ちなど）
+            await this.undoEndHalfInning(snap);
+            return true;
+        }
+
+        // 遷移済み: 現在のイニングが遷移先そのもので、打席が記録されていない場合のみ戻せる
+        if (snap.newInningId && this.currentInning.id !== snap.newInningId) return false;
+        const atBats = await storage.getAtBatsByInning(this.currentInning.id);
+        if (atBats.length > 0) return false;
+
+        const finished = this.currentGame.innings.find(i => i.id === snap.inningId);
+        if (!finished) return false;
+
+        // 遷移先の空イニングを破棄し、終了したイニングを現在のイニングに戻す
+        await storage.deleteData('innings', this.currentInning.id);
+        this.currentInning = finished;
+        await this.undoEndHalfInning(snap);
+
+        // 回・表裏を終了したイニングに合わせる（undoEndHalfInning は触らないため）
+        this.currentGame.currentInning = finished.inning;
+        this.currentGame.isTopHalf = finished.isTopHalf;
+        await this.saveGame();
+        return true;
+    }
+
+    /**
+     * 打席を完了させた最後の1球の取り消し（1球単位記録用、2026-11-19 追加）。
+     * 完了済み打席を undoLastAtBat で打席開始時点まで巻き戻し、
+     * 最後の1球を除いた投球を新しい打席へ再適用して「打席の途中」の状態を復元する。
+     * これにより、ビデオ判定で判定が覆った後に最後の1球だけを記録し直せる。
+     * @returns {Promise<Object|null>} 復元した場合は { pitchesReapplied }、対象が無い場合は null
+     */
+    async undoCompletedAtBatLastPitch() {
+        if (!this.currentGame || this.currentAtBat) return null;
+
+        const allAtBats = await this.getAllAtBats();
+        if (!allAtBats.length) return null;
+        const lastAtBat = allAtBats[allAtBats.length - 1];
+
+        const pitches = await storage.getPitchesByAtBat(lastAtBat.id);
+        if (!pitches.length) return null;
+
+        const surviving = pitches.slice(0, -1);
+        const playerId = lastAtBat.playerId;
+        const battingOrder = lastAtBat.battingOrder;
+        const pitchCountsBefore = this.currentGame.pitchCounts
+            ? { ...this.currentGame.pitchCounts } : null;
+
+        // 打席開始時点まで巻き戻す（イニング遷移・試合終了も含めて復元される）
+        await this.undoLastAtBat();
+
+        // 同じ打者の打席を再開し、最後の1球以外の投球を再適用する
+        await this.startAtBat(playerId, battingOrder);
+        for (const p of surviving) {
+            await this.recordPitch({
+                pitchType: p.pitchType ?? null,
+                velocity: p.velocity ?? null,
+                location: p.location ?? null,
+                result: p.result
+            });
+        }
+
+        // 投球数を補正する（undoLastAtBat は pitchCounts を再計算しないため、
+        // 「最後の1球だけを取り消した」状態に合わせる）
+        if (pitchCountsBefore && this.currentGame.pitchCounts && this.currentInning) {
+            const pitchingTeam = this.currentInning.isTopHalf ? 'home' : 'away';
+            if (pitchCountsBefore[pitchingTeam] !== undefined) {
+                this.currentGame.pitchCounts[pitchingTeam] =
+                    Math.max(0, pitchCountsBefore[pitchingTeam] - 1);
+            }
+        }
+
+        await this.saveGame();
+        return { pitchesReapplied: surviving.length };
+    }
+
+    /**
      * 走者プレー（盗塁・牽制・ボーク等）の取り消し。
      * プレー直前のスナップショット（recordBaserunningPlay で記録）から状態を復元する。
      * プレーで3アウトチェンジした場合はイニング遷移ごと巻き戻し、
@@ -2500,8 +2588,14 @@ class GameManager {
 
         // ---- 空イニングを全件クリーンアップ ----
         // endHalfInning()→startInning()で生成されたInning Bなど孤立空イニングも含めて削除
+        // ※ 遷移先のイニングは currentInning であって game.innings に含まれないため、
+        //   候補に加えないとストレージに残り、再読み込み時に幽霊イニングとして復活する
+        const inningsToCheck = [...this.currentGame.innings];
+        if (this.currentInning?.id && !inningsToCheck.some(i => i.id === this.currentInning.id)) {
+            inningsToCheck.push(this.currentInning);
+        }
         const survivingInnings = [];
-        for (const inn of [...this.currentGame.innings]) {
+        for (const inn of inningsToCheck) {
             const abs = await storage.getAtBatsByInning(inn.id);
             if (abs.length === 0) {
                 await storage.deleteData('innings', inn.id);

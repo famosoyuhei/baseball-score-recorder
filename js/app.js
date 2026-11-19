@@ -9348,9 +9348,14 @@ class BaseballApp {
         this._updateInningUndoBtn();
     }
 
-    undoLastInningAction() {
+    async undoLastInningAction() {
         if (!gameManager.currentInning || !this.inningActionHistory?.length) return;
         const last = this.inningActionHistory.pop();
+        if (last.type === 'endHalfInning') {
+            // イニング終了の取り消し（履歴の復元と表示更新は _undoEndHalfInning 側で行う）
+            await this._undoEndHalfInning();
+            return;
+        }
         if (last.type === 'runs') {
             gameManager.undoRuns(last.amount);
         } else if (last.type === 'hit') {
@@ -9412,6 +9417,8 @@ class BaseballApp {
             btn.textContent = `${base}: ${i18n.t('markUnearned') || '−自責点'}`;
         } else if (last.type === 'undoUnearned') {
             btn.textContent = `${base}: ${i18n.t('undoMarkUnearned') || '+自責点'}`;
+        } else if (last.type === 'endHalfInning') {
+            btn.textContent = `${base}: ${i18n.t('endHalfInning') || '攻撃終了'}`;
         }
     }
 
@@ -9475,7 +9482,7 @@ class BaseballApp {
     async endHalfInning() {
         if (!gameManager.currentInning) return;
 
-        // スナップショットを保存（pending_confirm 時の「戻す」ボタン用）
+        // スナップショットを保存（終了の取り消し用）
         this._endHalfInningSnap = {
             runs: gameManager.currentInning.runs,
             earnedRuns: gameManager.currentInning.earnedRuns ?? 0,
@@ -9483,6 +9490,7 @@ class BaseballApp {
             errors: gameManager.currentInning.errors,
             homeScore: gameManager.currentGame.homeScore,
             awayScore: gameManager.currentGame.awayScore,
+            inningId: gameManager.currentInning.id,
             inningActionHistory: [...(this.inningActionHistory || [])]
         };
 
@@ -9491,7 +9499,15 @@ class BaseballApp {
 
         try {
             await gameManager.endHalfInning();
-            this.inningActionHistory = [];
+
+            if (gameManager.currentGame?.status === 'active') {
+                // 試合継続: 次のハーフで何も記録されていない間は終了を取り消せるよう、
+                // スナップショットを保持し、取消履歴に「イニング終了」を積む
+                this._endHalfInningSnap.newInningId = gameManager.currentInning?.id ?? null;
+                this.inningActionHistory = [{ type: 'endHalfInning' }];
+            } else {
+                this.inningActionHistory = [];
+            }
             this._updateInningUndoBtn();
             this.updateGameDisplay();
             this.updateCurrentInningDisplay();
@@ -9499,11 +9515,6 @@ class BaseballApp {
 
             if (document.getElementById('inningNotes')) {
                 document.getElementById('inningNotes').value = '';
-            }
-
-            // 試合が終了しなかった（次イニングへ進んだ）場合はスナップショット不要
-            if (gameManager.currentGame?.status === 'active') {
-                this._endHalfInningSnap = null;
             }
         } catch (error) {
             this._endHalfInningSnap = null;
@@ -12950,16 +12961,27 @@ class BaseballApp {
 
         try {
             if (last.type === 'pitch') {
-                // 投球取り消し: currentAtBat.pitches の末尾を削除
-                if (!gameManager.currentAtBat?.pitches.length) {
+                if (gameManager.currentAtBat?.pitches.length) {
+                    // 打席継続中: 投球取り消し（currentAtBat.pitches の末尾を削除）
+                    const lastPitch = gameManager.currentAtBat.pitches.pop();
+                    gameManager.currentGame.balls = lastPitch.count.balls;
+                    gameManager.currentGame.strikes = lastPitch.count.strikes;
+                    if (lastPitch.id) await storage.deleteData('pitches', lastPitch.id);
+                    this.showSuccess('前球を取り消しました');
+                } else if (!gameManager.currentAtBat && !history.some(h => h.type === 'baserunning')) {
+                    // 打席を完了させた最後の1球: 打席途中の状態まで復元する
+                    // （イニング遷移・試合終了をまたいでいても戻せる）
+                    const restored = await gameManager.undoCompletedAtBatLastPitch();
+                    if (!restored) {
+                        this.showError('取り消す投球がありません');
+                        return;
+                    }
+                    this.updateCurrentInningDisplay();
+                    this.showSuccess('前球を取り消しました');
+                } else {
                     this.showError('取り消す投球がありません');
                     return;
                 }
-                const lastPitch = gameManager.currentAtBat.pitches.pop();
-                gameManager.currentGame.balls = lastPitch.count.balls;
-                gameManager.currentGame.strikes = lastPitch.count.strikes;
-                if (lastPitch.id) await storage.deleteData('pitches', lastPitch.id);
-                this.showSuccess('前球を取り消しました');
 
             } else if (last.type === 'baserunning') {
                 // 走者プレー取り消し: スナップショットから状態を復元
@@ -13301,7 +13323,11 @@ class BaseballApp {
             return;
         }
         try {
-            await gameManager.undoEndHalfInning(snap);
+            const ok = await gameManager.reopenHalfInning(snap);
+            if (!ok) {
+                this.showError(i18n.t('nothingToUndo') || '取り消す操作がありません');
+                return;
+            }
             this._endHalfInningSnap = null;
             this.inningActionHistory = snap.inningActionHistory || [];
             this._updateInningUndoBtn();
